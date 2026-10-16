@@ -1,0 +1,243 @@
+<!-- KB 지식베이스 -->
+<style>
+  .quick-filters { display:flex; gap:6px; flex-wrap:wrap; margin-bottom:16px; }
+  .quick-filter { padding:5px 14px; border-radius:20px; font-size:13px; border:1px solid var(--border); background:var(--surface); cursor:pointer; transition:all 0.15s; color:var(--text-sub); }
+  .quick-filter.active { background:var(--primary); color:#fff; border-color:var(--primary); }
+  .quick-filter:hover:not(.active) { background:var(--bg); }
+  .kb-layout { display:flex; gap:16px; }
+  .kb-table-col { flex:1; min-width:0; }
+  .kb-detail-col { width:360px; flex-shrink:0; }
+  @media (max-width:768px) {
+    .kb-layout { flex-direction:column; }
+    .kb-detail-col { width:100%; }
+  }
+  .detail-section { margin-bottom:16px; }
+  .detail-section h4 { font-size:12px; font-weight:600; text-transform:uppercase; color:var(--text-hint); letter-spacing:0.05em; margin-bottom:8px; }
+  .detail-section p { font-size:13px; line-height:1.7; white-space:pre-wrap; }
+  .keyword-tags { display:flex; flex-wrap:wrap; gap:4px; }
+  .keyword-tag { padding:2px 8px; background:var(--primary-light); color:var(--primary); border-radius:20px; font-size:11px; }
+</style>
+
+<div class="flex-between mb-3">
+  <input type="text" class="form-input" id="kb-search" placeholder="제목, 키워드로 검색..." oninput="renderTable()" style="max-width:360px;">
+  <button class="btn btn-primary" onclick="openModal()">+ 새 KB</button>
+</div>
+<div class="quick-filters" id="quick-filters">
+  <span class="quick-filter" onclick="toggleFilter(this,'GPU')">GPU</span>
+  <span class="quick-filter" onclick="toggleFilter(this,'NVLink')">NVLink</span>
+  <span class="quick-filter" onclick="toggleFilter(this,'RAID')">RAID</span>
+  <span class="quick-filter" onclick="toggleFilter(this,'드라이버')">드라이버</span>
+  <span class="quick-filter" onclick="toggleFilter(this,'원격관리')">원격관리</span>
+  <span class="quick-filter" onclick="toggleFilter(this,'부품교체')">부품교체</span>
+  <span class="quick-filter" onclick="toggleFilter(this,'펌웨어')">펌웨어</span>
+</div>
+
+<div class="kb-layout">
+  <div class="kb-table-col">
+    <div class="card" style="padding:0;overflow:hidden;">
+      <div class="table-wrap">
+      <table class="table table-clickable">
+        <thead>
+          <tr>
+            <th>제목</th><th>관련벤더</th><th>키워드</th><th>등록일</th>
+          </tr>
+        </thead>
+        <tbody id="kb-tbody"></tbody>
+      </table>
+      </div>
+      <div id="kb-empty" class="empty-state" style="display:none;">
+        <div class="empty-icon">📖</div><div>등록된 지식베이스가 없습니다</div>
+      </div>
+    </div>
+  </div>
+  <div class="kb-detail-col" id="kb-detail-col" style="display:none;">
+    <div class="card" id="detail-panel"></div>
+  </div>
+</div>
+
+<!-- 모달 -->
+<div class="modal-overlay" id="kb-modal" style="display:none;" onclick="if(event.target===this)closeModal()">
+  <div class="modal">
+    <div class="modal-header">
+      <h3 id="modal-title">새 KB 등록</h3>
+      <button class="modal-close" onclick="closeModal()">×</button>
+    </div>
+    <div class="modal-body">
+      <input type="hidden" id="edit-id">
+      <div class="form-group">
+        <label class="form-label">제목 *</label>
+        <input type="text" class="form-input" id="f-title" placeholder="문제 제목">
+      </div>
+      <div class="form-group">
+        <label class="form-label">증상</label>
+        <textarea class="form-textarea" id="f-symptom" rows="3" placeholder="발생 증상 설명"></textarea>
+      </div>
+      <div class="form-group">
+        <label class="form-label">원인</label>
+        <textarea class="form-textarea" id="f-cause" rows="3" placeholder="원인 분석"></textarea>
+      </div>
+      <div class="form-group">
+        <label class="form-label">조치순서</label>
+        <textarea class="form-textarea" id="f-solution" rows="5" placeholder="해결 방법 및 순서"></textarea>
+      </div>
+      <div class="form-row">
+        <div class="form-group">
+          <label class="form-label">관련벤더 (콤마 구분)</label>
+          <input type="text" class="form-input" id="f-vendors" placeholder="Dell, HPE, Supermicro">
+        </div>
+        <div class="form-group">
+          <label class="form-label">키워드 (콤마 구분)</label>
+          <input type="text" class="form-input" id="f-keywords" placeholder="GPU, 드라이버, 설치">
+        </div>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn" onclick="closeModal()">취소</button>
+      <button class="btn btn-primary" onclick="saveKB()">저장</button>
+    </div>
+  </div>
+</div>
+
+<script>
+FS.requireAuth();
+
+function toArr(v) {
+  if (!v) return [];
+  return Array.isArray(v) ? v : String(v).split(',').map(s => s.trim()).filter(Boolean);
+}
+
+let allArticles = [];
+let activeFilters = new Set();
+let kbSelectedId = null;
+
+function esc(s) {
+  return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+
+function init() {
+  activeFilters.clear();
+  kbSelectedId = null;
+  document.querySelectorAll('.quick-filter').forEach(el => el.classList.remove('active'));
+  const uid = FS.getCurrentUser().uid;
+  FS.watch([['kb_articles', [['user_id', '==', uid]]]], ([articles]) => {
+    allArticles = articles;
+    allArticles.sort((a,b) => (b.created_at?.seconds||0) - (a.created_at?.seconds||0));
+    renderTable();
+    // 열려 있는 상세 패널 갱신
+    if (kbSelectedId) showDetail(kbSelectedId);
+  });
+}
+
+function toggleFilter(el, tag) {
+  if (activeFilters.has(tag)) { activeFilters.delete(tag); el.classList.remove('active'); }
+  else { activeFilters.add(tag); el.classList.add('active'); }
+  renderTable();
+}
+
+function renderTable() {
+  const q = document.getElementById('kb-search').value.toLowerCase();
+  let data = allArticles.filter(a => {
+    const matchQ = !q || a.title?.toLowerCase().includes(q) || toArr(a.keywords).some(k=>k.toLowerCase().includes(q));
+    const matchF = activeFilters.size === 0 || [...activeFilters].some(f => toArr(a.keywords).some(k=>k.includes(f)));
+    return matchQ && matchF;
+  });
+  if (kbSelectedId && !data.find(a => a.id === kbSelectedId)) {
+    kbSelectedId = null;
+    document.getElementById('kb-detail-col').style.display = 'none';
+  }
+  const tbody = document.getElementById('kb-tbody');
+  document.getElementById('kb-empty').style.display = data.length ? 'none' : '';
+  tbody.innerHTML = data.map(a => `
+    <tr onclick="showDetail('${a.id}')">
+      <td style="font-weight:500;">${FS.esc(a.title||'')}</td>
+      <td>${FS.esc(toArr(a.related_vendors).join(', ')||'-')}</td>
+      <td>${toArr(a.keywords).map(k=>`<span class="keyword-tag">${FS.esc(k)}</span>`).join(' ')}</td>
+      <td>${FS.formatDate(a.created_at)||'-'}</td>
+    </tr>`).join('');
+}
+
+function showDetail(id) {
+  kbSelectedId = id;
+  const a = allArticles.find(x=>x.id===id);
+  if (!a) return;
+  document.getElementById('kb-detail-col').style.display = '';
+  document.getElementById('detail-panel').innerHTML = `
+    <div class="flex-between mb-3">
+      <span style="font-weight:600;font-size:14px;">${esc(a.title||'')}</span>
+      <div class="flex gap-1">
+        <button class="btn btn-sm" onclick="openModal('${id}')">수정</button>
+        <button class="btn btn-sm btn-danger" onclick="deleteKB('${id}')">삭제</button>
+        <button class="btn btn-ghost btn-sm" onclick="document.getElementById('kb-detail-col').style.display='none'">✕</button>
+      </div>
+    </div>
+    ${a.symptom ? `<div class="detail-section"><h4>증상</h4><p>${esc(a.symptom)}</p></div>` : ''}
+    ${a.cause ? `<div class="detail-section"><h4>원인</h4><p>${esc(a.cause)}</p></div>` : ''}
+    ${a.solution ? `<div class="detail-section"><h4>조치순서</h4><p>${esc(a.solution)}</p></div>` : ''}
+    <div class="detail-section">
+      <h4>키워드</h4>
+      <div class="keyword-tags">${toArr(a.keywords).map(k=>`<span class="keyword-tag">${esc(k)}</span>`).join('')}</div>
+    </div>
+    ${toArr(a.related_vendors).length ? `<div class="detail-section"><h4>관련벤더</h4><p>${esc(toArr(a.related_vendors).join(', '))}</p></div>` : ''}
+    <div class="text-hint" style="font-size:11px;margin-top:8px;">등록일: ${FS.formatDate(a.created_at)||'-'}</div>`;
+}
+
+function openModal(id) {
+  const modal = document.getElementById('kb-modal');
+  modal.style.display = 'flex';
+  if (id) {
+    const a = allArticles.find(x=>x.id===id);
+    document.getElementById('modal-title').textContent = 'KB 수정';
+    document.getElementById('edit-id').value = id;
+    document.getElementById('f-title').value = a.title||'';
+    document.getElementById('f-symptom').value = a.symptom||'';
+    document.getElementById('f-cause').value = a.cause||'';
+    document.getElementById('f-solution').value = a.solution||'';
+    document.getElementById('f-vendors').value = toArr(a.related_vendors).join(', ');
+    document.getElementById('f-keywords').value = toArr(a.keywords).join(', ');
+  } else {
+    document.getElementById('modal-title').textContent = '새 KB 등록';
+    document.getElementById('edit-id').value = '';
+    ['f-title','f-symptom','f-cause','f-solution','f-vendors','f-keywords'].forEach(id=>document.getElementById(id).value='');
+  }
+}
+
+function closeModal() { document.getElementById('kb-modal').style.display='none'; }
+
+async function saveKB() {
+  const title = document.getElementById('f-title').value.trim();
+  if (!title) { Toast.error('제목을 입력하세요'); return; }
+  const data = {
+    user_id: FS.getCurrentUser().uid,
+    title,
+    symptom: document.getElementById('f-symptom').value.trim(),
+    cause: document.getElementById('f-cause').value.trim(),
+    solution: document.getElementById('f-solution').value.trim(),
+    related_vendors: document.getElementById('f-vendors').value.split(',').map(s=>s.trim()).filter(Boolean),
+    keywords: document.getElementById('f-keywords').value.split(',').map(s=>s.trim()).filter(Boolean),
+  };
+  const id = document.getElementById('edit-id').value;
+  if (id) {
+    await FS.update('kb_articles', id, data);
+    const idx = allArticles.findIndex(x=>x.id===id);
+    if (idx>=0) allArticles[idx] = {...allArticles[idx], ...data};
+    Toast.success('수정되었습니다');
+  } else {
+    const newId = await FS.add('kb_articles', data);
+    allArticles.unshift({id:newId, ...data});
+    Toast.success('KB가 등록되었습니다');
+  }
+  closeModal();
+  renderTable();
+}
+
+async function deleteKB(id) {
+  if (!await Dialog.confirm('이 아티클을 삭제하시겠습니까?', true)) return;
+  await FS.remove('kb_articles', id);
+  allArticles = allArticles.filter(x=>x.id!==id);
+  renderTable();
+  if (kbSelectedId===id) document.getElementById('kb-detail-col').style.display='none';
+  Toast.success('아티클이 삭제되었습니다');
+}
+
+init();
+</script>

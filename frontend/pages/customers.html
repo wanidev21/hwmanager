@@ -1,0 +1,772 @@
+<!-- 고객사·프로젝트·장비 -->
+<style>
+.cust-layout { display:flex; gap:16px; align-items:flex-start; }
+.cust-col-left { width:290px; flex-shrink:0; }
+.cust-col-right { flex:1; min-width:0; }
+@media (max-width:960px) {
+  .cust-layout { flex-direction:column; }
+  .cust-col-left { width:100%; }
+}
+.cust-item {
+  padding:10px 14px; border-bottom:1px solid var(--border);
+  cursor:pointer; transition:background 0.1s;
+  display:flex; align-items:center; justify-content:space-between; gap:8px;
+}
+.cust-item:last-child { border-bottom:none; }
+.cust-item:hover { background:var(--bg); }
+.cust-item.active { background:#fdf0eb; border-left:3px solid var(--primary); padding-left:11px; }
+.cust-item-info { flex:1; min-width:0; }
+.cust-item-name { font-size:13px; font-weight:600; color:var(--text); overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.cust-item-meta { font-size:11px; color:var(--text-hint); margin-top:2px; }
+.cust-item-actions { display:none; gap:3px; flex-shrink:0; }
+.cust-item:hover .cust-item-actions { display:flex; }
+.cust-item.active .cust-item-actions { display:flex; }
+
+.panel-hdr {
+  display:flex; align-items:center; justify-content:space-between;
+  padding:11px 14px; border-bottom:1px solid var(--border); gap:8px; flex-wrap:wrap;
+}
+.breadcrumb { display:flex; align-items:center; gap:6px; font-size:13px; overflow:hidden; flex:1; min-width:0; }
+.bc-link { color:var(--primary); cursor:pointer; font-weight:500; white-space:nowrap; flex-shrink:0; }
+.bc-link:hover { text-decoration:underline; }
+.bc-cur { font-weight:600; color:var(--text); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.bc-sep { color:var(--text-hint); flex-shrink:0; }
+</style>
+
+<div class="flex-between mb-3">
+  <div style="font-size:16px;font-weight:600;">고객사 관리</div>
+  <button class="btn btn-primary" onclick="openCustModal()">+ 고객사 등록</button>
+</div>
+
+<div class="cust-layout">
+  <!-- 좌측: 고객사 목록 -->
+  <div class="cust-col-left">
+    <div class="card" style="padding:0;overflow:hidden;">
+      <div style="padding:10px 12px;border-bottom:1px solid var(--border);">
+        <input type="text" class="form-input" id="cust-search"
+          placeholder="고객사 검색..." oninput="renderCustomers()" style="margin:0;">
+      </div>
+      <div id="cust-list" style="max-height:calc(100vh - 238px);overflow-y:auto;"></div>
+      <div id="cust-empty" class="empty-state" style="display:none;">
+        <div class="empty-icon">🏢</div><div>등록된 고객사가 없습니다</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 우측: 프로젝트 / 장비 패널 -->
+  <div class="cust-col-right">
+    <!-- 기본 안내 -->
+    <div id="right-placeholder" class="card"
+      style="display:flex;align-items:center;justify-content:center;height:160px;color:var(--text-hint);font-size:13px;">
+      ← 고객사를 선택하면 프로젝트 목록이 표시됩니다
+    </div>
+
+    <!-- 프로젝트 패널 -->
+    <div id="proj-panel" style="display:none;">
+      <div class="card" style="padding:0;overflow:hidden;">
+        <div class="panel-hdr">
+          <div class="breadcrumb">
+            <span id="bc-cust-name" class="bc-cur"></span>
+            <span class="bc-sep">›</span>
+            <span style="color:var(--text-hint);font-size:12px;">프로젝트</span>
+          </div>
+          <button class="btn btn-primary btn-sm" onclick="openProjModal()">+ 프로젝트 추가</button>
+        </div>
+        <div style="overflow-x:auto;">
+          <table class="table table-clickable">
+            <thead>
+              <tr>
+                <th>프로젝트명</th><th>벤더</th><th>장비유형</th>
+                <th>등록장비</th><th>설치일</th><th>워런티만료</th><th>상태</th>
+                <th style="width:90px;"></th>
+              </tr>
+            </thead>
+            <tbody id="proj-tbody"></tbody>
+          </table>
+        </div>
+        <div id="proj-empty" class="empty-state" style="display:none;">
+          <div class="empty-icon">📦</div><div>등록된 프로젝트가 없습니다</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- 장비 패널 -->
+    <div id="asset-panel" style="display:none;">
+      <div class="card" style="padding:0;overflow:hidden;">
+        <div class="panel-hdr">
+          <div class="breadcrumb">
+            <span id="bc-cust-name2" class="bc-link" onclick="backToProjects()"></span>
+            <span class="bc-sep">›</span>
+            <span id="bc-proj-name" class="bc-cur"></span>
+          </div>
+          <div class="flex gap-1">
+            <button class="btn btn-sm" onclick="backToProjects()">← 프로젝트</button>
+            <button class="btn btn-sm" onclick="downloadCsvTemplate()">↓ 템플릿</button>
+            <button class="btn btn-sm" onclick="document.getElementById('csv-import-input').click()">CSV 일괄 추가</button>
+            <button class="btn btn-primary btn-sm" onclick="openAssetModal()">+ 장비 추가</button>
+          </div>
+        </div>
+        <div style="overflow-x:auto;">
+          <table class="table table-clickable">
+            <thead>
+              <tr>
+                <th>Hostname</th><th>S/N</th><th>IP</th><th>OS</th>
+                <th>상태</th><th>BMC버전</th><th>드라이버버전</th>
+                <th style="width:90px;"></th>
+              </tr>
+            </thead>
+            <tbody id="asset-tbody"></tbody>
+          </table>
+        </div>
+        <div id="asset-empty" class="empty-state" style="display:none;">
+          <div class="empty-icon">🖥</div><div>등록된 장비가 없습니다</div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+<input type="file" id="csv-import-input" accept=".csv" style="display:none;" onchange="importAssetCsv(this)">
+
+<!-- 고객사 모달 -->
+<div class="modal-overlay" id="cust-modal" style="display:none;" onclick="if(event.target===this)closeCustModal()">
+  <div class="modal">
+    <div class="modal-header">
+      <h3 id="cust-modal-title">고객사 등록</h3>
+      <button class="modal-close" onclick="closeCustModal()">×</button>
+    </div>
+    <div class="modal-body">
+      <input type="hidden" id="f-cust-id">
+      <div class="form-row">
+        <div class="form-group"><label class="form-label">고객사명 *</label><input type="text" class="form-input" id="f-cust-name" placeholder="(주)예시회사"></div>
+        <div class="form-group"><label class="form-label">담당자</label><input type="text" class="form-input" id="f-cust-contact" placeholder="홍길동"></div>
+      </div>
+      <div class="form-row">
+        <div class="form-group"><label class="form-label">연락처</label><input type="text" class="form-input" id="f-cust-phone" placeholder="010-0000-0000"></div>
+        <div class="form-group"><label class="form-label">이메일</label><input type="email" class="form-input" id="f-cust-email" placeholder="contact@company.com"></div>
+      </div>
+      <div class="form-group"><label class="form-label">주소</label><input type="text" class="form-input" id="f-cust-address"></div>
+      <div class="form-group"><label class="form-label">메모</label><textarea class="form-textarea" id="f-cust-memo" rows="2"></textarea></div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn" onclick="closeCustModal()">취소</button>
+      <button class="btn btn-primary" onclick="saveCustomer()">저장</button>
+    </div>
+  </div>
+</div>
+
+<!-- 프로젝트 모달 -->
+<div class="modal-overlay" id="proj-modal" style="display:none;" onclick="if(event.target===this)closeProjModal()">
+  <div class="modal" style="max-width:560px;">
+    <div class="modal-header">
+      <h3 id="proj-modal-title">프로젝트 추가</h3>
+      <button class="modal-close" onclick="closeProjModal()">×</button>
+    </div>
+    <div class="modal-body">
+      <input type="hidden" id="f-proj-id">
+      <div class="form-group">
+        <label class="form-label">프로젝트명 *</label>
+        <input type="text" class="form-input" id="f-proj-name" placeholder="DGX H100 도입 프로젝트">
+      </div>
+      <div class="form-row">
+        <div class="form-group">
+          <label class="form-label">벤더</label>
+          <input type="text" class="form-input" id="f-proj-vendor" list="vendor-list" placeholder="DELL, HPE, DGX...">
+          <datalist id="vendor-list">
+            <option value="DGX"><option value="DELL"><option value="HPE">
+            <option value="Lenovo"><option value="OEM">
+          </datalist>
+        </div>
+        <div class="form-group">
+          <label class="form-label">장비유형</label>
+          <input type="text" class="form-input" id="f-proj-device-type" list="device-type-list" placeholder="서버, GPU서버...">
+          <datalist id="device-type-list">
+            <option value="서버"><option value="GPU서버"><option value="워크스테이션">
+            <option value="스위치"><option value="스토리지">
+          </datalist>
+        </div>
+      </div>
+      <div class="form-row">
+        <div class="form-group">
+          <label class="form-label">대수</label>
+          <input type="number" class="form-input" id="f-proj-quantity" min="1" placeholder="1">
+        </div>
+        <div class="form-group">
+          <label class="form-label">설치일</label>
+          <input type="date" class="form-input" id="f-proj-install-date">
+        </div>
+      </div>
+      <div class="form-group">
+        <label class="form-label">워런티 만료일</label>
+        <input type="date" class="form-input" id="f-proj-warranty">
+      </div>
+      <div class="form-group">
+        <label class="form-label">메모</label>
+        <textarea class="form-textarea" id="f-proj-memo" rows="2"></textarea>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn" onclick="closeProjModal()">취소</button>
+      <button class="btn btn-primary" onclick="saveProject()">저장</button>
+    </div>
+  </div>
+</div>
+
+<!-- 장비 모달 -->
+<div class="modal-overlay" id="asset-modal" style="display:none;" onclick="if(event.target===this)closeAssetModal()">
+  <div class="modal" style="max-width:640px;">
+    <div class="modal-header">
+      <h3 id="asset-modal-title">장비 추가</h3>
+      <button class="modal-close" onclick="closeAssetModal()">×</button>
+    </div>
+    <div class="modal-body">
+      <input type="hidden" id="f-asset-id">
+      <div class="form-row">
+        <div class="form-group"><label class="form-label">Hostname *</label><input type="text" class="form-input" id="f-asset-hostname" placeholder="server-01"></div>
+        <div class="form-group"><label class="form-label">장비유형</label><input type="text" class="form-input" id="f-asset-device-type" placeholder="서버, GPU서버..."></div>
+      </div>
+      <div class="form-row">
+        <div class="form-group"><label class="form-label">모델명</label><input type="text" class="form-input" id="f-asset-model" placeholder="PowerEdge R750"></div>
+        <div class="form-group"><label class="form-label">S/N</label><input type="text" class="form-input" id="f-asset-serial" placeholder="시리얼번호"></div>
+      </div>
+      <div class="form-row">
+        <div class="form-group"><label class="form-label">위치</label><input type="text" class="form-input" id="f-asset-location" placeholder="서버실 Rack-A01"></div>
+        <div class="form-group"><label class="form-label">IP 주소</label><input type="text" class="form-input" id="f-asset-ip" placeholder="192.168.1.10"></div>
+      </div>
+      <div class="form-row">
+        <div class="form-group"><label class="form-label">OS</label><input type="text" class="form-input" id="f-asset-os" placeholder="Ubuntu 22.04"></div>
+        <div class="form-group"><label class="form-label">상태</label>
+          <select class="form-select" id="f-asset-status">
+            <option>운영중</option><option>장애</option><option>점검중</option><option>폐기</option>
+          </select>
+        </div>
+      </div>
+      <div class="form-row">
+        <div class="form-group"><label class="form-label">CPU</label><input type="text" class="form-input" id="f-asset-cpu" placeholder="Intel Xeon Gold 6338"></div>
+        <div class="form-group"><label class="form-label">메모리</label><input type="text" class="form-input" id="f-asset-memory" placeholder="512GB DDR4"></div>
+      </div>
+      <div class="form-row">
+        <div class="form-group"><label class="form-label">GPU</label><input type="text" class="form-input" id="f-asset-gpu" placeholder="NVIDIA H100 x8"></div>
+        <div class="form-group"><label class="form-label">디스크</label><input type="text" class="form-input" id="f-asset-disk" placeholder="NVMe 3.84TB x4"></div>
+      </div>
+      <div class="form-row">
+        <div class="form-group"><label class="form-label">BMC버전</label><input type="text" class="form-input" id="f-asset-bmc" placeholder="3.00.00"></div>
+        <div class="form-group"><label class="form-label">BIOS버전</label><input type="text" class="form-input" id="f-asset-bios" placeholder="1.12.3"></div>
+      </div>
+      <div class="form-row">
+        <div class="form-group"><label class="form-label">드라이버버전</label><input type="text" class="form-input" id="f-asset-driver" placeholder="550.107.02"></div>
+        <div class="form-group"><label class="form-label">설치일</label><input type="date" class="form-input" id="f-asset-install-date"></div>
+      </div>
+      <div class="form-group">
+        <label class="form-label">벤더케이스번호</label>
+        <input type="text" class="form-input" id="f-asset-vendor-case" placeholder="DEL-2024-12345">
+      </div>
+      <div class="form-group">
+        <label class="form-label">메모</label>
+        <textarea class="form-textarea" id="f-asset-memo" rows="2"></textarea>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn" onclick="closeAssetModal()">취소</button>
+      <button class="btn btn-primary" onclick="saveAsset()">저장</button>
+    </div>
+  </div>
+</div>
+
+<script>
+FS.requireAuth();
+
+let allCustomers     = [];
+let allProjects      = [];
+let allAssets        = [];
+let selectedCustomerId = null;
+let selectedProjectId  = null;
+
+function daysLeft(dateStr) {
+  if (!dateStr) return null;
+  let d;
+  if (typeof dateStr === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(dateStr)) {
+    const [y, mo, dy] = dateStr.split('-').map(Number);
+    d = new Date(y, mo - 1, dy);
+  } else {
+    d = dateStr.toDate ? dateStr.toDate() : new Date(dateStr);
+  }
+  const today = new Date(); today.setHours(0, 0, 0, 0);
+  return Math.ceil((d - today) / 86400000);
+}
+
+function warrantyBadge(dateStr) {
+  const d = daysLeft(dateStr);
+  if (d === null) return '<span class="badge badge-gray">-</span>';
+  if (d < 0)    return '<span class="badge badge-danger">만료됨</span>';
+  if (d <= 30)  return `<span class="badge badge-danger">${d}일</span>`;
+  if (d <= 90)  return `<span class="badge badge-warning">${d}일</span>`;
+  return `<span class="badge badge-success">${d}일</span>`;
+}
+
+function escHtml(s) {
+  return (s || '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+}
+
+function init() {
+  // 페이지 재진입 시 패널은 초기 상태로 그려지므로 선택도 초기화
+  selectedCustomerId = null;
+  selectedProjectId  = null;
+  FS.watch([['customers'], ['projects'], ['assets']], ([custs, projs, assets]) => {
+    allCustomers = custs;
+    allProjects  = projs;
+    allAssets    = assets;
+    allCustomers.sort((a, b) => (a.name || '').localeCompare(b.name || ''));
+
+    // 다른 기기에서 선택 중인 항목이 삭제된 경우
+    if (selectedCustomerId && !allCustomers.some(c => c.id === selectedCustomerId)) {
+      selectedCustomerId = null; selectedProjectId = null;
+      showPanel('none');
+    } else if (selectedProjectId && !allProjects.some(p => p.id === selectedProjectId)) {
+      selectedProjectId = null;
+      showPanel('projects');
+    }
+
+    renderCustomers();
+    if (document.getElementById('proj-panel').style.display !== 'none') renderProjects();
+    if (document.getElementById('asset-panel').style.display !== 'none') renderAssets();
+  });
+}
+
+// ── 고객사 목록 ──────────────────────────────────────────────────────────────
+function renderCustomers() {
+  const q = (document.getElementById('cust-search').value || '').toLowerCase();
+  const data = allCustomers.filter(c =>
+    !q || (c.name || '').toLowerCase().includes(q) || (c.contact || '').toLowerCase().includes(q)
+  );
+  document.getElementById('cust-empty').style.display = data.length ? 'none' : '';
+  document.getElementById('cust-list').innerHTML = data.map(c => {
+    const projCount  = allProjects.filter(p => p.customer_id === c.id).length;
+    const assetCount = allAssets.filter(a => a.customer_id === c.id).length;
+    const active = selectedCustomerId === c.id ? ' active' : '';
+    return `<div class="cust-item${active}" onclick="selectCustomer('${c.id}')">
+      <div class="cust-item-info">
+        <div class="cust-item-name">${escHtml(c.name || '')}</div>
+        <div class="cust-item-meta">프로젝트 ${projCount}개 · 장비 ${assetCount}대</div>
+      </div>
+      <div class="cust-item-actions" onclick="event.stopPropagation()">
+        <button class="btn btn-ghost btn-sm" onclick="openCustModal('${c.id}')">✏</button>
+        <button class="btn btn-ghost btn-sm" style="color:var(--danger);" onclick="deleteCustomer('${c.id}')">×</button>
+      </div>
+    </div>`;
+  }).join('');
+}
+
+function selectCustomer(id) {
+  selectedCustomerId = id;
+  selectedProjectId  = null;
+  renderCustomers();
+  showPanel('projects');
+  renderProjects();
+}
+
+// ── 패널 전환 ────────────────────────────────────────────────────────────────
+function showPanel(panel) {
+  document.getElementById('right-placeholder').style.display = panel === 'none'     ? '' : 'none';
+  document.getElementById('proj-panel').style.display         = panel === 'projects' ? '' : 'none';
+  document.getElementById('asset-panel').style.display        = panel === 'assets'   ? '' : 'none';
+}
+
+// ── 프로젝트 패널 ────────────────────────────────────────────────────────────
+function renderProjects() {
+  const c = allCustomers.find(x => x.id === selectedCustomerId);
+  document.getElementById('bc-cust-name').textContent = c?.name || '';
+  const projs = allProjects.filter(p => p.customer_id === selectedCustomerId);
+  document.getElementById('proj-empty').style.display = projs.length ? 'none' : '';
+  document.getElementById('proj-tbody').innerHTML = projs.map(p => {
+    return `<tr onclick="selectProject('${p.id}')">
+      <td style="font-weight:500;">${escHtml(p.name || '')}</td>
+      <td>${escHtml(p.vendor || '-')}</td>
+      <td>${escHtml(p.device_type || '-')}</td>
+      <td>${allAssets.filter(a => a.project_id === p.id).length}대</td>
+      <td>${FS.formatDate(p.install_date) || '-'}</td>
+      <td>${p.warranty_expire ? FS.formatDate(p.warranty_expire) : '-'}</td>
+      <td>${warrantyBadge(p.warranty_expire)}</td>
+      <td onclick="event.stopPropagation()">
+        <div class="flex gap-1">
+          <button class="btn btn-ghost btn-sm" onclick="openProjModal('${p.id}')">✏</button>
+          <button class="btn btn-ghost btn-sm" style="color:var(--danger);" onclick="deleteProject('${p.id}')">×</button>
+        </div>
+      </td>
+    </tr>`;
+  }).join('');
+}
+
+function selectProject(id) {
+  selectedProjectId = id;
+  showPanel('assets');
+  renderAssets();
+}
+
+function backToProjects() {
+  selectedProjectId = null;
+  showPanel('projects');
+  renderProjects();
+}
+
+// ── 장비 패널 ────────────────────────────────────────────────────────────────
+function renderAssets() {
+  const c = allCustomers.find(x => x.id === selectedCustomerId);
+  const p = allProjects.find(x => x.id === selectedProjectId);
+  document.getElementById('bc-cust-name2').textContent = c?.name || '';
+  document.getElementById('bc-proj-name').textContent  = p?.name || '';
+
+  const assets = allAssets.filter(a => a.project_id === selectedProjectId);
+  document.getElementById('asset-empty').style.display = assets.length ? 'none' : '';
+  document.getElementById('asset-tbody').innerHTML = assets.map(a => {
+    const sc = a.status === '운영중' ? 'badge-success' : a.status === '장애' ? 'badge-danger' : 'badge-warning';
+    return `<tr>
+      <td style="font-weight:500;">${escHtml(a.hostname || '-')}</td>
+      <td>${escHtml(a.serial || '-')}</td>
+      <td>${escHtml(a.ip_address || '-')}</td>
+      <td>${escHtml(a.os || '-')}</td>
+      <td><span class="badge ${sc}">${FS.esc(a.status || '-')}</span></td>
+      <td>${escHtml(a.bmc_version || '-')}</td>
+      <td>${escHtml(a.driver_version || '-')}</td>
+      <td onclick="event.stopPropagation()">
+        <div class="flex gap-1">
+          <button class="btn btn-ghost btn-sm" onclick="openAssetModal('${a.id}')">✏</button>
+          <button class="btn btn-ghost btn-sm" style="color:var(--danger);" onclick="deleteAsset('${a.id}')">×</button>
+        </div>
+      </td>
+    </tr>`;
+  }).join('');
+}
+
+// ── 고객사 CRUD ───────────────────────────────────────────────────────────────
+function openCustModal(id) {
+  document.getElementById('cust-modal-title').textContent = id ? '고객사 수정' : '고객사 등록';
+  document.getElementById('f-cust-id').value = id || '';
+  if (id) {
+    const c = allCustomers.find(x => x.id === id);
+    if (!c) { Toast.error('이미 삭제된 항목입니다'); return; }
+    document.getElementById('f-cust-name').value    = c.name    || '';
+    document.getElementById('f-cust-contact').value = c.contact || '';
+    document.getElementById('f-cust-phone').value   = c.phone   || '';
+    document.getElementById('f-cust-email').value   = c.email   || '';
+    document.getElementById('f-cust-address').value = c.address || '';
+    document.getElementById('f-cust-memo').value    = c.memo    || '';
+  } else {
+    ['f-cust-name','f-cust-contact','f-cust-phone','f-cust-email','f-cust-address','f-cust-memo']
+      .forEach(i => document.getElementById(i).value = '');
+  }
+  document.getElementById('cust-modal').style.display = 'flex';
+}
+function closeCustModal() { document.getElementById('cust-modal').style.display = 'none'; }
+
+async function saveCustomer() {
+  const name = document.getElementById('f-cust-name').value.trim();
+  if (!name) { Toast.error('고객사명을 입력하세요'); return; }
+  const data = {
+    name,
+    contact: document.getElementById('f-cust-contact').value.trim(),
+    phone:   document.getElementById('f-cust-phone').value.trim(),
+    email:   document.getElementById('f-cust-email').value.trim(),
+    address: document.getElementById('f-cust-address').value.trim(),
+    memo:    document.getElementById('f-cust-memo').value.trim(),
+  };
+  const id = document.getElementById('f-cust-id').value;
+  if (id) {
+    await FS.update('customers', id, data);
+    const idx = allCustomers.findIndex(x => x.id === id);
+    if (idx >= 0) allCustomers[idx] = { ...allCustomers[idx], ...data };
+  } else {
+    const newId = await FS.add('customers', data);
+    allCustomers.push({ id: newId, ...data });
+    allCustomers.sort((a, b) => (a.name || '').localeCompare(b.name || ''));
+  }
+  closeCustModal();
+  renderCustomers();
+  if (selectedCustomerId) renderProjects();
+  Toast.success(id ? '수정되었습니다' : '고객사가 등록되었습니다');
+}
+
+async function deleteCustomer(id) {
+  const projCount  = allProjects.filter(p => p.customer_id === id).length;
+  const assetCount = allAssets.filter(a => a.customer_id === id).length;
+  const msg = (projCount || assetCount)
+    ? `프로젝트 ${projCount}개, 장비 ${assetCount}대가 함께 삭제됩니다. 삭제하시겠습니까?`
+    : '삭제하시겠습니까?';
+  if (!await Dialog.confirm(msg, true)) return;
+
+  const delAssets   = allAssets.filter(a => a.customer_id === id);
+  const delProjects = allProjects.filter(p => p.customer_id === id);
+  await Promise.all([
+    ...delAssets.map(a => FS.remove('assets', a.id)),
+    ...delProjects.map(p => FS.remove('projects', p.id)),
+    FS.remove('customers', id),
+  ]);
+  allAssets    = allAssets.filter(a => a.customer_id !== id);
+  allProjects  = allProjects.filter(p => p.customer_id !== id);
+  allCustomers = allCustomers.filter(c => c.id !== id);
+  if (selectedCustomerId === id) {
+    selectedCustomerId = null; selectedProjectId = null;
+    showPanel('none');
+  }
+  renderCustomers();
+  Toast.success('삭제되었습니다');
+}
+
+// ── 프로젝트 CRUD ─────────────────────────────────────────────────────────────
+function openProjModal(id) {
+  document.getElementById('proj-modal-title').textContent = id ? '프로젝트 수정' : '프로젝트 추가';
+  document.getElementById('f-proj-id').value = id || '';
+  if (id) {
+    const p = allProjects.find(x => x.id === id);
+    if (!p) { Toast.error('이미 삭제된 항목입니다'); return; }
+    document.getElementById('f-proj-name').value         = p.name            || '';
+    document.getElementById('f-proj-vendor').value       = p.vendor          || '';
+    document.getElementById('f-proj-device-type').value  = p.device_type     || '';
+    document.getElementById('f-proj-quantity').value     = p.quantity        || '';
+    document.getElementById('f-proj-install-date').value = p.install_date    || '';
+    document.getElementById('f-proj-warranty').value     = p.warranty_expire || '';
+    document.getElementById('f-proj-memo').value         = p.memo            || '';
+  } else {
+    ['f-proj-name','f-proj-vendor','f-proj-device-type','f-proj-quantity',
+     'f-proj-install-date','f-proj-warranty','f-proj-memo']
+      .forEach(i => document.getElementById(i).value = '');
+  }
+  document.getElementById('proj-modal').style.display = 'flex';
+}
+function closeProjModal() { document.getElementById('proj-modal').style.display = 'none'; }
+
+async function saveProject() {
+  const name = document.getElementById('f-proj-name').value.trim();
+  if (!name) { Toast.error('프로젝트명을 입력하세요'); return; }
+  const data = {
+    customer_id:     selectedCustomerId,
+    name,
+    vendor:          document.getElementById('f-proj-vendor').value.trim(),
+    device_type:     document.getElementById('f-proj-device-type').value.trim(),
+    quantity:        Number(document.getElementById('f-proj-quantity').value) || 0,
+    install_date:    document.getElementById('f-proj-install-date').value,
+    warranty_expire: document.getElementById('f-proj-warranty').value,
+    memo:            document.getElementById('f-proj-memo').value.trim(),
+  };
+  const id = document.getElementById('f-proj-id').value;
+  if (id) {
+    await FS.update('projects', id, data);
+    const idx = allProjects.findIndex(x => x.id === id);
+    if (idx >= 0) allProjects[idx] = { ...allProjects[idx], ...data };
+  } else {
+    const newId = await FS.add('projects', data);
+    allProjects.push({ id: newId, ...data });
+  }
+  closeProjModal();
+  renderProjects();
+  renderCustomers();
+  Toast.success(id ? '수정되었습니다' : '프로젝트가 추가되었습니다');
+}
+
+async function deleteProject(id) {
+  const assetCount = allAssets.filter(a => a.project_id === id).length;
+  const msg = assetCount
+    ? `장비 ${assetCount}대가 함께 삭제됩니다. 삭제하시겠습니까?`
+    : '삭제하시겠습니까?';
+  if (!await Dialog.confirm(msg, true)) return;
+
+  const delAssets = allAssets.filter(a => a.project_id === id);
+  await Promise.all([
+    ...delAssets.map(a => FS.remove('assets', a.id)),
+    FS.remove('projects', id),
+  ]);
+  allAssets   = allAssets.filter(a => a.project_id !== id);
+  allProjects = allProjects.filter(p => p.id !== id);
+  if (selectedProjectId === id) { selectedProjectId = null; showPanel('projects'); }
+  renderProjects();
+  renderCustomers();
+  Toast.success('삭제되었습니다');
+}
+
+// ── 장비 CRUD ────────────────────────────────────────────────────────────────
+function openAssetModal(id) {
+  document.getElementById('asset-modal-title').textContent = id ? '장비 수정' : '장비 추가';
+  document.getElementById('f-asset-id').value = id || '';
+  if (id) {
+    const a = allAssets.find(x => x.id === id);
+    if (!a) { Toast.error('이미 삭제된 항목입니다'); return; }
+    document.getElementById('f-asset-hostname').value    = a.hostname       || '';
+    document.getElementById('f-asset-device-type').value= a.device_type    || '';
+    document.getElementById('f-asset-model').value       = a.model          || '';
+    document.getElementById('f-asset-serial').value      = a.serial         || '';
+    document.getElementById('f-asset-location').value    = a.location       || '';
+    document.getElementById('f-asset-ip').value          = a.ip_address     || '';
+    document.getElementById('f-asset-os').value          = a.os             || '';
+    document.getElementById('f-asset-status').value      = a.status         || '운영중';
+    document.getElementById('f-asset-cpu').value         = a.cpu            || '';
+    document.getElementById('f-asset-memory').value      = a.memory         || '';
+    document.getElementById('f-asset-gpu').value         = a.gpu            || '';
+    document.getElementById('f-asset-disk').value        = a.disk           || '';
+    document.getElementById('f-asset-bmc').value         = a.bmc_version    || '';
+    document.getElementById('f-asset-bios').value        = a.bios_version   || '';
+    document.getElementById('f-asset-driver').value      = a.driver_version || '';
+    document.getElementById('f-asset-install-date').value= a.install_date   || '';
+    document.getElementById('f-asset-vendor-case').value = a.vendor_case_no || '';
+    document.getElementById('f-asset-memo').value        = a.memo           || '';
+  } else {
+    ['f-asset-hostname','f-asset-device-type','f-asset-model','f-asset-serial',
+     'f-asset-location','f-asset-ip','f-asset-os','f-asset-cpu','f-asset-memory',
+     'f-asset-gpu','f-asset-disk','f-asset-bmc','f-asset-bios','f-asset-driver',
+     'f-asset-install-date','f-asset-vendor-case','f-asset-memo']
+      .forEach(i => document.getElementById(i).value = '');
+    document.getElementById('f-asset-status').value = '운영중';
+  }
+  document.getElementById('asset-modal').style.display = 'flex';
+}
+function closeAssetModal() { document.getElementById('asset-modal').style.display = 'none'; }
+
+async function saveAsset() {
+  const hostname = document.getElementById('f-asset-hostname').value.trim();
+  if (!hostname) { Toast.error('Hostname을 입력하세요'); return; }
+  const data = {
+    customer_id:    selectedCustomerId,
+    project_id:     selectedProjectId,
+    hostname,
+    device_type:    document.getElementById('f-asset-device-type').value.trim(),
+    model:          document.getElementById('f-asset-model').value.trim(),
+    serial:         document.getElementById('f-asset-serial').value.trim(),
+    location:       document.getElementById('f-asset-location').value.trim(),
+    ip_address:     document.getElementById('f-asset-ip').value.trim(),
+    os:             document.getElementById('f-asset-os').value.trim(),
+    status:         document.getElementById('f-asset-status').value,
+    cpu:            document.getElementById('f-asset-cpu').value.trim(),
+    memory:         document.getElementById('f-asset-memory').value.trim(),
+    gpu:            document.getElementById('f-asset-gpu').value.trim(),
+    disk:           document.getElementById('f-asset-disk').value.trim(),
+    bmc_version:    document.getElementById('f-asset-bmc').value.trim(),
+    bios_version:   document.getElementById('f-asset-bios').value.trim(),
+    driver_version: document.getElementById('f-asset-driver').value.trim(),
+    install_date:   document.getElementById('f-asset-install-date').value,
+    vendor_case_no: document.getElementById('f-asset-vendor-case').value.trim(),
+    memo:           document.getElementById('f-asset-memo').value.trim(),
+  };
+  const id = document.getElementById('f-asset-id').value;
+  if (id) {
+    await FS.update('assets', id, data);
+    const idx = allAssets.findIndex(x => x.id === id);
+    if (idx >= 0) allAssets[idx] = { ...allAssets[idx], ...data };
+  } else {
+    const newId = await FS.add('assets', data);
+    allAssets.push({ id: newId, ...data });
+  }
+  closeAssetModal();
+  renderAssets();
+  renderCustomers();
+  Toast.success(id ? '수정되었습니다' : '장비가 추가되었습니다');
+}
+
+async function deleteAsset(id) {
+  if (!await Dialog.confirm('이 장비를 삭제하시겠습니까?', true)) return;
+  await FS.remove('assets', id);
+  allAssets = allAssets.filter(x => x.id !== id);
+  renderAssets();
+  renderCustomers();
+  Toast.success('삭제되었습니다');
+}
+
+// ── CSV 일괄 가져오기 ─────────────────────────────────────────────────────────
+const CSV_FIELDS = [
+  'hostname','device_type','model','serial','location','ip_address','os','status',
+  'cpu','memory','gpu','disk','bmc_version','bios_version','driver_version',
+  'install_date','vendor_case_no','memo'
+];
+const CSV_LABELS = [
+  'Hostname(필수)','장비유형','모델명','S/N','위치','IP주소','OS','상태(운영중/장애/점검중/폐기)',
+  'CPU','메모리','GPU','디스크','BMC버전','BIOS버전','드라이버버전',
+  '설치일(YYYY-MM-DD)','벤더케이스번호','메모'
+];
+
+function downloadCsvTemplate() {
+  const sample = [
+    'server-01','GPU서버','DGX H100','SN123456','Rack-A01','192.168.1.10',
+    'Ubuntu 22.04','운영중','Intel Xeon Gold 6338','512GB DDR4','NVIDIA H100 x8',
+    'NVMe 3.84TB x4','3.00.00','1.12.3','550.107.02','2024-01-15','','샘플 장비'
+  ];
+  const rows = [
+    CSV_LABELS.map(h => `"${h}"`).join(','),
+    sample.map(v => `"${v}"`).join(',')
+  ];
+  const blob = new Blob(['﻿' + rows.join('\n')], { type: 'text/csv;charset=utf-8' });
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = 'asset_template.csv';
+  a.click();
+  URL.revokeObjectURL(a.href);
+}
+
+function parseCsv(text) {
+  const lines = text.replace(/\r\n/g, '\n').replace(/\r/g, '\n').split('\n');
+  const result = [];
+  for (const line of lines) {
+    if (!line.trim()) continue;
+    const row = [];
+    let field = '', inQuote = false;
+    for (let i = 0; i < line.length; i++) {
+      const c = line[i];
+      if (c === '"') {
+        if (inQuote && line[i + 1] === '"') { field += '"'; i++; }
+        else inQuote = !inQuote;
+      } else if (c === ',' && !inQuote) {
+        row.push(field); field = '';
+      } else {
+        field += c;
+      }
+    }
+    row.push(field);
+    result.push(row);
+  }
+  return result;
+}
+
+async function importAssetCsv(input) {
+  const file = input.files[0];
+  input.value = '';
+  if (!file) return;
+
+  const text = await file.text();
+  const rows = parseCsv(text);
+  if (rows.length < 2) { Toast.error('데이터 행이 없습니다'); return; }
+
+  // Map header row to field names (supports Korean labels or English field names)
+  const headerLookup = {};
+  CSV_LABELS.forEach((lbl, i) => { headerLookup[lbl.toLowerCase()] = CSV_FIELDS[i]; });
+  CSV_FIELDS.forEach(f => { headerLookup[f.toLowerCase()] = f; });
+
+  const colMap = rows[0].map(h => headerLookup[h.trim().toLowerCase()] || null);
+
+  const validRows = [];
+  const errors = [];
+  for (let i = 1; i < rows.length; i++) {
+    const row = rows[i];
+    if (row.every(c => !c.trim())) continue;
+    const obj = { customer_id: selectedCustomerId, project_id: selectedProjectId };
+    colMap.forEach((field, ci) => { if (field) obj[field] = (row[ci] || '').trim(); });
+    if (!obj.hostname) { errors.push(`행 ${i + 1}: hostname 없음`); continue; }
+    if (!obj.status) obj.status = '운영중';
+    validRows.push(obj);
+  }
+
+  if (errors.length && !validRows.length) {
+    Toast.error(errors[0]);
+    return;
+  }
+  if (!validRows.length) { Toast.error('추가할 장비가 없습니다'); return; }
+
+  try {
+    const ids = await Promise.all(validRows.map(d => FS.add('assets', d)));
+    ids.forEach((id, i) => allAssets.push({ id, ...validRows[i] }));
+    renderAssets();
+    renderCustomers();
+    renderProjects();
+    Toast.success(`${validRows.length}대 추가되었습니다`);
+  } catch (e) {
+    Toast.error('추가 중 오류: ' + e.message);
+  }
+}
+
+init();
+</script>

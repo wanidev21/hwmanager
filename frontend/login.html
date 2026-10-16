@@ -1,0 +1,229 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+  <meta name="theme-color" content="#e8540a">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-title" content="HW Manager">
+  <link rel="manifest" href="/manifest.json">
+  <link rel="apple-touch-icon" href="/static/icons/icon-192.png">
+  <title>HW Manager - 로그인</title>
+  <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-auth-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore-compat.js"></script>
+  <script src="/firebase-config.js"></script>
+  <script src="/static/js/firebase-service.js"></script>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Noto Sans KR', sans-serif;
+      background: #f7f7f5;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      min-height: 100vh;
+      color: #1a1a1a;
+    }
+
+    .login-card {
+      background: #ffffff;
+      border: 1px solid #e5e5e3;
+      border-radius: 14px;
+      box-shadow: 0 4px 24px rgba(0,0,0,0.07);
+      width: 360px;
+      padding: 44px 40px 36px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 0;
+    }
+
+    .logo-icon {
+      width: 44px;
+      height: 44px;
+      background: #e8540a;
+      border-radius: 11px;
+      color: white;
+      font-weight: 800;
+      font-size: 18px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      margin-bottom: 16px;
+    }
+    .login-title {
+      font-size: 17px;
+      font-weight: 700;
+      color: #1a1a1a;
+      margin-bottom: 6px;
+    }
+    .login-subtitle {
+      font-size: 12px;
+      color: #9b9b9b;
+      margin-bottom: 32px;
+    }
+
+    .error-box {
+      display: none;
+      width: 100%;
+      background: #fef2f2;
+      border: 1px solid #fca5a5;
+      border-radius: 8px;
+      padding: 9px 13px;
+      font-size: 12px;
+      color: #dc2626;
+      margin-bottom: 14px;
+      text-align: center;
+    }
+    .error-box.show { display: block; }
+
+    .btn-google {
+      width: 100%;
+      height: 42px;
+      background: #ffffff;
+      color: #3c4043;
+      border: 1px solid #dadce0;
+      border-radius: 8px;
+      font-size: 14px;
+      font-weight: 500;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 10px;
+      transition: background 0.15s, box-shadow 0.15s;
+      font-family: inherit;
+    }
+    .btn-google:hover  { background: #f8f9fa; box-shadow: 0 1px 4px rgba(0,0,0,0.12); }
+    .btn-google:active { background: #f1f3f4; }
+    .btn-google:disabled { opacity: 0.55; cursor: not-allowed; }
+
+    .login-note {
+      margin-top: 20px;
+      font-size: 11px;
+      color: #b0b0b0;
+      text-align: center;
+    }
+
+    @media (max-width: 480px) {
+      body {
+        align-items: flex-start;
+        padding-top: 64px;
+        padding-bottom: env(safe-area-inset-bottom);
+      }
+      .login-card {
+        width: 100%;
+        border-radius: 0;
+        border-left: none;
+        border-right: none;
+        border-top: none;
+        box-shadow: none;
+        padding: 40px 28px 32px;
+      }
+      .btn-google {
+        height: 48px;
+        font-size: 15px;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div class="login-card">
+    <div class="logo-icon">X</div>
+    <div class="login-title">HW Manager</div>
+    <div class="login-subtitle">서버 H/W 엔지니어 업무 관리</div>
+
+    <div class="error-box" id="login-error"></div>
+
+    <button class="btn-google" id="btn-google" onclick="doGoogleLogin()">
+      <svg width="18" height="18" viewBox="0 0 48 48" xmlns="http://www.w3.org/2000/svg">
+        <path fill="#EA4335" d="M24 9.5c3.54 0 6.71 1.22 9.21 3.6l6.85-6.85C35.9 2.38 30.47 0 24 0 14.62 0 6.51 5.38 2.56 13.22l7.98 6.19C12.43 13.72 17.74 9.5 24 9.5z"/>
+        <path fill="#4285F4" d="M46.98 24.55c0-1.57-.15-3.09-.38-4.55H24v9.02h12.94c-.58 2.96-2.26 5.48-4.78 7.18l7.73 6c4.51-4.18 7.09-10.36 7.09-17.65z"/>
+        <path fill="#FBBC05" d="M10.53 28.59c-.48-1.45-.76-2.99-.76-4.59s.27-3.14.76-4.59l-7.98-6.19C.92 16.46 0 20.12 0 24c0 3.88.92 7.54 2.56 10.78l7.97-6.19z"/>
+        <path fill="#34A853" d="M24 48c6.48 0 11.93-2.13 15.89-5.81l-7.73-6c-2.18 1.48-4.97 2.35-8.16 2.35-6.26 0-11.57-4.22-13.47-9.91l-7.98 6.19C6.51 42.62 14.62 48 24 48z"/>
+      </svg>
+      Google로 로그인
+    </button>
+
+    <p class="login-note">등록된 Google 계정만 이용할 수 있습니다</p>
+  </div>
+
+  <script>
+    const btn = document.getElementById('btn-google');
+
+    function showError(msg) {
+      const el = document.getElementById('login-error');
+      el.textContent = msg; el.classList.add('show');
+    }
+    function hideError() {
+      document.getElementById('login-error').classList.remove('show');
+    }
+    function handleLoginError(e) {
+      if (e.code === 'auth/popup-closed-by-user' || e.code === 'auth/cancelled-popup-request') return;
+      if (e.code === 'app/email-not-allowed') {
+        showError('등록되지 않은 계정입니다. 관리자에게 문의하세요');
+      } else if (e.code === 'auth/popup-blocked') {
+        showError('팝업이 차단되었습니다. 브라우저에서 팝업을 허용해 주세요');
+      } else {
+        showError('로그인 중 오류가 발생했습니다: ' + e.message);
+      }
+    }
+
+    async function doGoogleLogin() {
+      hideError();
+      btn.disabled = true;
+      try {
+        const result = await FS.loginWithGoogle();
+        if (!result) return; // 리다이렉트 방식: 페이지 이동 후 아래 bootstrap에서 처리
+        await FS.completeLogin(result);
+        window.location.replace('/');
+      } catch (e) {
+        handleLoginError(e);
+        btn.disabled = false;
+      }
+    }
+
+    // 리다이렉트 로그인 결과를 먼저 처리한 뒤 로그인 상태 확인
+    (async () => {
+      const btnHtml = btn.innerHTML;
+      btn.disabled = true;
+      btn.textContent = '로그인 확인 중...';
+      try {
+        const result = await FS.handleRedirectResult();
+        if (result && result.user) {
+          await FS.completeLogin(result);
+          window.location.replace('/');
+          return;
+        }
+      } catch (e) {
+        handleLoginError(e);
+      }
+      btn.innerHTML = btnHtml;
+      btn.disabled = false;
+
+      // 로그인 페이지에서 로그인된 상태 = 방금 로그인한 경우
+      // (모바일에서 리다이렉트 결과가 유실돼도 인증은 끝났으므로 그대로 진행.
+      //  만료 세션·로그아웃은 index.html에서 이미 signOut 후 이 페이지로 옴)
+      let handled = false;
+      FS.onAuthChanged(async user => {
+        if (!user || handled) return;
+        handled = true;
+        btn.disabled = true;
+        btn.textContent = '로그인 중...';
+        try {
+          await FS.completeLogin({ user });
+          window.location.replace('/');
+        } catch (e) {
+          handled = false;
+          handleLoginError(e);
+          btn.innerHTML = btnHtml;
+          btn.disabled = false;
+        }
+      });
+    })();
+  </script>
+</body>
+</html>

@@ -1,0 +1,80 @@
+<!-- 회원 관리 -->
+<div class="card" style="padding:0;overflow:hidden;">
+  <div class="table-wrap">
+  <table class="table">
+    <thead>
+      <tr><th>이름</th><th>이메일</th><th>역할</th><th>가입일</th><th style="width:160px;">역할 변경</th></tr>
+    </thead>
+    <tbody id="users-tbody"></tbody>
+  </table>
+  </div>
+  <div id="users-empty" class="empty-state" style="display:none;">
+    <div class="empty-icon">👥</div><div>회원 정보가 없습니다</div>
+  </div>
+</div>
+
+<div class="card mt-3" style="background:var(--info-bg);border-color:#bfdbfe;">
+  <div style="font-size:13px;color:var(--info);">
+    <strong>안내:</strong> 회원 가입 시 이 목록에 자동으로 등록됩니다.
+    역할을 <strong>admin</strong>으로 변경하면 회원 관리 메뉴 접근 권한이 부여됩니다.
+  </div>
+</div>
+
+<script>
+FS.requireAuth();
+
+let allUsers = [];
+
+async function init() {
+  // admin 여부 확인
+  const current = FS.getCurrentUser();
+  if (current) {
+    const me = await FS.getOne('users', current.uid);
+    if (!me || me.role !== 'admin') {
+      document.querySelector('.content').innerHTML = `
+        <div class="empty-state">
+          <div class="empty-icon">🔒</div>
+          <div>관리자 권한이 필요합니다</div>
+        </div>`;
+      return;
+    }
+  }
+
+  FS.watch([['users']], ([users]) => {
+    allUsers = users;
+    allUsers.sort((a,b)=>(a.email||'').localeCompare(b.email||''));
+    renderUsers();
+  });
+}
+
+function renderUsers() {
+  document.getElementById('users-empty').style.display = allUsers.length?'none':'';
+  document.getElementById('users-tbody').innerHTML = allUsers.map(u=>`
+    <tr>
+      <td style="font-weight:500;">${FS.esc(u.displayName||u.name||'-')}</td>
+      <td>${FS.esc(u.email||'-')}</td>
+      <td><span class="badge ${u.role==='admin'?'badge-danger':'badge-gray'}">${FS.esc(u.role||'user')}</span></td>
+      <td>${FS.formatDate(u.created_at)||'-'}</td>
+      <td>
+        <select class="form-select" style="font-size:12px;padding:3px 8px;" onchange="changeRole('${u.id}',this.value)">
+          <option ${(u.role||'user')==='user'?'selected':''} value="user">user</option>
+          <option ${u.role==='admin'?'selected':''} value="admin">admin</option>
+        </select>
+      </td>
+    </tr>`).join('');
+}
+
+async function changeRole(id, role) {
+  if (!await Dialog.confirm(`역할을 '${role}'로 변경하시겠습니까?`)) {
+    renderUsers();
+    return;
+  }
+  await FS.update('users', id, { role });
+  const u = allUsers.find(x=>x.id===id);
+  if (u) u.role = role;
+  renderUsers();
+  Toast.success(`역할이 '${role}'로 변경되었습니다`);
+}
+
+init();
+</script>

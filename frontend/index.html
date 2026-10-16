@@ -1,0 +1,524 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+  <meta name="theme-color" content="#e8540a">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="default">
+  <meta name="apple-mobile-web-app-title" content="HW Manager">
+  <link rel="manifest" href="/manifest.json">
+  <link rel="apple-touch-icon" href="/static/icons/icon-192.png">
+  <title>HW Manager</title>
+  <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-auth-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore-compat.js"></script>
+  <script src="/firebase-config.js"></script>
+  <script src="/static/js/firebase-service.js"></script>
+  <link rel="stylesheet" href="/static/css/app.css">
+</head>
+<body>
+  <div class="layout">
+    <!-- 사이드바 -->
+    <aside class="sidebar">
+      <div class="sidebar-logo" id="sidebar-logo" title="개요로 이동">
+        <div class="logo-icon">X</div>
+        <div class="logo-text">HW Manager</div>
+      </div>
+
+      <nav class="sidebar-nav">
+        <div class="nav-group-label">고객·업무</div>
+        <a class="nav-item" data-page="customers" href="#">
+          <span class="nav-icon">🏢</span> 고객사·자산
+        </a>
+        <a class="nav-item" data-page="delivery" href="#">
+          <span class="nav-icon">📋</span> 납품확인서
+        </a>
+
+        <div class="nav-group-label">장애·현황</div>
+        <a class="nav-item" data-page="tickets" href="#">
+          <span class="nav-icon">⚠️</span> 장애 티켓
+        </a>
+        <a class="nav-item" data-page="warranty" href="#">
+          <span class="nav-icon">🛡️</span> 워런티 현황
+        </a>
+
+        <div class="nav-group-label">일정·기록</div>
+        <a class="nav-item" data-page="calendar" href="#">
+          <span class="nav-icon">📅</span> 캘린더
+        </a>
+
+        <div class="nav-group-label">지식·기술</div>
+        <a class="nav-item" data-page="kb" href="#">
+          <span class="nav-icon">📖</span> 지식베이스
+        </a>
+        <a class="nav-item" data-page="tech" href="#">
+          <span class="nav-icon">🎓</span> 기술 학습
+        </a>
+
+        <div id="admin-section" style="display:none;">
+          <div class="nav-group-label">관리</div>
+          <a class="nav-item" data-page="users" href="#">
+            <span class="nav-icon">👤</span> 회원 관리
+          </a>
+        </div>
+
+        <!-- PC 전용: 폰 설치용 QR -->
+        <a class="nav-item nav-install" id="btn-install-qr" href="#">
+          <span class="nav-icon">📱</span> 모바일 설치
+        </a>
+      </nav>
+
+      <div class="sidebar-footer">
+        <div class="user-avatar" id="user-avatar">?</div>
+        <div class="user-info">
+          <div class="user-name" id="user-name"></div>
+          <div class="user-role" id="user-role"></div>
+        </div>
+        <button class="theme-toggle" id="theme-toggle" title="다크 모드 전환">🌙</button>
+        <button class="btn btn-ghost btn-sm" id="btn-logout" title="로그아웃">↩</button>
+      </div>
+    </aside>
+
+    <!-- 사이드바 오버레이 (모바일) -->
+    <div class="sidebar-overlay" id="sidebar-overlay"></div>
+
+    <!-- 메인 -->
+    <main class="main">
+      <div class="topbar">
+        <button class="topbar-menu-btn" id="btn-menu" title="메뉴" aria-label="메뉴 열기">☰</button>
+        <div style="display:flex;align-items:center;gap:6px;font-size:13px;">
+          <span id="page-group" style="color:var(--text-hint);"></span>
+          <span id="breadcrumb-sep" style="color:var(--text-hint);display:none;">/</span>
+          <span id="page-title" style="font-weight:600;color:var(--text);"></span>
+        </div>
+      </div>
+      <div class="content" id="page-content">
+        <div class="empty-state">
+          <div class="empty-icon">⏳</div>
+          <div>페이지를 불러오는 중...</div>
+        </div>
+      </div>
+    </main>
+  </div>
+
+  <!-- 모바일 설치 QR -->
+  <div class="modal-overlay" id="install-modal" style="display:none;">
+    <div class="modal" style="max-width:420px;">
+      <div class="modal-header">
+        <h3>휴대폰에 설치하기</h3>
+        <button class="modal-close" id="install-close">×</button>
+      </div>
+      <div class="modal-body" style="text-align:center;">
+        <img src="/static/icons/install-qr.svg" alt="HW Manager 설치 QR 코드"
+             style="width:200px;height:200px;margin:4px auto 8px;display:block;">
+        <div style="font-size:12px;color:var(--text-hint);margin-bottom:16px;">hwmanager-593ba.web.app</div>
+        <div style="text-align:left;font-size:13px;line-height:1.7;">
+          <div style="font-weight:600;margin-bottom:2px;">📷 폰 카메라로 QR 코드를 비추고 뜨는 링크를 누르세요</div>
+          <div style="margin-top:10px;"><b>아이폰</b> — Safari에서 열린 화면 아래 <b>공유 버튼(□↑) → 홈 화면에 추가</b></div>
+          <div style="margin-top:6px;"><b>안드로이드</b> — Chrome 오른쪽 위 <b>⋮ → 앱 설치</b> (또는 홈 화면에 추가)</div>
+          <div style="margin-top:10px;font-size:12px;color:var(--text-hint);">설치 후 홈 화면의 HW Manager 아이콘으로 실행하면 됩니다.</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 토스트 컨테이너 -->
+  <div class="toast-container" id="toast-container"></div>
+
+  <!-- PWA Service Worker -->
+  <script>
+    if ('serviceWorker' in navigator) {
+      window.addEventListener('load', () => {
+        navigator.serviceWorker.register('/sw.js').catch(() => {});
+      });
+    }
+  </script>
+
+
+  <script>
+    const PAGE_TITLES = {
+      overview:  '개요',
+      customers: '고객사·자산',
+      tickets:   '장애 티켓',
+      kb:        '지식베이스',
+      warranty:  '워런티 현황',
+      calendar:  '캘린더',
+      tech:      '기술 학습',
+      delivery:  '납품확인서',
+      users:     '회원 관리',
+    };
+
+    const PAGE_GROUPS = {
+      customers: '고객·업무',
+      delivery:  '고객·업무',
+      tickets:   '장애·현황',
+      warranty:  '장애·현황',
+      calendar:  '일정·기록',
+      kb:        '지식·기술',
+      tech:      '지식·기술',
+      users:     '관리',
+    };
+
+    let currentPage = null;
+    const _injectedPages = new Set();
+    const _pageGlobals = {};
+
+    // 스크립트 코드에서 top-level function 이름 추출
+    function _extractFuncNames(code) {
+      const re = /(?:^|[\n;{}])\s*(?:async\s+)?function\s+(\w+)\s*\(/g;
+      const names = new Set();
+      let m;
+      while ((m = re.exec(code)) !== null) names.add(m[1]);
+      return [...names];
+    }
+
+    // 페이지 로드
+    async function loadPage(page) {
+      if (currentPage === page) return;
+
+      // 이전 페이지의 실시간 구독 해제
+      FS.unwatchAll();
+
+      // 현재 페이지 전환 직전, window에 남아 있는 현재 페이지 함수 스냅샷 갱신
+      // (다른 페이지 로드로 덮어쓰이기 전에 최신 참조를 저장)
+      if (currentPage && _pageGlobals[currentPage]) {
+        Object.keys(_pageGlobals[currentPage]).forEach(k => {
+          if (typeof window[k] !== 'undefined') {
+            _pageGlobals[currentPage][k] = window[k];
+          }
+        });
+      }
+
+      currentPage = page;
+
+      document.querySelectorAll('.nav-item').forEach(el => {
+        el.classList.toggle('active', el.dataset.page === page);
+      });
+      const group = PAGE_GROUPS[page] || '';
+      document.getElementById('page-group').textContent = group;
+      document.getElementById('breadcrumb-sep').style.display = group ? '' : 'none';
+      document.getElementById('page-title').textContent = PAGE_TITLES[page] || page;
+
+      const content = document.getElementById('page-content');
+      content.innerHTML = `<div class="skeleton-page">
+        <div class="skeleton sk-title"></div>
+        <div class="skeleton sk-bar"></div>
+        <div class="skeleton sk-table"></div>
+      </div>`;
+
+      try {
+        const res = await fetch('/pages/' + page + '.html', { cache: 'no-store' });
+        if (!res.ok) throw new Error('Not found');
+        const html = await res.text();
+
+        const parser = new DOMParser();
+        const doc = parser.parseFromString(html, 'text/html');
+
+        // 스크립트·스타일 수집 및 제거 (DOMParser는 <style>을 head에 배치)
+        const scripts = [...doc.querySelectorAll('script')];
+        scripts.forEach(s => s.remove());
+        const styles = [...doc.querySelectorAll('style')];
+        styles.forEach(s => s.remove());
+
+        // HTML 삽입
+        content.innerHTML = doc.body ? doc.body.innerHTML : html;
+
+        // 페이지별 스타일 삽입
+        styles.forEach(s => {
+          const el = document.createElement('style');
+          el.textContent = s.textContent;
+          content.insertBefore(el, content.firstChild);
+        });
+
+        if (!_injectedPages.has(page)) {
+          // 최초 로드: 이 페이지가 선언하는 함수명을 미리 추출
+          const funcNames = [];
+          scripts.forEach(s => {
+            if (!s.src) funcNames.push(..._extractFuncNames(s.textContent));
+          });
+
+          // script element로 전역 주입 (window 스코프에 함수 등록)
+          for (const s of scripts) {
+            await new Promise(resolve => {
+              const el = document.createElement('script');
+              if (s.src) {
+                el.src = s.src;
+                el.onload = resolve;
+                el.onerror = resolve;
+              } else {
+                el.textContent = s.textContent;
+              }
+              document.head.appendChild(el);
+              if (!s.src) resolve();
+            });
+          }
+
+          // 이 페이지가 정의한 함수만 정확히 저장 (이름이 겹쳐도 현재 시점의 참조를 저장)
+          _pageGlobals[page] = {};
+          funcNames.forEach(name => {
+            if (typeof window[name] !== 'undefined') {
+              _pageGlobals[page][name] = window[name];
+            }
+          });
+
+          _injectedPages.add(page);
+        } else {
+          // 재방문: 이 페이지의 함수들을 window에 복원 후 init 재호출
+          Object.assign(window, _pageGlobals[page]);
+          if (typeof window.init === 'function') window.init();
+        }
+      } catch (e) {
+        console.error('Page load error:', page, e);
+        content.innerHTML = '<div class="empty-state"><div class="empty-icon">⚠️</div><div>페이지를 불러올 수 없습니다</div></div>';
+      }
+    }
+
+    // ── 모바일 사이드바 ──
+    const sidebar  = document.querySelector('.sidebar');
+    const overlay  = document.getElementById('sidebar-overlay');
+    const btnMenu  = document.getElementById('btn-menu');
+
+    function openSidebar() {
+      sidebar.classList.add('open');
+      overlay.classList.add('open');
+      document.body.style.overflow = 'hidden';
+    }
+    function closeSidebar() {
+      sidebar.classList.remove('open');
+      overlay.classList.remove('open');
+      document.body.style.overflow = '';
+    }
+
+    btnMenu.addEventListener('click', () => {
+      sidebar.classList.contains('open') ? closeSidebar() : openSidebar();
+    });
+    overlay.addEventListener('click', closeSidebar);
+
+    // 로고 클릭 → 개요
+    document.getElementById('sidebar-logo').addEventListener('click', () => {
+      document.querySelectorAll('.nav-item').forEach(el => el.classList.remove('active'));
+      currentPage = null;
+      closeSidebar();
+      loadPage('overview');
+    });
+
+    // 네비 클릭
+    document.querySelectorAll('.nav-item[data-page]').forEach(el => {
+      el.addEventListener('click', e => {
+        e.preventDefault();
+        closeSidebar();
+        loadPage(el.dataset.page);
+      });
+    });
+
+    // 모바일 설치 QR
+    const installModal = document.getElementById('install-modal');
+    document.getElementById('btn-install-qr').addEventListener('click', e => {
+      e.preventDefault();
+      installModal.style.display = 'flex';
+    });
+    document.getElementById('install-close').addEventListener('click', () => installModal.style.display = 'none');
+    installModal.addEventListener('click', e => { if (e.target === installModal) installModal.style.display = 'none'; });
+
+    // 로그아웃
+    document.getElementById('btn-logout').addEventListener('click', async () => {
+      localStorage.removeItem('hw-last-active');
+      localStorage.removeItem('gAccessToken');
+      await FS.logout();
+      window.location.href = '/login';
+    });
+
+    // ── 자동 로그아웃 (30분 비활성) ──
+    const IDLE_MS   = 30 * 60 * 1000;
+    const WARN_MS   =  5 * 60 * 1000;
+    let _idleTimer, _warnTimer, _warnEl, _lastThrottle = 0;
+
+    // onAuthStateChanged 콜백은 비동기(IndexedDB 읽기 후)로 실행되므로
+    // 그 전에 이벤트가 hw-last-active를 덮어쓰는 것을 막기 위해 스크립트 시작 시점에 캡처
+    const _sessionCheck = localStorage.getItem('hw-last-active');
+
+    function _removeWarn() {
+      if (_warnEl) { _warnEl.remove(); _warnEl = null; }
+    }
+
+    function _showIdleWarn() {
+      if (_warnEl) return;
+      _warnEl = document.createElement('div');
+      _warnEl.style.cssText = [
+        'position:fixed;bottom:24px;right:24px;z-index:9999',
+        'background:#1a1a1a;color:#fff;border-radius:8px',
+        'padding:12px 16px;font-size:13px;display:flex;align-items:center;gap:12px',
+        'box-shadow:0 4px 24px rgba(0,0,0,0.25);'
+      ].join(';');
+      _warnEl.innerHTML = `
+        <span>5분 후 자동 로그아웃됩니다</span>
+        <button id="_stay-btn" style="background:var(--primary);color:#fff;border:none;border-radius:4px;padding:4px 12px;cursor:pointer;font-size:12px;font-family:inherit;">계속 사용</button>`;
+      document.body.appendChild(_warnEl);
+      document.getElementById('_stay-btn').addEventListener('click', _resetIdle);
+    }
+
+    async function _doLogout() {
+      _removeWarn();
+      localStorage.removeItem('hw-last-active');
+      localStorage.removeItem('gAccessToken');
+      await FS.logout();
+      window.location.href = '/login';
+    }
+
+    function _resetIdle() {
+      const now = Date.now();
+      clearTimeout(_idleTimer);
+      clearTimeout(_warnTimer);
+      _removeWarn();
+      // mousemove 등 고빈도 이벤트에서 localStorage 쓰기를 1분마다 한 번으로 제한
+      if (now - _lastThrottle > 60000) {
+        localStorage.setItem('hw-last-active', now);
+        _lastThrottle = now;
+      }
+      _warnTimer = setTimeout(_showIdleWarn, IDLE_MS - WARN_MS);
+      _idleTimer = setTimeout(_doLogout, IDLE_MS);
+    }
+
+    ['mousemove','keydown','click','touchstart','scroll'].forEach(evt => {
+      document.addEventListener(evt, _resetIdle, { passive: true });
+    });
+
+    // ── 다크 모드 ──
+    const DARK_VARS = {
+      '--bg': '#111110', '--surface': '#1c1c1a', '--border': '#2e2e2b',
+      '--text': '#ececea', '--text-sub': '#a0a09e', '--text-hint': '#686866',
+      '--primary-light': '#2c1506', '--shadow': '0 1px 3px rgba(0,0,0,0.4)',
+    };
+    const LIGHT_VARS = {
+      '--bg': '#f7f7f5', '--surface': '#ffffff', '--border': '#e5e5e3',
+      '--text': '#1a1a1a', '--text-sub': '#6b6b6b', '--text-hint': '#9b9b9b',
+      '--primary-light': '#fdf0eb', '--shadow': '0 1px 2px rgba(0,0,0,0.06)',
+    };
+
+    function _applyTheme(dark) {
+      const vars = dark ? DARK_VARS : LIGHT_VARS;
+      const root = document.documentElement;
+      Object.entries(vars).forEach(([k, v]) => root.style.setProperty(k, v));
+      if (dark) {
+        root.setAttribute('data-theme', 'dark');
+      } else {
+        root.removeAttribute('data-theme');
+      }
+      const btn = document.getElementById('theme-toggle');
+      if (btn) btn.textContent = dark ? '☀️' : '🌙';
+    }
+
+    _applyTheme(localStorage.getItem('hw-theme') === 'dark');
+
+    document.getElementById('theme-toggle').addEventListener('click', () => {
+      const isDark = document.documentElement.hasAttribute('data-theme');
+      localStorage.setItem('hw-theme', isDark ? 'light' : 'dark');
+      _applyTheme(!isDark);
+    });
+
+    // ── Toast ──
+    window.Toast = (() => {
+      const ICONS = { success: '✓', error: '✕', warn: '⚠', info: 'ℹ' };
+      function show(msg, type, duration = 3200) {
+        const container = document.getElementById('toast-container');
+        const el = document.createElement('div');
+        el.className = `toast toast-${type}`;
+        el.innerHTML = `<span class="toast-icon">${ICONS[type] || ''}</span><span class="toast-msg">${msg}</span>`;
+        container.appendChild(el);
+        const dismiss = () => {
+          el.classList.add('toast-out');
+          el.addEventListener('animationend', () => el.remove(), { once: true });
+        };
+        const t = setTimeout(dismiss, duration);
+        el.addEventListener('click', () => { clearTimeout(t); dismiss(); });
+      }
+      return {
+        success: (msg, d) => show(msg, 'success', d),
+        error:   (msg, d) => show(msg, 'error', d),
+        warn:    (msg, d) => show(msg, 'warn', d),
+        info:    (msg, d) => show(msg, 'info', d),
+      };
+    })();
+
+    // ── Dialog (커스텀 confirm) ──
+    window.Dialog = {
+      confirm(msg, danger = false) {
+        return new Promise(resolve => {
+          const overlay = document.createElement('div');
+          overlay.className = 'modal-overlay';
+          overlay.style.zIndex = '4000';
+          overlay.innerHTML = `
+            <div class="modal" style="max-width:360px;">
+              <div class="modal-body" style="padding:24px 24px 16px;">
+                <p style="font-size:13px;line-height:1.7;color:var(--text);">${msg}</p>
+              </div>
+              <div class="modal-footer">
+                <button class="btn" id="_dlg-cancel">취소</button>
+                <button class="btn ${danger ? 'btn-danger' : 'btn-primary'}" id="_dlg-ok">확인</button>
+              </div>
+            </div>`;
+          document.body.appendChild(overlay);
+          const done = v => { overlay.remove(); resolve(v); };
+          overlay.querySelector('#_dlg-cancel').onclick = () => done(false);
+          overlay.querySelector('#_dlg-ok').onclick     = () => done(true);
+          overlay.addEventListener('keydown', e => {
+            if (e.key === 'Escape') done(false);
+            if (e.key === 'Enter')  done(true);
+          });
+          overlay.querySelector('#_dlg-ok').focus();
+        });
+      }
+    };
+
+    // 모바일 Google 캘린더 재연결(리다이렉트) 후 돌아온 경우 토큰 저장
+    FS.handleRedirectResult().then(result => {
+      const token = result?.credential?.accessToken;
+      if (token) {
+        localStorage.setItem('gAccessToken', token);
+        Toast.success('Google 캘린더가 다시 연결되었습니다');
+      }
+    }).catch(e => console.warn('redirect result', e));
+
+    // 인증 확인
+    FS.onAuthChanged(async user => {
+      if (!user) {
+        window.location.href = '/login';
+        return;
+      }
+
+      // 세션 만료 체크: 30분 비활성 후 재방문 시 로그아웃
+      // _sessionCheck 는 스크립트 시작 시점(이벤트 발생 전)에 캡처한 값을 사용
+      if (!_sessionCheck || Date.now() - parseInt(_sessionCheck) > IDLE_MS) {
+        localStorage.removeItem('hw-last-active');
+        await FS.logout();
+        window.location.href = '/login';
+        return;
+      }
+
+      // 사용자 정보 표시
+      const displayName = user.displayName || user.email;
+      const initial = displayName.charAt(0).toUpperCase();
+      document.getElementById('user-avatar').textContent = initial;
+      document.getElementById('user-name').textContent = displayName;
+      document.getElementById('user-role').textContent = user.email;
+
+      // admin 역할 확인
+      try {
+        const userDoc = await FS.getOne('users', user.uid);
+        if (userDoc && userDoc.role === 'admin') {
+          document.getElementById('admin-section').style.display = 'block';
+        }
+      } catch (e) {}
+
+      // 자동 로그아웃 타이머 시작 (첫 기록은 즉시 반영)
+      _lastThrottle = 0;
+      _resetIdle();
+
+      // 기본 페이지: 개요
+      loadPage('overview');
+    });
+  </script>
+</body>
+</html>

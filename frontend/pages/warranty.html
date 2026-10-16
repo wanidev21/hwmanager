@@ -1,0 +1,283 @@
+<!-- 워런티 현황 (프로젝트 단위) -->
+<style>
+.stat-cards { display:grid; grid-template-columns:repeat(4,1fr); gap:12px; margin-bottom:16px; }
+@media (max-width:860px) { .stat-cards { grid-template-columns:repeat(2,1fr); } }
+.stat-card {
+  background:var(--surface); border:1px solid var(--border); border-radius:var(--radius);
+  padding:14px 16px; border-left:4px solid transparent;
+  cursor:pointer; transition:opacity 0.1s, box-shadow 0.1s;
+}
+.stat-card:hover { box-shadow:0 2px 8px rgba(0,0,0,.06); }
+.stat-card.active { box-shadow:0 0 0 2px var(--card-accent); }
+.stat-card-val { font-size:26px; font-weight:700; color:var(--text); line-height:1.2; margin-bottom:4px; }
+.stat-card-label { font-size:12px; color:var(--text-sub); font-weight:500; }
+
+.warranty-banner {
+  background:#fef2f2; border:1px solid #fecaca; border-radius:var(--radius);
+  padding:10px 14px; margin-bottom:14px;
+  font-size:13px; color:#dc2626; font-weight:500;
+}
+
+.proj-asset-panel { margin-top:16px; }
+.proj-asset-panel .card { padding:0; overflow:hidden; }
+.asset-row {
+  display:flex; flex-wrap:wrap; gap:12px; padding:10px 16px;
+  border-bottom:1px solid var(--border); font-size:12px; align-items:flex-start;
+}
+.asset-row:last-child { border-bottom:none; }
+.asset-row-field { display:flex; flex-direction:column; gap:2px; min-width:70px; }
+.arf-label { font-size:10px; font-weight:600; color:var(--text-hint); text-transform:uppercase; letter-spacing:.04em; }
+.arf-val { font-size:12px; color:var(--text); }
+</style>
+
+<!-- 만료 임박 배너 -->
+<div id="warranty-banner" class="warranty-banner" style="display:none;"></div>
+
+<!-- 스탯 카드 -->
+<div class="stat-cards" id="stat-cards"></div>
+
+<!-- 필터 바 -->
+<div class="flex gap-2 mb-3" style="flex-wrap:wrap;">
+  <select class="form-select" id="filter-customer" style="width:180px;" onchange="renderTable()">
+    <option value="">전체 고객사</option>
+  </select>
+  <select class="form-select" id="filter-vendor" style="width:150px;" onchange="renderTable()">
+    <option value="">전체 벤더</option>
+  </select>
+  <select class="form-select" id="filter-status" style="width:150px;" onchange="onStatusDropdown()">
+    <option value="">전체 상태</option>
+    <option value="expired">만료</option>
+    <option value="urgent">임박 (90일)</option>
+    <option value="ok">정상</option>
+  </select>
+  <select class="form-select" id="sort-by" style="width:160px;" onchange="renderTable()">
+    <option value="expire">만료일순</option>
+    <option value="customer">고객사순</option>
+    <option value="project">프로젝트명순</option>
+  </select>
+</div>
+
+<!-- 워런티 테이블 -->
+<div class="card" style="padding:0;overflow:hidden;">
+  <div style="overflow-x:auto;">
+    <table class="table table-clickable">
+      <thead>
+        <tr>
+          <th>만료일</th><th>잔여기간</th><th>고객사</th>
+          <th>프로젝트명</th><th>벤더</th><th>장비유형</th><th>등록장비</th><th>메모</th>
+        </tr>
+      </thead>
+      <tbody id="w-tbody"></tbody>
+    </table>
+  </div>
+  <div id="w-empty" class="empty-state" style="display:none;">
+    <div class="empty-icon">⚡</div><div>프로젝트 데이터가 없습니다</div>
+  </div>
+</div>
+
+<!-- 장비 목록 패널 (행 클릭 시 표시) -->
+<div class="proj-asset-panel" id="proj-asset-panel" style="display:none;">
+  <div class="card" style="padding:0;overflow:hidden;">
+    <div style="display:flex;align-items:center;justify-content:space-between;padding:11px 14px;border-bottom:1px solid var(--border);">
+      <span id="proj-asset-title" style="font-weight:600;font-size:13px;"></span>
+      <button class="btn btn-ghost btn-sm" onclick="document.getElementById('proj-asset-panel').style.display='none'">✕ 닫기</button>
+    </div>
+    <div id="proj-asset-list"></div>
+    <div id="proj-asset-empty" class="empty-state" style="display:none;">
+      <div class="empty-icon">🖥</div><div>등록된 장비가 없습니다</div>
+    </div>
+  </div>
+</div>
+
+<script>
+FS.requireAuth();
+
+let wProjects    = [];
+let wCustomers   = {};
+let wAssets      = [];
+let wCardFilter  = '';  // stat card 클릭 필터
+
+function daysLeft(dateStr) {
+  if (!dateStr) return null;
+  let d;
+  if (typeof dateStr === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(dateStr)) {
+    const [y, mo, dy] = dateStr.split('-').map(Number);
+    d = new Date(y, mo - 1, dy);
+  } else {
+    d = dateStr.toDate ? dateStr.toDate() : new Date(dateStr);
+  }
+  const today = new Date(); today.setHours(0, 0, 0, 0);
+  return Math.ceil((d - today) / 86400000);
+}
+
+function daysBadge(days) {
+  if (days === null) return '<span class="badge badge-gray">정보없음</span>';
+  if (days < 0)    return '<span class="badge badge-danger">만료됨</span>';
+  if (days <= 30)  return `<span class="badge badge-danger">${days}일</span>`;
+  if (days <= 90)  return `<span class="badge badge-warning">${days}일</span>`;
+  return `<span class="badge badge-success">${days}일</span>`;
+}
+
+function escHtml(s) {
+  return (s || '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+}
+
+function init() {
+  FS.watch([['projects'], ['customers'], ['assets']], ([projects, customers, assets]) => {
+    wProjects  = projects;
+    wAssets    = assets;
+    wCustomers = {};
+    customers.forEach(c => wCustomers[c.id] = c.name || c.id);
+
+    // 고객사 필터 옵션
+    customers.sort((a, b) => (a.name || '').localeCompare(b.name || ''));
+    FS.setOptions(document.getElementById('filter-customer'),
+      customers.map(c => ({ value: c.id, label: c.name || c.id })));
+
+    // 벤더 필터 옵션
+    const vendors = [...new Set(wProjects.map(p => p.vendor).filter(Boolean))].sort();
+    FS.setOptions(document.getElementById('filter-vendor'), vendors.map(v => ({ value: v, label: v })));
+
+    renderStats();
+    renderBanner();
+    renderTable();
+  });
+}
+
+function renderStats() {
+  const total   = wProjects.length;
+  const danger  = wProjects.filter(p => { const d = daysLeft(p.warranty_expire); return d !== null && d <= 30; }).length;
+  const warning = wProjects.filter(p => { const d = daysLeft(p.warranty_expire); return d !== null && d > 30 && d <= 180; }).length;
+  const ok      = wProjects.filter(p => { const d = daysLeft(p.warranty_expire); return d !== null && d > 180; }).length;
+
+  function card(label, val, color, key) {
+    const isActive = wCardFilter === key;
+    return `<div class="stat-card${isActive ? ' active' : ''}"
+      style="border-left-color:${color};${isActive ? '--card-accent:'+color+';' : ''}"
+      onclick="setCardFilter('${key}')">
+      <div class="stat-card-val">${val}</div>
+      <div class="stat-card-label">${label}</div>
+    </div>`;
+  }
+  document.getElementById('stat-cards').innerHTML =
+    card('전체 프로젝트', total,   '#3b82f6', '') +
+    card('만료·1개월이내', danger,  '#ef4444', 'danger') +
+    card('6개월이내',       warning, '#f97316', 'warning') +
+    card('정상',            ok,      '#22c55e', 'ok');
+}
+
+function setCardFilter(key) {
+  wCardFilter = wCardFilter === key ? '' : key;
+  renderStats();
+  renderTable();
+}
+
+function onStatusDropdown() {
+  renderStats();
+  renderTable();
+}
+
+// ── 배너 ──────────────────────────────────────────────────────────────────────
+function renderBanner() {
+  const urgent = wProjects.filter(p => {
+    const d = daysLeft(p.warranty_expire);
+    return d !== null && d <= 30;
+  });
+  if (!urgent.length) { document.getElementById('warranty-banner').style.display = 'none'; return; }
+  const totalUnits = urgent.reduce((s, p) => s + wAssets.filter(a => a.project_id === p.id).length, 0);
+  document.getElementById('warranty-banner').textContent =
+    `⚠ 워런티 만료 임박: ${urgent.length}개 프로젝트 (${totalUnits}대) — 즉시 확인 필요`;
+  document.getElementById('warranty-banner').style.display = '';
+}
+
+// ── 테이블 ───────────────────────────────────────────────────────────────────
+function renderTable() {
+  const cFilter = document.getElementById('filter-customer').value;
+  const vFilter = document.getElementById('filter-vendor').value;
+  const sFilter = document.getElementById('filter-status').value;
+  const sortBy  = document.getElementById('sort-by').value;
+
+  let data = wProjects.filter(p => {
+    if (cFilter && p.customer_id !== cFilter) return false;
+    if (vFilter && p.vendor !== vFilter) return false;
+    if (sFilter) {
+      const d = daysLeft(p.warranty_expire);
+      if (sFilter === 'expired' && !(d !== null && d < 0))             return false;
+      if (sFilter === 'urgent'  && !(d !== null && d >= 0 && d <= 90)) return false;
+      if (sFilter === 'ok'      && !(d !== null && d > 90))            return false;
+    }
+    if (wCardFilter) {
+      const d = daysLeft(p.warranty_expire);
+      if (wCardFilter === 'danger'  && !(d !== null && d <= 30))            return false;
+      if (wCardFilter === 'warning' && !(d !== null && d > 30 && d <= 180)) return false;
+      if (wCardFilter === 'ok'      && !(d !== null && d > 180))            return false;
+    }
+    return true;
+  });
+
+  data.sort((a, b) => {
+    if (sortBy === 'expire')   return (daysLeft(a.warranty_expire) ?? 9999) - (daysLeft(b.warranty_expire) ?? 9999);
+    if (sortBy === 'customer') return (wCustomers[a.customer_id] || '').localeCompare(wCustomers[b.customer_id] || '');
+    if (sortBy === 'project')  return (a.name || '').localeCompare(b.name || '');
+    return 0;
+  });
+
+  document.getElementById('w-empty').style.display = data.length ? 'none' : '';
+  document.getElementById('w-tbody').innerHTML = data.map(p => {
+    const days = daysLeft(p.warranty_expire);
+    const memo = (p.memo || '').substring(0, 40) + ((p.memo || '').length > 40 ? '…' : '');
+    return `<tr onclick="showProjectAssets('${p.id}')">
+      <td>${FS.formatDate(p.warranty_expire) || '-'}</td>
+      <td>${daysBadge(days)}</td>
+      <td>${escHtml(wCustomers[p.customer_id] || p.customer_id || '-')}</td>
+      <td style="font-weight:500;">${escHtml(p.name || '-')}</td>
+      <td>${escHtml(p.vendor || '-')}</td>
+      <td>${escHtml(p.device_type || '-')}</td>
+      <td>${wAssets.filter(a => a.project_id === p.id).length}대</td>
+      <td style="color:var(--text-sub);">${escHtml(memo)}</td>
+    </tr>`;
+  }).join('');
+}
+
+// ── 장비 목록 패널 ────────────────────────────────────────────────────────────
+function showProjectAssets(projectId) {
+  const assets = wAssets.filter(a => a.project_id === projectId);
+  const proj = wProjects.find(p => p.id === projectId);
+  const projectName = proj ? (proj.name || '') : projectId;
+  document.getElementById('proj-asset-title').textContent =
+    `${projectName} — 장비 목록 (${assets.length}대)`;
+  document.getElementById('proj-asset-empty').style.display = assets.length ? 'none' : '';
+
+  const statusCls = s => s === '운영중' ? 'badge-success' : s === '장애' ? 'badge-danger' : 'badge-warning';
+
+  document.getElementById('proj-asset-list').innerHTML = assets.map(a => {
+    const fields = [
+      ['Hostname',  a.hostname],
+      ['S/N',       a.serial],
+      ['IP',        a.ip_address],
+      ['OS',        a.os],
+      ['CPU',       a.cpu],
+      ['메모리',    a.memory],
+      ['GPU',       a.gpu],
+      ['디스크',    a.disk],
+      ['BMC',       a.bmc_version],
+      ['드라이버',  a.driver_version],
+    ].filter(([, v]) => v);
+    return `<div class="asset-row">
+      <div style="min-width:70px;padding-top:2px;">
+        <span class="badge ${statusCls(a.status || '')}">${FS.esc(a.status || '-')}</span>
+      </div>
+      ${fields.map(([l, v]) => `<div class="asset-row-field">
+        <span class="arf-label">${l}</span>
+        <span class="arf-val">${escHtml(v)}</span>
+      </div>`).join('')}
+    </div>`;
+  }).join('');
+
+  const panel = document.getElementById('proj-asset-panel');
+  panel.style.display = '';
+  panel.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+}
+
+init();
+</script>

@@ -1,0 +1,29 @@
+# ── 비밀 정보 (절대 커밋 금지) ──
+firebase-credentials.json
+*-credentials*.json
+serviceAccount*.json
+.env
+
+# ── Python ──
+__pycache__/
+*.pyc
+.venv/
+venv/
+
+# ── Firebase CLI ──
+.firebase/
+firebase-debug.log
+firestore-debug.log
+ui-debug.log
+
+# ── Node ──
+node_modules/
+
+# ── 로컬 도구 설정 ──
+.claude/settings.local.json
+
+# ── OS / 에디터 ──
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/

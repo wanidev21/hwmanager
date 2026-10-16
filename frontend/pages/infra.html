@@ -1,0 +1,286 @@
+<!-- 사내 인프라 -->
+<style>
+  .infra-layout { display:flex; gap:16px; }
+  .infra-table-col { flex:1; min-width:0; }
+  .infra-detail-col { width:320px; flex-shrink:0; }
+  @media (max-width:768px) {
+    .infra-layout { flex-direction:column; }
+    .infra-detail-col { width:100%; }
+  }
+  .detail-field { margin-bottom:10px; }
+  .detail-field label { font-size:11px; font-weight:600; color:var(--text-hint); text-transform:uppercase; display:block; margin-bottom:2px; }
+  .detail-field span { font-size:13px; }
+</style>
+
+<div class="flex-between mb-3">
+  <h2 style="font-size:18px;font-weight:600;">사내 인프라</h2>
+  <button class="btn btn-primary" onclick="openModal()">+ 장비 등록</button>
+</div>
+
+<div id="stat-grid"></div>
+
+<div class="flex gap-2 mb-3">
+  <select class="form-select" id="filter-type" style="width:160px;" onchange="renderTable()">
+    <option value="">전체 유형</option>
+    <option>서버</option><option>스위치</option><option>NAS</option><option>워크스테이션</option>
+  </select>
+  <select class="form-select" id="filter-team" style="width:160px;" onchange="renderTable()">
+    <option value="">전체 팀</option>
+  </select>
+</div>
+
+<div class="infra-layout">
+  <div class="infra-table-col">
+    <div class="card" style="padding:0;overflow:hidden;">
+      <div class="table-wrap">
+      <table class="table table-clickable">
+        <thead>
+          <tr><th>장비명</th><th>유형</th><th>벤더·모델</th><th>팀</th><th>사용자</th><th>IP</th><th>상태</th><th style="width:80px;">액션</th></tr>
+        </thead>
+        <tbody id="infra-tbody"></tbody>
+      </table>
+      </div>
+      <div id="infra-empty" class="empty-state" style="display:none;"><div class="empty-icon">🖥</div><div>장비가 없습니다</div></div>
+    </div>
+  </div>
+  <div class="infra-detail-col" id="detail-col" style="display:none;">
+    <div class="card" id="detail-panel"></div>
+  </div>
+</div>
+
+<!-- 모달 -->
+<div class="modal-overlay" id="infra-modal" style="display:none;" onclick="if(event.target===this)closeModal()">
+  <div class="modal" style="max-width:680px;">
+    <div class="modal-header">
+      <h3 id="modal-title">장비 등록</h3>
+      <button class="modal-close" onclick="closeModal()">×</button>
+    </div>
+    <div class="modal-body">
+      <input type="hidden" id="edit-id">
+      <div class="form-row">
+        <div class="form-group"><label class="form-label">장비명 *</label><input type="text" class="form-input" id="f-name"></div>
+        <div class="form-group"><label class="form-label">서브명</label><input type="text" class="form-input" id="f-sub"></div>
+      </div>
+      <div class="form-row">
+        <div class="form-group"><label class="form-label">유형</label>
+          <select class="form-select" id="f-device_type"><option>서버</option><option>스위치</option><option>NAS</option><option>워크스테이션</option><option>기타</option></select>
+        </div>
+        <div class="form-group"><label class="form-label">상태</label>
+          <select class="form-select" id="f-status"><option value="사용중">사용중</option><option value="미사용">미사용</option><option value="예비">예비</option></select>
+        </div>
+      </div>
+      <div class="form-row">
+        <div class="form-group"><label class="form-label">벤더</label><input type="text" class="form-input" id="f-vendor"></div>
+        <div class="form-group"><label class="form-label">모델</label><input type="text" class="form-input" id="f-model"></div>
+      </div>
+      <div class="form-row">
+        <div class="form-group"><label class="form-label">시리얼번호</label><input type="text" class="form-input" id="f-serial_number"></div>
+        <div class="form-group"><label class="form-label">IP 주소</label><input type="text" class="form-input" id="f-ip_address"></div>
+      </div>
+      <div class="form-row">
+        <div class="form-group"><label class="form-label">팀</label><input type="text" class="form-input" id="f-team"></div>
+        <div class="form-group"><label class="form-label">사용자</label><input type="text" class="form-input" id="f-user_name"></div>
+      </div>
+      <div class="form-row">
+        <div class="form-group"><label class="form-label">OS</label><input type="text" class="form-input" id="f-os"></div>
+        <div class="form-group"><label class="form-label">위치</label><input type="text" class="form-input" id="f-location"></div>
+      </div>
+      <div class="form-row">
+        <div class="form-group"><label class="form-label">CPU</label><input type="text" class="form-input" id="f-cpu"></div>
+        <div class="form-group"><label class="form-label">메모리</label><input type="text" class="form-input" id="f-memory"></div>
+      </div>
+      <div class="form-row">
+        <div class="form-group"><label class="form-label">GPU</label><input type="text" class="form-input" id="f-gpu"></div>
+        <div class="form-group"><label class="form-label">디스크</label><input type="text" class="form-input" id="f-disk"></div>
+      </div>
+      <div class="form-row">
+        <div class="form-group"><label class="form-label">사용기간</label><input type="text" class="form-input" id="f-usage_period"></div>
+        <div class="form-group"><label class="form-label">용도</label><input type="text" class="form-input" id="f-purpose"></div>
+      </div>
+      <div class="form-group"><label class="form-label">메모</label><textarea class="form-textarea" id="f-memo"></textarea></div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn" onclick="closeModal()">취소</button>
+      <button class="btn btn-primary" onclick="saveAsset()">저장</button>
+    </div>
+  </div>
+</div>
+
+<script>
+FS.requireAuth();
+
+let infraAssets = [];
+let currentTab = 'active';
+let infraSelectedId = null;
+
+function init() {
+  infraSelectedId = null;
+  currentTab = 'active';
+  FS.watch([['internal_assets']], ([assets]) => {
+    infraAssets = assets;
+    const teams = [...new Set(infraAssets.map(a=>a.team).filter(Boolean))].sort();
+    FS.setOptions(document.getElementById('filter-team'), teams.map(t => ({ value:t, label:t })));
+    renderStats();
+    renderTable();
+
+    // 열려 있는 상세 패널 갱신 (메모 입력 중이면 건드리지 않음)
+    const detailCol = document.getElementById('detail-col');
+    if (infraSelectedId && detailCol.style.display !== 'none') {
+      if (!infraAssets.some(a=>a.id===infraSelectedId)) detailCol.style.display = 'none';
+      else if (document.activeElement?.id !== 'detail-memo') showDetail(infraSelectedId);
+    }
+  });
+}
+
+function renderStats() {
+  const total  = infraAssets.length;
+  const active = infraAssets.filter(a=>a.status==='사용중').length;
+  const spare  = infraAssets.filter(a=>a.status!=='사용중').length;
+  function item(label, count, tab) {
+    const isActive = currentTab === tab ? ' active' : '';
+    return `<div class="ts-item${isActive}" onclick="setTab('${tab}')">
+      <span class="ts-count">${count}</span><span class="ts-label">${label}</span>
+    </div>`;
+  }
+  document.getElementById('stat-grid').innerHTML = `
+    <div class="stat-bar">
+      <div class="ts-item" style="cursor:default;">
+        <span class="ts-count">${total}</span><span class="ts-label">전체 장비</span>
+      </div>
+      <div class="ts-divider"></div>
+      ${item('사용중', active, 'active')}
+      <div class="ts-divider"></div>
+      ${item('미사용·예비', spare, 'spare')}
+    </div>`;
+}
+
+function setTab(tab) {
+  currentTab = tab;
+  renderStats();
+  renderTable();
+}
+
+function renderTable() {
+  const typeF = document.getElementById('filter-type').value;
+  const teamF = document.getElementById('filter-team').value;
+  let data = infraAssets.filter(a => {
+    const statusOk = currentTab==='active' ? a.status==='사용중' : a.status!=='사용중';
+    return statusOk && (!typeF||a.device_type===typeF) && (!teamF||a.team===teamF);
+  });
+  document.getElementById('infra-empty').style.display = data.length?'none':'';
+  document.getElementById('infra-tbody').innerHTML = data.map(a=>`
+    <tr onclick="showDetail('${a.id}')">
+      <td><div style="font-weight:500;">${FS.esc(a.name||'')}</div><div style="font-size:11px;color:var(--text-hint);">${FS.esc(a.sub||'')}</div></td>
+      <td><span class="badge badge-gray">${FS.esc(a.device_type||'-')}</span></td>
+      <td>${FS.esc(a.vendor||'')} ${FS.esc(a.model||'')}</td>
+      <td>${FS.esc(a.team||'-')}</td>
+      <td>${FS.esc(a.user_name||'-')}</td>
+      <td style="font-family:monospace;font-size:12px;">${FS.esc(a.ip_address||'-')}</td>
+      <td><span class="badge ${a.status==='사용중'?'badge-success':'badge-gray'}">${FS.esc(a.status||'-')}</span></td>
+      <td onclick="event.stopPropagation()">
+        <button class="btn btn-sm" onclick="openModal('${a.id}')">수정</button>
+      </td>
+    </tr>`).join('');
+}
+
+function showDetail(id) {
+  infraSelectedId = id;
+  const a = infraAssets.find(x=>x.id===id);
+  if (!a) return;
+  document.getElementById('detail-col').style.display='';
+  const fields = [
+    ['장비명', a.name], ['서브명', a.sub], ['유형', a.device_type], ['상태', a.status],
+    ['벤더', a.vendor], ['모델', a.model], ['시리얼번호', a.serial_number],
+    ['팀', a.team], ['사용자', a.user_name], ['IP', a.ip_address],
+    ['OS', a.os], ['CPU', a.cpu], ['메모리', a.memory], ['GPU', a.gpu], ['디스크', a.disk],
+    ['위치', a.location], ['사용기간', a.usage_period], ['용도', a.purpose]
+  ];
+  document.getElementById('detail-panel').innerHTML = `
+    <div class="flex-between mb-3">
+      <span style="font-weight:600;font-size:14px;">${FS.esc(a.name||'')}</span>
+      <div class="flex gap-1">
+        <button class="btn btn-sm btn-danger" onclick="deleteAsset('${id}')">삭제</button>
+        <button class="btn btn-ghost btn-sm" onclick="document.getElementById('detail-col').style.display='none'">✕</button>
+      </div>
+    </div>
+    ${fields.filter(([,v])=>v).map(([l,v])=>`<div class="detail-field"><label>${l}</label><span>${FS.esc(v)}</span></div>`).join('')}
+    <div class="form-group mt-3">
+      <label class="form-label">메모</label>
+      <textarea class="form-textarea" id="detail-memo" rows="4">${FS.esc(a.memo||'')}</textarea>
+    </div>
+    <button class="btn btn-primary btn-sm" onclick="saveMemo('${id}', this)">메모 저장</button>`;
+}
+
+async function saveMemo(id, btn) {
+  const memo = document.getElementById('detail-memo').value;
+  await FS.update('internal_assets', id, { memo });
+  const idx = infraAssets.findIndex(x=>x.id===id);
+  if (idx>=0) infraAssets[idx].memo = memo;
+  if (btn) {
+    const prev = btn.textContent;
+    btn.textContent = '저장됨 ✓';
+    btn.disabled = true;
+    setTimeout(() => { btn.textContent = prev; btn.disabled = false; }, 1500);
+  }
+}
+
+const FIELDS = ['name','sub','device_type','vendor','model','serial_number','team','user_name','ip_address','os','cpu','memory','gpu','disk','location','usage_period','status','purpose','memo'];
+
+function openModal(id) {
+  document.getElementById('infra-modal').style.display='flex';
+  FIELDS.forEach(f => {
+    const el = document.getElementById('f-'+f);
+    if (el) el.value='';
+  });
+  if (id) {
+    const a = infraAssets.find(x=>x.id===id);
+    document.getElementById('modal-title').textContent='장비 수정';
+    document.getElementById('edit-id').value=id;
+    FIELDS.forEach(f => {
+      const el = document.getElementById('f-'+f);
+      if (el && a[f]!=null) el.value=a[f];
+    });
+  } else {
+    document.getElementById('modal-title').textContent='장비 등록';
+    document.getElementById('edit-id').value='';
+  }
+}
+
+function closeModal() { document.getElementById('infra-modal').style.display='none'; }
+
+async function saveAsset() {
+  const name = document.getElementById('f-name').value.trim();
+  if (!name) { Toast.error('장비명을 입력하세요'); return; }
+  const data = {};
+  FIELDS.forEach(f => {
+    const el = document.getElementById('f-'+f);
+    if (el) data[f] = el.value.trim();
+  });
+  const id = document.getElementById('edit-id').value;
+  if (id) {
+    await FS.update('internal_assets', id, data);
+    const idx = infraAssets.findIndex(x=>x.id===id);
+    if (idx>=0) infraAssets[idx]={...infraAssets[idx],...data};
+    Toast.success('수정되었습니다');
+  } else {
+    const newId = await FS.add('internal_assets', data);
+    infraAssets.unshift({id:newId,...data});
+    Toast.success('장비가 등록되었습니다');
+  }
+  closeModal();
+  renderStats();
+  renderTable();
+}
+
+async function deleteAsset(id) {
+  if (!await Dialog.confirm('이 자산을 삭제하시겠습니까?', true)) return;
+  await FS.remove('internal_assets', id);
+  infraAssets = infraAssets.filter(x=>x.id!==id);
+  document.getElementById('detail-col').style.display='none';
+  renderStats();
+  renderTable();
+  Toast.success('자산이 삭제되었습니다');
+}
+
+init();
+</script>

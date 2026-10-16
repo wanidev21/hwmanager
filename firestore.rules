@@ -1,0 +1,55 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // 로그인 허용 계정 — frontend/static/js/firebase-service.js 의 ALLOWED_EMAILS 와 같이 관리
+    function allowed() {
+      return request.auth != null
+        && request.auth.token.email_verified == true
+        && request.auth.token.email in ['karismawan1977@gmail.com'];
+    }
+
+    function isAdmin() {
+      return allowed()
+        && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin';
+    }
+
+    // 본인 소유 문서 (user_id == 로그인 uid)
+    function ownsExisting() {
+      return allowed() && resource.data.user_id == request.auth.uid;
+    }
+    function ownsIncoming() {
+      return allowed() && request.resource.data.user_id == request.auth.uid;
+    }
+
+    // ── 사용자 ──
+    match /users/{uid} {
+      allow read: if allowed();
+      // 첫 로그인 시 본인 문서 생성 (role은 'user'로만)
+      allow create: if allowed() && request.auth.uid == uid && request.resource.data.role == 'user';
+      // 본인은 role 외 필드만 수정, 관리자는 모두 수정
+      allow update: if isAdmin()
+        || (allowed() && request.auth.uid == uid && request.resource.data.role == resource.data.role);
+      allow delete: if isAdmin();
+    }
+
+    // ── 개인 데이터 (본인 것만) ──
+    match /kb_articles/{id}     { allow read, delete: if ownsExisting(); allow create: if ownsIncoming(); allow update: if ownsExisting() && ownsIncoming(); }
+    match /tech_domains/{id}    { allow read, delete: if ownsExisting(); allow create: if ownsIncoming(); allow update: if ownsExisting() && ownsIncoming(); }
+    match /tech_topics/{id}     { allow read, delete: if ownsExisting(); allow create: if ownsIncoming(); allow update: if ownsExisting() && ownsIncoming(); }
+    match /tech_notes/{id}      { allow read, delete: if ownsExisting(); allow create: if ownsIncoming(); allow update: if ownsExisting() && ownsIncoming(); }
+    match /releases/{id}        { allow read, delete: if ownsExisting(); allow create: if ownsIncoming(); allow update: if ownsExisting() && ownsIncoming(); }
+    match /calendar_events/{id} { allow read, delete: if ownsExisting(); allow create: if ownsIncoming(); allow update: if ownsExisting() && ownsIncoming(); }
+
+    // ── 공용 업무 데이터 (허용 계정 모두 읽기/쓰기) ──
+    match /customers/{id}       { allow read, write: if allowed(); }
+    match /projects/{id}        { allow read, write: if allowed(); }
+    match /assets/{id}          { allow read, write: if allowed(); }
+    match /tickets/{id}         { allow read, write: if allowed(); }
+    match /internal_assets/{id} { allow read, write: if allowed(); }
+    match /delivery_notes/{id}  { allow read, write: if allowed(); }
+    match /delivery_items/{id}  { allow read, write: if allowed(); }
+
+    // 그 외 컬렉션은 모두 차단 (기본값)
+  }
+}

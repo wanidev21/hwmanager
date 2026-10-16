@@ -1,0 +1,188 @@
+<!-- 개요 -->
+<style>
+  .ov-welcome { margin-bottom:24px; }
+  .ov-section-grid { display:grid; grid-template-columns:repeat(3,1fr); gap:16px; align-items:start; }
+  .ov-section-grid > .card + .card { margin-top: 0; }
+  @media (max-width:768px) {
+    .ov-section-grid { grid-template-columns:1fr; gap:12px; }
+    .ov-welcome { margin-bottom:16px; }
+  }
+  .ov-card { cursor:pointer; transition:border-color 0.15s, box-shadow 0.15s; }
+  .ov-card:hover { border-color:var(--primary); box-shadow:0 4px 16px rgba(232,84,10,0.08); }
+  .ov-card-head { display:flex; align-items:center; justify-content:space-between; margin-bottom:12px; }
+  .ov-card-icon { font-size:15px; filter:grayscale(1); }
+  .ov-card-label { font-size:12px; font-weight:600; color:var(--text-sub); }
+  .ov-card-count { font-size:26px; font-weight:700; color:var(--text); line-height:1; margin-bottom:14px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+  .ov-card-count span { font-size:13px; font-weight:400; color:var(--text-hint); margin-left:4px; }
+  .ov-mini-item { display:flex; align-items:center; justify-content:space-between; padding:5px 0; border-bottom:1px solid var(--border); font-size:12px; color:var(--text-sub); gap:8px; }
+  .ov-mini-item:last-child { border-bottom:none; }
+  .ov-mini-name { overflow:hidden; text-overflow:ellipsis; white-space:nowrap; flex:1; }
+  .ov-goto { font-size:11px; color:var(--primary); font-weight:500; white-space:nowrap; }
+  .ov-empty { font-size:12px; color:var(--text-hint); padding:12px 0; text-align:center; }
+</style>
+
+<div class="ov-welcome">
+  <div style="font-size:18px;font-weight:600;">안녕하세요, <span id="ov-name"></span>님</div>
+  <div style="font-size:13px;color:var(--text-hint);margin-top:3px;" id="ov-date"></div>
+</div>
+
+<div id="ov-stats"></div>
+
+<div class="ov-section-grid" id="ov-grid"></div>
+
+<script>
+FS.requireAuth();
+
+function init() {
+  const user = FS.getCurrentUser();
+  document.getElementById('ov-name').textContent = user?.displayName || user?.email || '';
+  document.getElementById('ov-date').textContent =
+    new Date().toLocaleDateString('ko-KR', { year:'numeric', month:'long', day:'numeric', weekday:'long' });
+
+  const uid = FS.getCurrentUser().uid;
+  FS.watch([
+    ['customers'],
+    ['projects'],
+    ['assets'],
+    ['tickets'],
+    ['kb_articles',  [['user_id', '==', uid]]],
+    ['delivery_notes'],
+    ['tech_notes',   [['user_id', '==', uid]]],
+  ], data => renderOverview(...data));
+}
+
+function renderOverview(customers, projects, assets, tickets, kbArticles, deliveryNotes, techNotes) {
+
+  const today = new Date(); today.setHours(0,0,0,0);
+  function daysLeft(exp) {
+    if (!exp) return null;
+    let d = typeof exp === 'string' ? new Date(exp.replace(/-/g,'/')) : (exp.toDate ? exp.toDate() : new Date(exp));
+    return Math.ceil((d - today) / 86400000);
+  }
+
+  const custMap = Object.fromEntries(customers.map(c => [c.id, c.name || c.id]));
+  const warrantyProjects = projects.filter(p => p.warranty_expire);
+  const expiringSoon = warrantyProjects.filter(p => { const d = daysLeft(p.warranty_expire); return d !== null && d <= 90; });
+  const openTickets = tickets.filter(t => t.status !== '완료');
+
+  document.getElementById('ov-stats').innerHTML = `
+    <div class="stat-bar">
+      <div class="ts-item" onclick="loadPage('customers')">
+        <span class="ts-count">${customers.length}</span><span class="ts-label">전체 고객사</span>
+      </div>
+      <div class="ts-divider"></div>
+      <div class="ts-item" onclick="loadPage('tickets')">
+        <span class="ts-count">${openTickets.length}</span><span class="ts-label">처리중 티켓</span>
+      </div>
+      <div class="ts-divider"></div>
+      <div class="ts-item" onclick="loadPage('warranty')">
+        <span class="ts-count">${expiringSoon.length}</span><span class="ts-label">워런티 90일 이내</span>
+      </div>
+      <div class="ts-divider"></div>
+      <div class="ts-item" onclick="loadPage('kb')">
+        <span class="ts-count">${kbArticles.length}</span><span class="ts-label">KB 아티클</span>
+      </div>
+    </div>
+  `;
+
+  const byDate = arr => [...arr].sort((a,b) => (b.created_at?.seconds||0) - (a.created_at?.seconds||0));
+  const recentCustomers = byDate(customers).slice(0,3);
+  const recentTickets   = byDate(tickets).slice(0,3);
+  const criticalWarranty = [...expiringSoon].sort((a,b) => (daysLeft(a.warranty_expire)||999) - (daysLeft(b.warranty_expire)||999)).slice(0,3);
+  const recentKB        = byDate(kbArticles).slice(0,3);
+  const recentDelivery  = byDate(deliveryNotes).slice(0,3);
+
+  const STATUS_BADGE = { '접수':'badge-info','진행중':'badge-warning','보류':'badge-gray','완료':'badge-success' };
+
+  const EMPTY_ROW = '<div class="ov-mini-item"><span class="ov-mini-name" style="color:var(--text-hint);">—</span><span></span></div>';
+  function miniList(items, renderFn) {
+    const rows = items.slice(0, 3).map(renderFn);
+    while (rows.length < 3) rows.push(EMPTY_ROW);
+    return rows.join('');
+  }
+
+  document.getElementById('ov-grid').innerHTML = `
+    <div class="card ov-card" onclick="loadPage('customers')">
+      <div class="ov-card-head">
+        <div class="flex gap-2"><span class="ov-card-icon">🏢</span><span class="ov-card-label">고객사·자산</span></div>
+        <span class="ov-goto">열기 →</span>
+      </div>
+      <div class="ov-card-count">${customers.length}<span>개사 · 장비 ${assets.length}개</span></div>
+      ${miniList(recentCustomers, c => `
+        <div class="ov-mini-item">
+          <span class="ov-mini-name">${FS.esc(c.name||'-')}</span>
+          <span>${FS.esc(c.contact||'-')}</span>
+        </div>`)}
+    </div>
+
+    <div class="card ov-card" onclick="loadPage('tickets')">
+      <div class="ov-card-head">
+        <div class="flex gap-2"><span class="ov-card-icon">⚠️</span><span class="ov-card-label">장애 티켓</span></div>
+        <span class="ov-goto">열기 →</span>
+      </div>
+      <div class="ov-card-count">${openTickets.length}<span>건 처리중 · 전체 ${tickets.length}건</span></div>
+      ${miniList(recentTickets, t => `
+        <div class="ov-mini-item">
+          <span class="ov-mini-name">${FS.esc(t.title||'-')}</span>
+          <span class="badge ${STATUS_BADGE[t.status]||'badge-gray'}">${FS.esc(t.status||'접수')}</span>
+        </div>`)}
+    </div>
+
+    <div class="card ov-card" onclick="loadPage('warranty')">
+      <div class="ov-card-head">
+        <div class="flex gap-2"><span class="ov-card-icon">🛡️</span><span class="ov-card-label">워런티 현황</span></div>
+        <span class="ov-goto">열기 →</span>
+      </div>
+      <div class="ov-card-count">${expiringSoon.length}<span>개 주의 · 전체 ${warrantyProjects.length}개</span></div>
+      ${miniList(criticalWarranty, p => {
+        const d = daysLeft(p.warranty_expire);
+        return `<div class="ov-mini-item">
+          <span class="ov-mini-name">${FS.esc(custMap[p.customer_id]||'')} · ${FS.esc(p.name||'-')}</span>
+          <span style="color:${d<=30?'var(--danger)':'var(--warning)'};font-weight:500;">${d<0?'만료됨':d+'일'}</span>
+        </div>`;
+      })}
+    </div>
+
+    <div class="card ov-card" onclick="loadPage('kb')">
+      <div class="ov-card-head">
+        <div class="flex gap-2"><span class="ov-card-icon">📖</span><span class="ov-card-label">지식베이스</span></div>
+        <span class="ov-goto">열기 →</span>
+      </div>
+      <div class="ov-card-count">${kbArticles.length}<span>개 아티클</span></div>
+      ${miniList(recentKB, a => `
+        <div class="ov-mini-item">
+          <span class="ov-mini-name">${FS.esc(a.title||'-')}</span>
+          <span style="color:var(--text-hint);">${FS.formatDate(a.created_at)||''}</span>
+        </div>`)}
+    </div>
+
+    <div class="card ov-card" onclick="loadPage('tech')">
+      <div class="ov-card-head">
+        <div class="flex gap-2"><span class="ov-card-icon">🎓</span><span class="ov-card-label">기술 학습</span></div>
+        <span class="ov-goto">열기 →</span>
+      </div>
+      <div class="ov-card-count">${techNotes.length}<span>개 노트</span></div>
+      ${miniList(byDate(techNotes).slice(0,3), n => `
+        <div class="ov-mini-item">
+          <span class="ov-mini-name">${FS.esc(n.title||'-')}</span>
+          <span style="color:var(--text-hint);">${FS.formatDate(n.created_at)||''}</span>
+        </div>`)}
+    </div>
+
+    <div class="card ov-card" onclick="loadPage('delivery')">
+      <div class="ov-card-head">
+        <div class="flex gap-2"><span class="ov-card-icon">📋</span><span class="ov-card-label">납품확인서</span></div>
+        <span class="ov-goto">열기 →</span>
+      </div>
+      <div class="ov-card-count">${deliveryNotes.length}<span>건</span></div>
+      ${miniList(recentDelivery, n => `
+        <div class="ov-mini-item">
+          <span class="ov-mini-name">${FS.esc(n.doc_number||'-')}</span>
+          <span style="color:var(--text-hint);">${FS.esc(n.delivery_date||'-')}</span>
+        </div>`)}
+    </div>
+  `;
+}
+
+init();
+</script>

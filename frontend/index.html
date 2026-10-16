@@ -175,8 +175,12 @@
     }
 
     // 페이지 로드
-    async function loadPage(page) {
+    // opts.fromHistory: 뒤로가기로 온 경우 (기록을 새로 쌓지 않음)
+    async function loadPage(page, opts = {}) {
       if (currentPage === page) return;
+
+      // 뒤로가기 지원: 화면 이동을 브라우저 기록에 남김
+      if (!opts.fromHistory) history.pushState({ page }, '');
 
       // 이전 페이지의 실시간 구독 해제
       FS.unwatchAll();
@@ -302,6 +306,56 @@
       currentPage = null;
       closeSidebar();
       loadPage('overview');
+    });
+
+    // ── 뒤로가기 (안드로이드 뒤로 버튼·브라우저 뒤로) ──
+    // 열린 창·메뉴·상세가 있으면 먼저 닫고, 없으면 이전 화면으로. 개요에서는 한 번 더 누르면 종료
+    const _visible = el => el && getComputedStyle(el).display !== 'none';
+
+    function _closeTopLayer() {
+      // 1) 확인 창 → 취소
+      const dlgCancel = document.getElementById('_dlg-cancel');
+      if (dlgCancel) { dlgCancel.click(); return true; }
+      // 2) 모달(입력 폼·미리보기·QR 등) → 가장 위의 것 닫기
+      const modals = [...document.querySelectorAll('.modal-overlay')].filter(_visible);
+      if (modals.length) { modals[modals.length - 1].style.display = 'none'; return true; }
+      // 3) 모바일 사이드 메뉴
+      if (sidebar.classList.contains('open')) { closeSidebar(); return true; }
+      // 4) 화면별 한 단계 뒤로
+      if (document.querySelector('#page-content #view-edit.active') && typeof window.showList === 'function') {
+        window.showList(); return true;                               // 납품확인서 편집 → 목록
+      }
+      if (_visible(document.querySelector('#page-content #asset-panel')) && typeof window.backToProjects === 'function') {
+        window.backToProjects(); return true;                         // 고객사: 장비 → 프로젝트
+      }
+      if (_visible(document.querySelector('#page-content #proj-panel')) && typeof window.showPanel === 'function') {
+        window.selectedCustomerId = null;                             // 고객사: 프로젝트 → 고객사 목록
+        window.showPanel('none');
+        if (typeof window.renderCustomers === 'function') window.renderCustomers();
+        return true;
+      }
+      for (const id of ['detail-col', 'kb-detail-col']) {             // 티켓·KB·사내장비 상세 패널
+        const el = document.querySelector('#page-content #' + id);
+        if (_visible(el)) { el.style.display = 'none'; return true; }
+      }
+      return false;
+    }
+
+    window.addEventListener('popstate', e => {
+      const state = e.state || {};
+      // 창·메뉴를 닫았으면 현재 화면에 머무름 (소비된 기록을 다시 채움)
+      if (_closeTopLayer()) {
+        history.pushState({ page: currentPage || 'overview' }, '');
+        return;
+      }
+      if (state.guard) {
+        // 맨 처음 기록에 도달: 개요를 보여 주고 안내만. 여기서 한 번 더 누르면 기록 밖으로 나가 앱 종료
+        if (currentPage !== 'overview') loadPage('overview', { fromHistory: true });
+        Toast.info('한 번 더 누르면 종료됩니다', 2000);
+        return;
+      }
+      closeSidebar();
+      loadPage(state.page || 'overview', { fromHistory: true });
     });
 
     // 네비 클릭
@@ -517,7 +571,10 @@
       _resetIdle();
 
       // 기본 페이지: 개요
-      loadPage('overview');
+      // 기록 구조 [보호용(guard), 개요] — 개요에서 뒤로가기 시 바로 앱이 꺼지지 않도록
+      history.replaceState({ page: 'overview', guard: true }, '');
+      history.pushState({ page: 'overview' }, '');
+      loadPage('overview', { fromHistory: true });
     });
   </script>
 </body>

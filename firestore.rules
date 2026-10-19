@@ -2,11 +2,12 @@ rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
 
-    // 로그인 허용 계정 — frontend/static/js/firebase-service.js 의 ALLOWED_EMAILS 와 같이 관리
+    // 로그인 허용 계정 — Firestore config/access 문서의 emails 목록 (코드에 이메일을 두지 않음)
+    // 추가·삭제: 회원 관리 화면(관리자) 또는 python scripts/access.py add|remove <email>
     function allowed() {
       return request.auth != null
         && request.auth.token.email_verified == true
-        && request.auth.token.email in ['karismawan1977@gmail.com'];
+        && request.auth.token.email.lower() in get(/databases/$(database)/documents/config/access).data.emails;
     }
 
     function isAdmin() {
@@ -20,6 +21,12 @@ service cloud.firestore {
     }
     function ownsIncoming() {
       return allowed() && request.resource.data.user_id == request.auth.uid;
+    }
+
+    // ── 허용 계정 목록 ── (읽기: 허용 계정 — 로그인 시 접근 확인용, 쓰기: 관리자)
+    match /config/access {
+      allow read: if allowed();
+      allow write: if isAdmin();
     }
 
     // ── 사용자 ──

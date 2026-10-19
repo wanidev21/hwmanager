@@ -22,7 +22,7 @@ FastAPI는 정적 파일 서빙만 담당. 데이터는 모두 Firestore (서버
 
 ## 스택
 - 호스팅: Firebase Hosting (로컬은 FastAPI + uvicorn으로 정적 서빙)
-- 인증: Firebase Auth Google 로그인 단일 (도메인 제한 없음, `ALLOWED_EMAILS` 허용 목록, Calendar 스코프 포함)
+- 인증: Firebase Auth Google 로그인 단일 (도메인 제한 없음, Firestore `config/access.emails` 허용 목록, Calendar 스코프 포함)
 - Firebase 계정(콘솔·CLI 로그인): karismawan1977@gmail.com
 - DB: Firestore (Firebase 프로젝트 `hwmanager-593ba`)
 - SDK: Firebase compat 10.8.0 (type="module" 방식 사용 안함)
@@ -84,7 +84,8 @@ hwmanager/
 - `/api/health` → `{"success": true}`
 
 ## Firestore 컬렉션
-customers, projects, assets, tickets, kb_articles,
+customers, projects, assets, tickets(+ logs 하위: 진행 기록), kb_articles,
+audit_logs(변경 이력, 추가 전용), config/access(허용 계정),
 internal_assets, tech_domains, tech_topics, tech_notes, releases,
 delivery_notes, delivery_items, calendar_events, users
 
@@ -98,14 +99,14 @@ customers → projects (customer_id) → assets (customer_id, project_id)
 ## 인증 흐름
 1. login.html → `FS.loginWithGoogle()`: PC는 팝업, 모바일·PWA는 리다이렉트 (`FS.handleRedirectResult()`로 결과 처리)
    - Hosting 도메인(web.app)에서는 authDomain을 현재 도메인으로 바꿔 iOS Safari 리다이렉트 문제 회피
-2. `FS.completeLogin()`: firebase-service.js `ALLOWED_EMAILS`에 없는 계정은 거부, 신규 사용자 → users/{uid} 문서 생성 (role: 'user')
+2. `FS.completeLogin()`: `FS.checkAccess()`(config/access 읽기 — 규칙상 허용 계정만 가능)로 확인해 목록에 없으면 거부, 신규 사용자 → users/{uid} 문서 생성 (role: 'user')
 3. Google access token은 localStorage `gAccessToken`에 저장 → calendar.html에서 Google Calendar API 호출
 4. index.html: onAuthStateChanged로 확인, 미로그인 → /login
 5. 30분 미사용 시 자동 로그아웃 (localStorage `hw-last-active`)
 6. users.role === 'admin' 이면 사용자 관리 메뉴 표시
 - 개인 데이터(kb_articles, tech_*, releases, calendar_events)는 `user_id == uid`로 필터 (클라이언트 쿼리 기준)
 - Firestore 보안 규칙: `firestore.rules` (배포: `firebase deploy --only firestore:rules`)
-  - 사용자 추가 시 **세 곳** 수정: `firestore.rules`의 `allowed()` + `firebase-service.js`의 `ALLOWED_EMAILS` + Google Cloud 콘솔 OAuth 테스트 사용자
+  - 사용자 추가 시 **두 곳**: 허용 목록(회원 관리 화면의 '로그인 허용 계정' 또는 `python scripts/access.py add <email>`) + Google Cloud 콘솔 OAuth 테스트 사용자. 이메일은 코드·저장소에 넣지 않음
     (OAuth 앱은 테스트 모드. Calendar 스코프가 민감 스코프라 테스트 사용자 외에는 "Google 인증 절차를 완료하지 않았습니다"로 차단됨)
   - 개인 데이터는 규칙에서도 `user_id == uid`만 허용, 공용 업무 데이터는 허용 계정 모두 읽기/쓰기, 목록에 없는 컬렉션은 차단
 - 관리자 지정: `python scripts/set_admin.py <email>`

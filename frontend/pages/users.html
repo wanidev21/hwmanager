@@ -1,4 +1,26 @@
 <!-- 회원 관리 -->
+<style>
+  .acc-row { display:flex; align-items:center; gap:8px; padding:9px 14px; border-top:1px solid var(--border); font-family:var(--font-mono); font-size:13px; }
+  .acc-row:first-child { border-top:none; }
+  .acc-row span { flex:1; min-width:0; overflow:hidden; text-overflow:ellipsis; }
+  .acc-add { display:flex; gap:8px; padding:12px 14px; border-top:2px solid var(--ink); background:var(--surface-2); flex-wrap:wrap; }
+  .acc-add input { flex:1 1 220px; min-width:0; }
+</style>
+
+<!-- 로그인 허용 계정 (Firestore config/access) -->
+<div class="card mb-3" style="padding:0;overflow:hidden;">
+  <div style="padding:10px 14px;background:#111;color:#ECEAE4;font-weight:800;font-size:13px;">로그인 허용 계정</div>
+  <div id="acc-list"></div>
+  <div class="acc-add">
+    <input type="email" class="form-input" id="acc-email" placeholder="someone@gmail.com" autocomplete="off"
+      onkeydown="if(event.key==='Enter')addAccess()">
+    <button class="btn btn-primary" onclick="addAccess()">추가</button>
+  </div>
+  <div style="padding:10px 14px;font-size:12px;color:var(--text-sub);line-height:1.6;border-top:1px solid var(--border);">
+    추가한 계정은 <b>Google Cloud 콘솔 → OAuth 동의 화면 → 테스트 사용자</b>에도 등록해야 로그인할 수 있습니다
+    (캘린더 권한 때문에 앱이 테스트 모드). 목록에서 빼면 다음 화면 이동부터 접근이 막힙니다.
+  </div>
+</div>
 <div class="card" style="padding:0;overflow:hidden;">
   <div class="table-wrap">
   <table class="table">
@@ -40,11 +62,53 @@ async function init() {
     }
   }
 
+  loadAccess();
   FS.watch([['users']], ([users]) => {
     allUsers = users;
     allUsers.sort((a,b)=>(a.email||'').localeCompare(b.email||''));
     renderUsers();
   });
+}
+
+// ── 로그인 허용 계정 ──
+const accRef = () => firebase.firestore().collection('config').doc('access');
+let accEmails = [];
+async function loadAccess() {
+  try {
+    const snap = await accRef().get({ source: 'server' });
+    accEmails = (snap.data()?.emails || []).slice().sort();
+  } catch (e) {
+    Toast.error('허용 계정을 불러오지 못했습니다: ' + (e.code || e.message));
+  }
+  renderAccess();
+}
+function renderAccess() {
+  const me = (FS.getCurrentUser()?.email || '').toLowerCase();
+  document.getElementById('acc-list').innerHTML = accEmails.map(e => `
+    <div class="acc-row">
+      <span>${FS.esc(e)}</span>
+      ${e === me ? '<span class="badge badge-gray" style="flex:none;">나</span>'
+        : `<button class="btn btn-sm btn-danger" onclick="removeAccess('${FS.esc(e)}')">빼기</button>`}
+    </div>`).join('') || '<div class="acc-row"><span>없음</span></div>';
+}
+async function addAccess() {
+  const el = document.getElementById('acc-email');
+  const email = el.value.trim().toLowerCase();
+  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) { Toast.error('이메일 형식을 확인하세요'); return; }
+  try {
+    await accRef().set({ emails: firebase.firestore.FieldValue.arrayUnion(email) }, { merge: true });
+    el.value = '';
+    Toast.success(`${email} 추가됨 — Google 콘솔 테스트 사용자에도 등록하세요`);
+    loadAccess();
+  } catch (e) { Toast.error('추가 실패: ' + (e.code || e.message)); }
+}
+async function removeAccess(email) {
+  if (!await Dialog.confirm(`${email} 계정의 접근을 막을까요?`, true)) return;
+  try {
+    await accRef().update({ emails: firebase.firestore.FieldValue.arrayRemove(email) });
+    Toast.success('제외했습니다');
+    loadAccess();
+  } catch (e) { Toast.error('실패: ' + (e.code || e.message)); }
 }
 
 function renderUsers() {

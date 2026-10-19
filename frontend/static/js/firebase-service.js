@@ -61,8 +61,8 @@ const _db   = firebase.firestore();
 // 오프라인 캐시 (탭 간 동기화). 지원하지 않는 브라우저면 무시
 _db.enablePersistence({ synchronizeTabs: true }).catch(() => {});
 
-// 로그인 허용 Google 계정 (도메인 제한 없음, 사용자 추가 시 여기에 이메일 추가)
-const ALLOWED_EMAILS = ['karismawan1977@gmail.com'];
+// 로그인 허용 계정은 Firestore config/access(emails)에서 관리 — 보안 규칙이 이 목록으로 접근을 막음.
+// 앱은 그 문서를 읽어 보고(허용 계정만 읽기 가능) 허용 여부를 판단
 
 const _googleProvider = new firebase.auth.GoogleAuthProvider();
 _googleProvider.addScope('https://www.googleapis.com/auth/calendar');
@@ -80,7 +80,6 @@ function _useRedirectLogin() {
 const _watchers = new Set();
 
 window.FS = {
-  ALLOWED_EMAILS,
 
   onAuthChanged(cb) {
     return _auth.onAuthStateChanged(cb);
@@ -114,8 +113,15 @@ window.FS = {
       go();
     }
   },
-  isAllowedEmail(email) {
-    return typeof email === 'string' && ALLOWED_EMAILS.includes(email.toLowerCase());
+  // true: 허용 / false: 목록에 없음 / null: 확인 불가(오프라인 등 — 로그아웃시키지 않음)
+  async checkAccess() {
+    try {
+      await _db.collection('config').doc('access').get({ source: 'server' });
+      return true;
+    } catch (e) {
+      if (e.code === 'permission-denied') return false;
+      return null;
+    }
   },
 
   // 데스크톱은 팝업 → 결과 반환, 모바일은 리다이렉트 → 페이지 이동 (결과는 handleRedirectResult에서)
@@ -146,7 +152,7 @@ window.FS = {
   // 로그인 결과 후처리: 도메인 검증, Calendar 토큰 저장, 신규 사용자 등록
   async completeLogin(result) {
     const user = result.user;
-    if (!FS.isAllowedEmail(user.email)) {
+    if (await FS.checkAccess() === false) {
       if (result.additionalUserInfo?.isNewUser) await user.delete();
       else await _auth.signOut();
       throw Object.assign(new Error('not allowed'), { code: 'app/email-not-allowed' });
@@ -374,7 +380,7 @@ window.FS = {
         return;
       }
       // 허용 도메인 아닌 계정은 강제 로그아웃
-      if (!FS.isAllowedEmail(user.email)) {
+      if (await FS.checkAccess() === false) {
         await FS.logout();
         FS.toLogin();
       }

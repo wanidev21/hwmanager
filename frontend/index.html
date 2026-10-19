@@ -180,7 +180,7 @@
       if (currentPage === page) return;
 
       // 뒤로가기 지원: 화면 이동을 브라우저 기록에 남김
-      if (!opts.fromHistory) history.pushState({ page }, '');
+      if (!opts.fromHistory) _pushHistory(page);
 
       // 이전 페이지의 실시간 구독 해제
       FS.unwatchAll();
@@ -341,11 +341,17 @@
       return false;
     }
 
+    // 기록마다 순번 n을 둠 (FS.toLogin()이 로그아웃 때 첫 기록까지 되감는 데 사용)
+    function _pushHistory(page) {
+      history.pushState({ page, n: ((history.state && history.state.n) || 0) + 1 }, '');
+    }
+
     window.addEventListener('popstate', e => {
+      if (FS._leaving) return;   // 로그아웃으로 기록을 되감는 중
       const state = e.state || {};
       // 창·메뉴를 닫았으면 현재 화면에 머무름 (소비된 기록을 다시 채움)
       if (_closeTopLayer()) {
-        history.pushState({ page: currentPage || 'overview' }, '');
+        _pushHistory(currentPage || 'overview');
         return;
       }
       if (state.guard) {
@@ -381,7 +387,7 @@
       localStorage.removeItem('hw-last-active');
       localStorage.removeItem('gAccessToken');
       await FS.logout();
-      window.location.href = '/login';
+      FS.toLogin();
     });
 
     // ── 자동 로그아웃 (30분 비활성) ──
@@ -418,7 +424,7 @@
       localStorage.removeItem('hw-last-active');
       localStorage.removeItem('gAccessToken');
       await FS.logout();
-      window.location.href = '/login';
+      FS.toLogin();
     }
 
     function _resetIdle() {
@@ -535,10 +541,18 @@
       }
     }).catch(e => console.warn('redirect result', e));
 
+    // 뒤로가기 캐시(bfcache)에서 복원됐는데 로그아웃 상태면 화면을 보여 주지 않고 로그인으로
+    window.addEventListener('pageshow', e => {
+      if (e.persisted && !FS.getCurrentUser()) {
+        document.documentElement.style.visibility = 'hidden';
+        location.replace('/login');
+      }
+    });
+
     // 인증 확인
     FS.onAuthChanged(async user => {
       if (!user) {
-        window.location.href = '/login';
+        if (!FS._loggingOut) FS.toLogin();
         return;
       }
 
@@ -547,7 +561,7 @@
       if (!_sessionCheck || Date.now() - parseInt(_sessionCheck) > IDLE_MS) {
         localStorage.removeItem('hw-last-active');
         await FS.logout();
-        window.location.href = '/login';
+        FS.toLogin();
         return;
       }
 
@@ -572,8 +586,8 @@
 
       // 기본 페이지: 개요
       // 기록 구조 [보호용(guard), 개요] — 개요에서 뒤로가기 시 바로 앱이 꺼지지 않도록
-      history.replaceState({ page: 'overview', guard: true }, '');
-      history.pushState({ page: 'overview' }, '');
+      history.replaceState({ page: 'overview', guard: true, n: 0 }, '');
+      _pushHistory('overview');
       loadPage('overview', { fromHistory: true });
     });
   </script>

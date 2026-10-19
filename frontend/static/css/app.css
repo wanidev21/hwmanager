@@ -809,7 +809,8 @@ html[data-theme="dark"] .toast { background: #2c2c2a; border: 1px solid #3e3e3c;
   /* 컨텐츠 패딩 */
   .content {
     padding: 14px 14px;
-    padding-bottom: calc(14px + env(safe-area-inset-bottom));
+    /* 브라우저 하단 툴바·홈 인디케이터에 마지막 내용이 가리지 않도록 여유 */
+    padding-bottom: calc(48px + env(safe-area-inset-bottom));
   }
 
   /* 페이지 타이틀 */

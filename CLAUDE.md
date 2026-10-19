@@ -7,7 +7,7 @@
 FastAPI는 정적 파일 서빙만 담당. 데이터는 모두 Firestore (서버 데이터 API 없음).
 
 ## 개발 환경 (로컬)
-- 경로: `C:\waniwani\hwmanager` (Windows 11)
+- 경로: `J:\claude\WORK\hwmanager` (Windows 11)
 - GitHub: https://github.com/wanidev21/hwmanager (공개 저장소, 브랜치 main). `firebase-credentials.json`·`.env`는 .gitignore로 제외. 개인정보(전화번호·회사 이메일)를 코드에 넣지 말 것
 - Python 3.10 (시스템), Docker 미설치 → 로컬에서 uvicorn 직접 실행
 - 의존성: `pip install -r requirements.txt`

@@ -40,10 +40,29 @@ window.FS = {
     return _auth.currentUser;
   },
   async logout() {
+    FS._loggingOut = true;   // signOut 직후 onAuthChanged(null)이 캐시 삭제 전에 페이지를 떠나지 않도록
     FS.unwatchAll();
     await _auth.signOut();
     // 공용 기기 대비: 로그아웃 시 로컬 캐시 삭제
     try { await _db.terminate(); await _db.clearPersistence(); } catch (e) {}
+  },
+
+  // 로그인 화면으로 이동 (앱 화면 기록을 남기지 않음)
+  // index.html은 기록마다 state.n(첫 기록 0부터)을 둠 → 첫 기록까지 되감은 뒤 그 자리를 /login으로 교체
+  // 그래야 로그인 화면에서 뒤로가기로 로그인 상태 화면이 다시 보이지 않음
+  toLogin() {
+    if (FS._leaving) return;
+    FS._leaving = true;
+    document.documentElement.style.visibility = 'hidden';   // 뒤로가기 캐시(bfcache)에 화면이 남지 않도록
+    const go = () => location.replace('/login');
+    const n = (history.state && history.state.n) || 0;
+    if (n > 0) {
+      window.addEventListener('popstate', go, { once: true });
+      setTimeout(go, 800);   // popstate가 오지 않는 경우 대비
+      history.go(-n);
+    } else {
+      go();
+    }
   },
   isAllowedEmail(email) {
     return typeof email === 'string' && ALLOWED_EMAILS.includes(email.toLowerCase());
@@ -206,16 +225,35 @@ window.FS = {
     });
     if ([...sel.options].some(o => o.value === prev)) sel.value = prev;
   },
+
+  // #page-content 안에서만 스크롤 (scrollIntoView는 overflow:hidden인 상위 요소까지 밀어
+  // 모바일에서 화면 위쪽이 잘린 채 되돌릴 수 없게 됨)
+  // block: 'start' = 요소를 맨 위로, 'nearest' = 가려진 만큼만 이동
+  scrollToEl(el, block = 'start') {
+    const box = document.getElementById('page-content');
+    if (!el || !box) return;
+    const b = box.getBoundingClientRect();
+    const r = el.getBoundingClientRect();
+    let delta;
+    if (block === 'nearest') {
+      if (r.top < b.top) delta = r.top - b.top;
+      else if (r.bottom > b.bottom) delta = Math.min(r.bottom - b.bottom, r.top - b.top);
+      else return;
+    } else {
+      delta = r.top - b.top - 8;
+    }
+    box.scrollTo({ top: box.scrollTop + delta, behavior: 'smooth' });
+  },
   requireAuth() {
     _auth.onAuthStateChanged(async user => {
       if (!user) {
-        window.location.href = '/login';
+        if (!FS._loggingOut) FS.toLogin();
         return;
       }
       // 허용 도메인 아닌 계정은 강제 로그아웃
       if (!FS.isAllowedEmail(user.email)) {
-        await _auth.signOut();
-        window.location.href = '/login';
+        await FS.logout();
+        FS.toLogin();
       }
     });
   },

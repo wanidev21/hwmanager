@@ -128,6 +128,27 @@
         font-size: 15px;
       }
     }
+
+    /* 뒤로가기 종료 안내 */
+    .exit-overlay {
+      position: fixed; inset: 0; z-index: 1000;
+      background: rgba(0,0,0,0.35);
+      display: none; align-items: center; justify-content: center;
+      padding: 24px;
+    }
+    .exit-overlay.show { display: flex; }
+    .exit-box {
+      background: #ffffff; border-radius: 14px; width: 100%; max-width: 320px;
+      padding: 24px 22px 18px; text-align: center;
+      box-shadow: 0 20px 60px rgba(0,0,0,0.15);
+    }
+    .exit-title { font-size: 16px; font-weight: 700; margin-bottom: 8px; }
+    .exit-msg { font-size: 13px; color: #6b6b6b; line-height: 1.6; margin-bottom: 18px; }
+    .exit-btn {
+      width: 100%; height: 44px; border: none; border-radius: 8px;
+      background: #e8540a; color: #fff; font-size: 14px; font-weight: 600;
+      font-family: inherit; cursor: pointer;
+    }
   </style>
 </head>
 <body>
@@ -151,8 +172,32 @@
     <p class="login-note">등록된 Google 계정만 이용할 수 있습니다</p>
   </div>
 
+  <div class="exit-overlay" id="exit-overlay">
+    <div class="exit-box">
+      <div class="exit-title">앱을 종료할까요?</div>
+      <div class="exit-msg">뒤로가기를 한 번 더 누르면 종료됩니다</div>
+      <button class="exit-btn" id="exit-stay">계속 사용</button>
+    </div>
+  </div>
+
   <script>
     const btn = document.getElementById('btn-google');
+
+    // ── 뒤로가기 → 종료 안내 (모바일·설치된 앱) ──
+    // 기록 구조 [보호용(guard), 로그인]. 뒤로가기로 guard에 오면 안내를 띄우고,
+    // 거기서 한 번 더 누르면 기록 밖으로 나가 앱 종료 (스크립트로는 앱을 닫을 수 없음)
+    if (matchMedia('(display-mode: standalone)').matches || matchMedia('(pointer: coarse)').matches) {
+      const exitOverlay = document.getElementById('exit-overlay');
+      history.replaceState({ guard: true }, '');
+      history.pushState({}, '');
+      window.addEventListener('popstate', e => {
+        if (e.state && e.state.guard) exitOverlay.classList.add('show');
+      });
+      document.getElementById('exit-stay').addEventListener('click', () => {
+        exitOverlay.classList.remove('show');
+        history.pushState({}, '');
+      });
+    }
 
     function showError(msg) {
       const el = document.getElementById('login-error');

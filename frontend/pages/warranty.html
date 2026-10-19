@@ -276,7 +276,7 @@ function showProjectAssets(projectId) {
 
   const panel = document.getElementById('proj-asset-panel');
   panel.style.display = '';
-  panel.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+  FS.scrollToEl(panel, 'nearest');
 }
 
 init();

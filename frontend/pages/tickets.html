@@ -140,8 +140,12 @@
         <label class="form-label">완료일</label>
         <input type="date" class="form-input" id="f-completed-at">
       </div>
-      <div class="form-group"><label class="form-label">증상</label><textarea class="form-textarea" id="f-symptom" rows="3" placeholder="발생한 증상을 상세히 기술"></textarea></div>
-      <div class="form-group"><label class="form-label">조치내용</label><textarea class="form-textarea" id="f-action" rows="3" placeholder="처리한 내용"></textarea></div>
+      <!-- 예전 방식(증상·조치 칸)으로 작성된 티켓을 수정할 때만 표시. 새 티켓은 진행 기록으로 -->
+      <div id="legacy-fields" style="display:none;">
+        <div class="form-group"><label class="form-label">증상 (예전 기록)</label><textarea class="form-textarea" id="f-symptom" rows="3"></textarea></div>
+        <div class="form-group"><label class="form-label">조치내용 (예전 기록)</label><textarea class="form-textarea" id="f-action" rows="3"></textarea></div>
+      </div>
+      <div id="new-hint" class="text-hint" style="font-size:12px;font-weight:600;">등록 후 진행 기록에 증상·점검·조치 내용을 시간순으로 남기세요.</div>
     </div>
     <div class="modal-footer">
       <button class="btn" onclick="closeModal()">취소</button>
@@ -260,7 +264,16 @@ function renderTickets() {
 }
 
 // 진행 기록 종류 (자동: 등록·상태)
-const TL_TYPES = ['점검', '조치', '벤더', '부품', '고객연락', '메모'];
+const TL_TYPES = ['증상', '점검', '조치', '벤더', '부품', '고객연락', '메모'];
+const TL_HINTS = {
+  '증상': '예: 부팅 중 PSOD 발생, iDRAC에 메모리 경고',
+  '점검': '예: HDD fail 확인 (Slot 3)',
+  '조치': '예: BIOS 2.13.0 업데이트 후 재부팅',
+  '벤더': '예: Dell 케이스 오픈 (SR 123456789)',
+  '부품': '예: Slot 3 HDD 교체 (RMA 접수)',
+  '고객연락': '예: 고객 담당자에게 작업 일정 공유',
+  '메모': '',
+};
 let tlStop = null;          // 열린 티켓의 기록 구독 해제 함수
 let tlTicketId = null;
 let tlLogs = [];
@@ -302,7 +315,7 @@ function tlElapsed(t) {
     const done = [...tlLogs].filter(l => l.auto && l.to === '완료').sort((a, b) => tlDate(b.at) - tlDate(a.at))[0];
     return done ? `총 ${tlDur(tlDate(done.at) - created)}` : '';
   }
-  const d = Math.floor((Date.now() - created) / 86400000);
+  const d = Math.max(0, Math.floor((Date.now() - created) / 86400000));   // 서버 시각이 약간 빠를 때 음수 방지
   return d ? `${d + 1}일째` : '오늘 접수';
 }
 
@@ -455,7 +468,7 @@ function tlRenderTypes() {
   document.getElementById('tl-types').innerHTML = TL_TYPES.map(ty =>
     `<button class="tl-chip${ty === tlType ? ' on' : ''}" onclick="tlPickType('${ty}')">${ty}</button>`).join('');
   document.getElementById('tl-parts').style.display = tlType === '부품' ? '' : 'none';
-  document.getElementById('tl-text').placeholder = tlType === '부품' ? '예: Slot 3 HDD 교체 (RMA 접수)' : '예: HDD fail 확인 (Slot 3)';
+  document.getElementById('tl-text').placeholder = TL_HINTS[tlType] || '';
 }
 function tlPartsHtml(l) {
   return (l.pn ? `<span class="tl-pn"><b>P/N</b>${FS.esc(l.pn)}</span>` : '') +
@@ -674,10 +687,16 @@ function openModal(id, prefill) {
     document.getElementById('f-completed-at').value=toDateInputVal(t.completed_at);
     document.getElementById('f-symptom').value=t.symptom||'';
     document.getElementById('f-action').value=t.action||'';
+    const legacy = !!(t.symptom || t.action);
+    document.getElementById('legacy-fields').style.display = legacy ? '' : 'none';
+    document.getElementById('new-hint').style.display = 'none';
   } else {
     document.getElementById('modal-title').textContent='티켓 등록';
     document.getElementById('edit-id').value='';
     ['f-title','f-assignee','f-symptom','f-action','f-completed-at'].forEach(i=>document.getElementById(i).value='');
+    document.getElementById('legacy-fields').style.display = 'none';
+    document.getElementById('new-hint').style.display = '';
+    setTimeout(() => document.getElementById('f-title').focus(), 50);
     document.getElementById('f-priority').value='보통';
     document.getElementById('f-status').value='접수';
     document.getElementById('f-customer').value=prefill?.customer_id||'';
@@ -704,9 +723,12 @@ async function saveTicket() {
     assignee: document.getElementById('f-assignee').value.trim(),
     priority: document.getElementById('f-priority').value,
     status,
-    symptom: document.getElementById('f-symptom').value.trim(),
-    action: document.getElementById('f-action').value.trim(),
   };
+  // 예전 증상·조치 칸은 표시된 경우(예전 티켓 수정)에만 저장
+  if (document.getElementById('legacy-fields').style.display !== 'none') {
+    data.symptom = document.getElementById('f-symptom').value.trim();
+    data.action  = document.getElementById('f-action').value.trim();
+  }
   const id = document.getElementById('edit-id').value;
   if (status === '완료') {
     data.completed_at = document.getElementById('f-completed-at').value
@@ -723,8 +745,16 @@ async function saveTicket() {
     Toast.success('티켓이 수정되었습니다');
   } else {
     const newId = await FS.add('tickets', data);
-    allTickets.unshift({id:newId, ...data});
-    Toast.success('티켓이 등록되었습니다');
+    allTickets.unshift({id:newId, ...data, created_at: { toDate: () => new Date(), seconds: Date.now() / 1000 }});
+    Toast.success('티켓이 등록되었습니다 — 진행 기록을 남겨 주세요');
+    closeModal();
+    renderStats();
+    renderTickets();
+    // 등록 직후: 상세(타임라인)를 열고 '증상' 기록부터
+    tlType = '증상';
+    showDetail(newId, true);
+    setTimeout(() => document.getElementById('tl-text')?.focus(), 100);
+    return;
   }
   closeModal();
   renderStats();

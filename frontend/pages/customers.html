@@ -23,6 +23,12 @@
 .av-label { font-size:10px; font-weight:600; color:var(--text-hint); text-transform:uppercase; letter-spacing:.04em; margin-bottom:2px; }
 .av-val { font-size:13px; color:var(--text); word-break:break-all; user-select:text; }
 .av-full { grid-column:1 / -1; }
+/* 워런티 기간 편집 */
+.wp-row { display:grid; grid-template-columns:96px minmax(0,1fr) minmax(0,1fr) 36px; gap:6px; align-items:center; margin-bottom:6px; }
+.wp-row .wp-memo { grid-column:2 / 4; }
+.wp-del { width:36px; height:36px; border:1.5px solid var(--ink); background:var(--surface); color:var(--text-sub); display:flex; align-items:center; justify-content:center; cursor:pointer; }
+@media (max-width:768px) { .wp-row { grid-template-columns:84px minmax(0,1fr) 36px; } .wp-row .wp-end { grid-column:2 / 3; } .wp-row .wp-memo { grid-column:2 / 3; } }
+.wp-sub { font-size:11px; color:var(--text-hint); font-weight:600; }
 .cust-item {
   padding:10px 14px; border-bottom:1px solid var(--border);
   cursor:pointer; transition:background 0.1s;
@@ -215,8 +221,9 @@ html[data-theme="dark"] .cust-item.active .cust-item-name, html[data-theme="dark
         </div>
       </div>
       <div class="form-group">
-        <label class="form-label">워런티 만료일</label>
-        <input type="date" class="form-input" id="f-proj-warranty">
+        <label class="form-label">워런티 기간 <span class="wp-sub">— 최초 계약(기본)과 연장 갱신을 순서대로</span></label>
+        <div id="wp-rows"></div>
+        <button type="button" class="btn btn-sm" onclick="wpAdd()" style="align-self:flex-start;">+ 연장 갱신 추가</button>
       </div>
       <div class="form-group">
         <label class="form-label">메모</label>
@@ -470,7 +477,7 @@ function renderProjects() {
       <td>${escHtml(p.device_type || '-')}</td>
       <td>${allAssets.filter(a => a.project_id === p.id).length}대</td>
       <td>${FS.formatDate(p.install_date) || '-'}</td>
-      <td>${p.warranty_expire ? FS.formatDate(p.warranty_expire) : '-'}</td>
+      <td>${p.warranty_expire ? FS.formatDate(p.warranty_expire) : '-'}${FS.warrantyPeriods(p).filter(x => x.type !== '기본').length ? ` <span class="wp-sub">연장 ${FS.warrantyPeriods(p).filter(x => x.type !== '기본').length}회</span>` : ''}</td>
       <td>${warrantyBadge(p.warranty_expire)}</td>
       <td onclick="event.stopPropagation()">
         <div class="flex gap-1">
@@ -687,16 +694,66 @@ function openProjModal(id) {
     document.getElementById('f-proj-device-type').value  = p.device_type     || '';
     document.getElementById('f-proj-quantity').value     = p.quantity        || '';
     document.getElementById('f-proj-install-date').value = p.install_date    || '';
-    document.getElementById('f-proj-warranty').value     = p.warranty_expire || '';
     document.getElementById('f-proj-memo').value         = p.memo            || '';
+    wpRows = FS.warrantyPeriods(p);
   } else {
     ['f-proj-name','f-proj-vendor','f-proj-device-type','f-proj-quantity',
-     'f-proj-install-date','f-proj-warranty','f-proj-memo']
+     'f-proj-install-date','f-proj-memo']
       .forEach(i => document.getElementById(i).value = '');
+    wpRows = [];
   }
+  if (!wpRows.length) wpRows = [{ type: '기본', start: '', end: '', memo: '' }];
+  wpRender();
   document.getElementById('proj-modal').style.display = 'flex';
 }
 function closeProjModal() { document.getElementById('proj-modal').style.display = 'none'; }
+
+// ── 워런티 기간 편집 (기본 → 연장 → 연장 ...) ──
+let wpRows = [];
+function wpSync() {
+  document.querySelectorAll('#wp-rows .wp-row').forEach((row, i) => {
+    wpRows[i] = {
+      type:  row.querySelector('.wp-type').value,
+      start: row.querySelector('.wp-start').value,
+      end:   row.querySelector('.wp-end').value,
+      memo:  row.querySelector('.wp-memo').value.trim(),
+    };
+  });
+}
+function wpRender() {
+  document.getElementById('wp-rows').innerHTML = wpRows.map((r, i) => `
+    <div class="wp-row">
+      <select class="form-select wp-type" aria-label="구분">
+        <option${r.type === '기본' ? ' selected' : ''}>기본</option>
+        <option${r.type !== '기본' ? ' selected' : ''}>연장</option>
+      </select>
+      <input type="date" class="form-input wp-start" value="${FS.esc(r.start)}" aria-label="시작일" onchange="wpAutoEnd(${i})">
+      <input type="date" class="form-input wp-end" value="${FS.esc(r.end)}" aria-label="종료일">
+      <button type="button" class="wp-del" onclick="wpRemove(${i})" aria-label="기간 삭제">${FS.icon('close', 14)}</button>
+      <input type="text" class="form-input wp-memo" value="${FS.esc(r.memo)}" placeholder="메모 (계약번호·갱신 조건 등)">
+    </div>`).join('');
+}
+function wpAddDays(dateStr, days) {
+  const d = new Date(dateStr + 'T00:00:00'); d.setDate(d.getDate() + days); return FS.localDate(d);
+}
+function wpAddYears(dateStr, years) {
+  const d = new Date(dateStr + 'T00:00:00'); d.setFullYear(d.getFullYear() + years); d.setDate(d.getDate() - 1); return FS.localDate(d);
+}
+// 연장: 직전 종료일 다음 날부터 1년
+function wpAdd() {
+  wpSync();
+  const last = [...wpRows].reverse().find(r => r.end);
+  const start = last ? wpAddDays(last.end, 1) : '';
+  wpRows.push({ type: wpRows.length ? '연장' : '기본', start, end: start ? wpAddYears(start, 1) : '', memo: '' });
+  wpRender();
+}
+function wpRemove(i) { wpSync(); wpRows.splice(i, 1); if (!wpRows.length) wpRows.push({ type: '기본', start: '', end: '', memo: '' }); wpRender(); }
+// 시작일만 넣으면 종료일 자동 (기본 3년, 연장 1년) — 비어 있을 때만
+function wpAutoEnd(i) {
+  wpSync();
+  const r = wpRows[i];
+  if (r.start && !r.end) { r.end = wpAddYears(r.start, r.type === '기본' ? 3 : 1); wpRender(); }
+}
 
 async function saveProject() {
   const name = document.getElementById('f-proj-name').value.trim();
@@ -708,9 +765,15 @@ async function saveProject() {
     device_type:     document.getElementById('f-proj-device-type').value.trim(),
     quantity:        Number(document.getElementById('f-proj-quantity').value) || 0,
     install_date:    document.getElementById('f-proj-install-date').value,
-    warranty_expire: document.getElementById('f-proj-warranty').value,
     memo:            document.getElementById('f-proj-memo').value.trim(),
   };
+  // 워런티: 기간 목록 + 호환용 최초 시작일·최종 만료일 (현황·개요 화면은 warranty_expire 기준)
+  wpSync();
+  const periods = wpRows.filter(r => r.end).sort((a, b) => (a.start || a.end).localeCompare(b.start || b.end));
+  if (periods.some(r => r.start && r.start > r.end)) { Toast.error('워런티 시작일이 종료일보다 늦습니다'); return; }
+  data.warranty_periods = periods;
+  data.warranty_expire  = periods.length ? periods.map(r => r.end).sort().pop() : '';
+  data.warranty_start   = periods.find(r => r.start)?.start || '';
   const id = document.getElementById('f-proj-id').value;
   if (id) {
     await FS.update('projects', id, data);

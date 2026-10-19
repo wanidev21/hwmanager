@@ -284,6 +284,29 @@ window.FS = {
     });
   },
 
+  // 프로젝트 워런티 기간 목록 [{type:'기본'|'연장', start, end, memo}] (시작일순)
+  // 예전 데이터(warranty_expire만 있음)는 설치일~만료일 '기본' 1건으로 간주
+  warrantyPeriods(p) {
+    const str = v => !v ? '' : (typeof v === 'string' ? v : FS.localDate(v.toDate ? v.toDate() : new Date(v)));
+    let list = Array.isArray(p.warranty_periods)
+      ? p.warranty_periods.map(x => ({ type: x.type || '연장', start: str(x.start), end: str(x.end), memo: x.memo || '' }))
+      : [];
+    if (!list.length && p.warranty_expire) list = [{ type: '기본', start: str(p.install_date), end: str(p.warranty_expire), memo: '' }];
+    return list.sort((a, b) => (a.start || a.end).localeCompare(b.start || b.end));
+  },
+  // '기본 3년 + 연장 2회' 형태 요약
+  warrantySummary(periods) {
+    if (!periods.length) return '';
+    const base = periods.find(x => x.type === '기본');
+    const ext = periods.filter(x => x.type !== '기본').length;
+    let years = '';
+    if (base && base.start && base.end) {
+      const y = Math.round((new Date(base.end) - new Date(base.start)) / (365.25 * 86400000));
+      if (y > 0) years = ` ${y}년`;
+    }
+    return (base ? `기본${years}` : '') + (ext ? `${base ? ' + ' : ''}연장 ${ext}회` : '');
+  },
+
   // 로컬(KST) 기준 'YYYY-MM-DD' (toISOString은 UTC라 오전 9시 전에는 하루 전 날짜가 됨)
   localDate(d = new Date()) {
     const p = n => String(n).padStart(2, '0');

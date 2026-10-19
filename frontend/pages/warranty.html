@@ -28,6 +28,14 @@
 .asset-row-field { display:flex; flex-direction:column; gap:2px; min-width:70px; }
 .arf-label { font-size:10px; font-weight:600; color:var(--text-hint); text-transform:uppercase; letter-spacing:.04em; }
 .arf-val { font-size:12px; color:var(--text); }
+.w-hist { font-size:11px; color:var(--text-hint); font-weight:600; white-space:nowrap; }
+.wp-timeline { display:flex; flex-wrap:wrap; gap:0; padding:12px 14px; border-bottom:2px solid var(--ink); background:var(--surface-2); }
+.wp-seg { display:flex; flex-direction:column; gap:3px; padding:8px 12px; border:2px solid var(--ink); background:var(--surface); margin:0 -2px -2px 0; min-width:150px; }
+.wp-seg.cur { background:var(--signal); color:#111111; }
+.wp-seg.cur .wp-seg-type { background:#111111; color:var(--signal); }
+.wp-seg-type { align-self:flex-start; font-size:10px; font-weight:900; padding:1px 6px; background:var(--ink); color:var(--bg); }
+.wp-seg-range { font-family:var(--font-mono); font-size:12px; font-weight:700; }
+.wp-seg-memo { font-size:11px; opacity:0.8; }
 </style>
 
 <!-- 만료 임박 배너 -->
@@ -58,7 +66,7 @@
     <table class="table table-clickable">
       <thead>
         <tr>
-          <th>만료일</th><th>잔여기간</th><th>고객사</th>
+          <th>만료일</th><th>잔여기간</th><th>워런티 시작 · 이력</th><th>고객사</th>
           <th>프로젝트명</th><th>벤더</th><th>장비유형</th><th>등록장비</th><th>메모</th>
         </tr>
       </thead>
@@ -77,6 +85,7 @@
       <span id="proj-asset-title" style="font-weight:600;font-size:13px;"></span>
       <button class="btn btn-ghost btn-sm" onclick="document.getElementById('proj-asset-panel').style.display='none'">✕ 닫기</button>
     </div>
+    <div id="proj-wp-timeline"></div>
     <div id="proj-asset-list"></div>
     <div id="proj-asset-empty" class="empty-state" style="display:none;">
       <div class="empty-icon">🖥</div><div>등록된 장비가 없습니다</div>
@@ -230,6 +239,8 @@ function renderTable() {
     return `<tr onclick="showProjectAssets('${p.id}')">
       <td>${FS.formatDate(p.warranty_expire) || '-'}</td>
       <td>${daysBadge(days)}</td>
+      <td>${(() => { const ps = FS.warrantyPeriods(p); const st = ps.find(x => x.start)?.start;
+        return `${st ? FS.formatDate(st) : '-'}<br><span class="w-hist">${FS.esc(FS.warrantySummary(ps))}</span>`; })()}</td>
       <td>${escHtml(wCustomers[p.customer_id] || p.customer_id || '-')}</td>
       <td style="font-weight:500;">${escHtml(p.name || '-')}</td>
       <td>${escHtml(p.vendor || '-')}</td>
@@ -247,8 +258,19 @@ function showProjectAssets(projectId, scroll = true) {
   const proj = wProjects.find(p => p.id === projectId);
   const projectName = proj ? (proj.name || '') : projectId;
   document.getElementById('proj-asset-title').textContent =
-    `${projectName} — 장비 목록 (${assets.length}대)`;
+    `${projectName} — 워런티 이력 · 장비 ${assets.length}대`;
   document.getElementById('proj-asset-empty').style.display = assets.length ? 'none' : '';
+
+  // 워런티 기간 이력 (기본 → 연장 …), 오늘이 포함된 기간 강조
+  const periods = proj ? FS.warrantyPeriods(proj) : [];
+  const today = FS.localDate();
+  document.getElementById('proj-wp-timeline').innerHTML = periods.length ? `<div class="wp-timeline">${periods.map(w => {
+    const cur = (!w.start || w.start <= today) && w.end >= today;
+    return `<div class="wp-seg${cur ? ' cur' : ''}">
+      <span class="wp-seg-type">${FS.esc(w.type)}${cur ? ' · 현재' : ''}</span>
+      <span class="wp-seg-range">${w.start ? FS.formatDate(w.start) : '?'} ~ ${FS.formatDate(w.end)}</span>
+      ${w.memo ? `<span class="wp-seg-memo">${FS.esc(w.memo)}</span>` : ''}
+    </div>`; }).join('')}</div>` : '';
 
   const statusCls = s => s === '운영중' ? 'badge-success' : s === '장애' ? 'badge-danger' : 'badge-warning';
 

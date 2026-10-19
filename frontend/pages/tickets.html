@@ -44,6 +44,20 @@
   .tl-actions button:hover { color:var(--text); background:var(--surface-2); }
   .tl-edit { display:flex; flex-direction:column; gap:6px; margin-top:6px; }
   .tl-empty { font-size:12px; color:var(--text-hint); padding:6px 0 4px 16px; }
+  /* 부품: P/N · FRU */
+  .tl-parts { display:grid; grid-template-columns:repeat(2, minmax(0,1fr)); gap:6px; }
+  .tl-parts input { font-family:var(--font-mono); }
+  .tl-pn { display:inline-flex; gap:4px; align-items:center; font-family:var(--font-mono); font-size:12px; font-weight:700; padding:2px 6px; background:var(--signal); color:#111111; border:1.5px solid var(--ink); margin:4px 4px 0 0; user-select:all; }
+  .tl-pn b { font-family:var(--font-body); font-size:10px; font-weight:900; }
+  /* 장비 · 관련 티켓 */
+  .td-asset { font-family:var(--font-mono); font-weight:700; color:var(--primary-text); cursor:pointer; text-decoration:underline; }
+  .td-related { border:2px solid var(--ink); margin-top:14px; }
+  .td-related-head { display:flex; justify-content:space-between; align-items:center; padding:7px 10px; background:var(--ink); color:var(--bg); font-size:12px; font-weight:800; }
+  html[data-theme="dark"] .td-related-head { background:#0C0C0B; color:#ECEAE4; }
+  .td-related-item { display:flex; align-items:center; gap:8px; padding:8px 10px; border-top:1px solid var(--border); font-size:12px; cursor:pointer; background:var(--surface); }
+  .td-related-item:hover { background:var(--surface-2); }
+  .td-related-item span:first-of-type { flex:1; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; font-weight:700; }
+  .tk-host { display:block; font-family:var(--font-mono); font-size:11px; color:var(--text-hint); font-weight:400; }
 </style>
 
 <div id="stat-grid"></div>
@@ -101,23 +115,26 @@
       <div class="form-group"><label class="form-label">제목 *</label><input type="text" class="form-input" id="f-title" placeholder="장애 내용 요약"></div>
       <div class="form-row">
         <div class="form-group"><label class="form-label">고객사</label>
-          <select class="form-select" id="f-customer"><option value="">선택 안 함</option></select>
+          <select class="form-select" id="f-customer" onchange="tkFillAssets()"><option value="">선택 안 함</option></select>
         </div>
-        <div class="form-group"><label class="form-label">담당자</label>
-          <input type="text" class="form-input" id="f-assignee" placeholder="담당자 이름">
+        <div class="form-group"><label class="form-label">장비</label>
+          <select class="form-select" id="f-asset" onchange="tkAssetPicked()"><option value="">선택 안 함</option></select>
         </div>
       </div>
       <div class="form-row">
+        <div class="form-group"><label class="form-label">담당자</label>
+          <input type="text" class="form-input" id="f-assignee" placeholder="담당자 이름">
+        </div>
         <div class="form-group"><label class="form-label">우선순위</label>
           <select class="form-select" id="f-priority">
             <option>보통</option><option>긴급</option><option>높음</option><option>낮음</option>
           </select>
         </div>
-        <div class="form-group"><label class="form-label">상태</label>
-          <select class="form-select" id="f-status" onchange="toggleCompletedAt()">
-            <option>접수</option><option>진행중</option><option>보류</option><option>완료</option>
-          </select>
-        </div>
+      </div>
+      <div class="form-group"><label class="form-label">상태</label>
+        <select class="form-select" id="f-status" onchange="toggleCompletedAt()">
+          <option>접수</option><option>진행중</option><option>보류</option><option>완료</option>
+        </select>
       </div>
       <div class="form-group" id="completed-at-group" style="display:none;">
         <label class="form-label">완료일</label>
@@ -138,6 +155,7 @@ FS.requireAuth();
 
 let allTickets = [];
 let ticketCusts = {};
+let ticketAssets = [];   // 장비 연결용
 let ticketSelectedId = null;
 
 const STATUS_BADGE = { '접수':'badge-info','진행중':'badge-warning','보류':'badge-gray','완료':'badge-success' };
@@ -147,12 +165,16 @@ function init() {
   ticketSelectedId = null;
   tlStop = null; tlTicketId = null; tlLogs = [];   // 페이지 재진입 시 (구독은 loadPage가 해제)
   // 개요에서 '처리중 티켓'을 눌러 들어온 경우
+  // 장비 상세에서 '장애 등록'으로 온 경우: 첫 데이터가 오면 장비가 채워진 등록 창 열기
+  let pendingNew = null;
   if (window.hwPageFilter && window.hwPageFilter.page === 'tickets') {
     document.getElementById('filter-status').value = window.hwPageFilter.status || '';
+    pendingNew = window.hwPageFilter.newFor || null;
     window.hwPageFilter = null;
   }
-  FS.watch([['tickets'], ['customers']], ([tickets, custList]) => {
+  FS.watch([['tickets'], ['customers'], ['assets']], ([tickets, custList, assets]) => {
     allTickets = tickets;
+    ticketAssets = assets;
     allTickets.sort((a,b)=>(b.created_at?.seconds||0)-(a.created_at?.seconds||0));
     ticketCusts = {};
     custList.forEach(c=>ticketCusts[c.id]=c.name||c.id);
@@ -164,6 +186,7 @@ function init() {
 
     renderStats();
     renderTickets();
+    if (pendingNew) { const p = pendingNew; pendingNew = null; openModal(null, p); }
 
     // 열려 있는 상세 패널 갱신 (다른 기기에서 삭제되면 닫기)
     const detailCol = document.getElementById('detail-col');
@@ -215,7 +238,7 @@ function renderTickets() {
   const cf = document.getElementById('filter-customer').value;
 
   const data = allTickets.filter(t =>
-    (!q || [t.title, ticketCusts[t.customer_id], t.assignee, t.symptom, t.action]
+    (!q || [t.title, ticketCusts[t.customer_id], t.assignee, t.symptom, t.action, tkHost(t.asset_id)]
       .some(v => String(v ?? '').toLowerCase().includes(q))) &&
     (!sf || (sf === '처리중' ? t.status !== '완료' : t.status===sf)) &&
     (!pf || t.priority===pf) &&
@@ -226,7 +249,7 @@ function renderTickets() {
   document.getElementById('ticket-tbody').innerHTML = data.map(t=>`
     <tr onclick="showDetail('${t.id}', true)">
       <td><span class="priority-dot" style="background:${PRIORITY_COLOR[t.priority||'보통']||'#9b9b9b'};"></span></td>
-      <td style="font-weight:500;max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${FS.esc(t.title||'')}</td>
+      <td style="font-weight:600;max-width:220px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${FS.esc(t.title||'')}${t.asset_id ? `<span class="tk-host">${FS.esc(tkHost(t.asset_id))}</span>` : ''}</td>
       <td style="font-size:12px;">${FS.esc(ticketCusts[t.customer_id]||'-')}</td>
       <td><span class="badge ${STATUS_BADGE[t.status||'접수']||'badge-gray'}">${FS.esc(t.status||'접수')}</span></td>
       <td style="font-size:12px;color:${PRIORITY_COLOR[t.priority]||'var(--text-sub)'};">${FS.esc(t.priority||'-')}</td>
@@ -277,10 +300,10 @@ function tlElapsed(t) {
   if (!created) return '';
   if (t.status === '완료') {
     const done = [...tlLogs].filter(l => l.auto && l.to === '완료').sort((a, b) => tlDate(b.at) - tlDate(a.at))[0];
-    return done ? `완료 · 총 ${tlDur(tlDate(done.at) - created)}` : '완료';
+    return done ? `총 ${tlDur(tlDate(done.at) - created)}` : '';
   }
   const d = Math.floor((Date.now() - created) / 86400000);
-  return `${t.status || '접수'} · ${d ? d + 1 + '일째' : '오늘 접수'}`;
+  return d ? `${d + 1}일째` : '오늘 접수';
 }
 
 function showDetail(id, scroll) {
@@ -298,6 +321,10 @@ function showDetail(id, scroll) {
       <div id="td-info"></div>
       <div class="tl-compose">
         <div class="tl-types" id="tl-types"></div>
+        <div class="tl-parts" id="tl-parts" style="display:none;">
+          <input type="text" class="form-input" id="tl-pn" placeholder="P/N" autocomplete="off">
+          <input type="text" class="form-input" id="tl-fru" placeholder="FRU" autocomplete="off">
+        </div>
         <textarea class="form-textarea" id="tl-text" rows="2" placeholder="예: HDD fail 확인 (Slot 3)" onkeydown="if((event.ctrlKey||event.metaKey)&&event.key==='Enter')tlAdd()"></textarea>
         <div class="tl-compose-foot">
           <button class="tl-when-btn" id="tl-when-btn" onclick="tlToggleWhen()">시간 지정</button>
@@ -343,7 +370,7 @@ function tlRenderInfo() {
     <div class="flex-between mb-2">
       <div class="flex gap-2">
         <span class="badge ${STATUS_BADGE[t.status||'접수']||'badge-gray'}">${FS.esc(t.status||'접수')}</span>
-        <span class="td-elapsed">${FS.esc(tlElapsed(t))}</span>
+        ${tlElapsed(t) ? `<span class="td-elapsed">${FS.esc(tlElapsed(t))}</span>` : ''}
       </div>
       <div class="flex gap-1">
         <button class="btn btn-sm" onclick="openModal('${id}')">수정</button>
@@ -354,6 +381,7 @@ function tlRenderInfo() {
     <h3 style="font-size:16px;font-weight:800;margin-bottom:12px;line-height:1.4;">${FS.esc(t.title||'')}</h3>
     <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:12px;font-size:12px;">
       <div><span class="text-hint">고객사</span><br>${FS.esc(ticketCusts[t.customer_id]||'-')}</div>
+      <div><span class="text-hint">장비</span><br>${t.asset_id && tkHost(t.asset_id) ? `<span class="td-asset" onclick="tkOpenAsset('${t.asset_id}')">${FS.esc(tkHost(t.asset_id))}</span>` : '-'}</div>
       <div><span class="text-hint">담당자</span><br>${FS.esc(t.assignee||'-')}</div>
       <div><span class="text-hint">우선순위</span><br><span style="color:${PRIORITY_COLOR[t.priority]||'inherit'};font-weight:800;">${FS.esc(t.priority||'-')}</span></div>
       <div><span class="text-hint">등록일</span><br>${FS.formatDate(t.created_at)||'-'}</div>
@@ -368,12 +396,70 @@ function tlRenderInfo() {
           <button class="btn btn-sm ${t.status===s?'btn-primary':''}" onclick="changeStatus('${id}','${s}')">${s}</button>
         `).join('')}
       </div>
-    </div>`;
+    </div>
+    ${tkRelatedHtml(t)}`;
+}
+
+// ── 장비 연결 ──
+function tkHost(assetId) {
+  const a = ticketAssets.find(x => x.id === assetId);
+  return a ? (a.hostname || a.serial || '') : '';
+}
+function tkFillAssets(selected) {
+  const cid = document.getElementById('f-customer').value;
+  const sel = document.getElementById('f-asset');
+  const list = ticketAssets
+    .filter(a => !cid || a.customer_id === cid)
+    .sort((a, b) => (a.hostname || '').localeCompare(b.hostname || ''));
+  FS.setOptions(sel, list.map(a => ({
+    value: a.id,
+    label: `${a.hostname || '-'}${a.serial ? ' · ' + a.serial : ''}${cid ? '' : ' (' + (ticketCusts[a.customer_id] || '-') + ')'}`,
+  })));
+  if (selected !== undefined) sel.value = selected || '';
+}
+function tkAssetPicked() {
+  // 장비를 먼저 고르면 고객사 자동 지정
+  const a = ticketAssets.find(x => x.id === document.getElementById('f-asset').value);
+  if (a && a.customer_id && document.getElementById('f-customer').value !== a.customer_id) {
+    document.getElementById('f-customer').value = a.customer_id;
+    tkFillAssets(a.id);
+  }
+}
+function tkOpenAsset(assetId) {
+  window.hwPageFilter = { page: 'customers', assetId };
+  loadPage('customers');
+}
+// 같은 장비의 다른 장애 (HDD·DIMM처럼 장애마다 티켓을 따로)
+function tkRelatedHtml(t) {
+  if (!t.asset_id) return '';
+  const others = allTickets.filter(x => x.id !== t.id && x.asset_id === t.asset_id)
+    .sort((a, b) => ((a.status === '완료') - (b.status === '완료')) || ((b.created_at?.seconds || 0) - (a.created_at?.seconds || 0)));
+  return `<div class="td-related">
+    <div class="td-related-head">
+      <span>같은 장비의 장애 ${others.length ? others.length + '건' : ''}</span>
+      <button class="btn btn-sm" onclick="tkNewForSameAsset('${t.id}')">${FS.icon('plus', 14)} 같은 장비에 장애 추가</button>
+    </div>
+    ${others.slice(0, 6).map(x => `<div class="td-related-item" onclick="showDetail('${x.id}', true)">
+      <span>${FS.esc(x.title || '')}</span>
+      <span class="badge ${STATUS_BADGE[x.status||'접수']||'badge-gray'}">${FS.esc(x.status||'접수')}</span>
+    </div>`).join('')}
+  </div>`;
+}
+function tkNewForSameAsset(ticketId) {
+  const t = allTickets.find(x => x.id === ticketId);
+  if (!t) return;
+  openModal(null, { customer_id: t.customer_id, asset_id: t.asset_id, assignee: t.assignee });
 }
 
 function tlRenderTypes() {
   document.getElementById('tl-types').innerHTML = TL_TYPES.map(ty =>
     `<button class="tl-chip${ty === tlType ? ' on' : ''}" onclick="tlPickType('${ty}')">${ty}</button>`).join('');
+  document.getElementById('tl-parts').style.display = tlType === '부품' ? '' : 'none';
+  document.getElementById('tl-text').placeholder = tlType === '부품' ? '예: Slot 3 HDD 교체 (RMA 접수)' : '예: HDD fail 확인 (Slot 3)';
+}
+function tlPartsHtml(l) {
+  return (l.pn ? `<span class="tl-pn"><b>P/N</b>${FS.esc(l.pn)}</span>` : '') +
+         (l.fru ? `<span class="tl-pn"><b>FRU</b>${FS.esc(l.fru)}</span>` : '');
 }
 function tlPickType(ty) { tlType = ty; tlRenderTypes(); document.getElementById('tl-text').focus(); }
 
@@ -401,6 +487,10 @@ function tlRenderTimeline() {
             <select class="form-select" id="tl-e-type" style="width:auto;height:32px;">${TL_TYPES.map(ty => `<option${ty === l.type ? ' selected' : ''}>${ty}</option>`).join('')}</select>
             <input type="datetime-local" class="form-input tl-when" id="tl-e-at" value="${tlLocalInput(tlDate(l.at) || new Date())}">
           </div>
+          <div class="tl-parts">
+            <input type="text" class="form-input" id="tl-e-pn" placeholder="P/N" value="${FS.esc(l.pn || '')}">
+            <input type="text" class="form-input" id="tl-e-fru" placeholder="FRU" value="${FS.esc(l.fru || '')}">
+          </div>
           <textarea class="form-textarea" id="tl-e-text" rows="2">${FS.esc(l.text || '')}</textarea>
           <div class="flex gap-1" style="justify-content:flex-end;">
             <button class="btn btn-sm" onclick="tlEditingId=null;tlRenderTimeline()">취소</button>
@@ -419,7 +509,8 @@ function tlRenderTimeline() {
           <button onclick="tlDelete('${l.id}')" aria-label="기록 삭제">${FS.icon('trash', 15)}</button>
         </span>` : ''}
       </div>
-      <div class="tl-text">${FS.esc(l.text || '')}</div>
+      ${l.text ? `<div class="tl-text">${FS.esc(l.text)}</div>` : ''}
+      ${tlPartsHtml(l)}
     </div>`;
   }).join('') : '<div class="tl-empty">아직 기록이 없습니다</div>';
 }
@@ -434,7 +525,10 @@ async function tlAdd() {
   if (tlSaving || !tlTicketId) return;
   const textEl = document.getElementById('tl-text');
   const text = textEl.value.trim();
-  if (!text) { Toast.error('내용을 입력하세요'); textEl.focus(); return; }
+  const isPart = tlType === '부품';
+  const pn  = isPart ? document.getElementById('tl-pn').value.trim() : '';
+  const fru = isPart ? document.getElementById('tl-fru').value.trim() : '';
+  if (!text && !pn && !fru) { Toast.error('내용을 입력하세요'); textEl.focus(); return; }
   const whenEl = document.getElementById('tl-when');
   const when = whenEl.style.display !== 'none' && whenEl.value ? new Date(whenEl.value) : null;
   tlSaving = true;
@@ -442,11 +536,13 @@ async function tlAdd() {
   try {
     await tlLogsRef(tlTicketId).add({
       type: tlType, text,
+      ...(isPart ? { pn, fru } : {}),
       at: when ? firebase.firestore.Timestamp.fromDate(when) : firebase.firestore.FieldValue.serverTimestamp(),
       ...tlAuthor(), auto: false,
       created_at: firebase.firestore.FieldValue.serverTimestamp(),
     });
     textEl.value = '';
+    if (isPart) { document.getElementById('tl-pn').value = ''; document.getElementById('tl-fru').value = ''; }
     if (when) tlToggleWhen();
     textEl.focus();   // 같은 종류로 바로 다음 기록
   } catch (e) {
@@ -473,11 +569,13 @@ async function tlAutoStatus(ticketId, from, to) {
 async function tlSaveEdit(logId) {
   const text = document.getElementById('tl-e-text').value.trim();
   const atVal = document.getElementById('tl-e-at').value;
-  if (!text) { Toast.error('내용을 입력하세요'); return; }
+  const pn  = document.getElementById('tl-e-pn').value.trim();
+  const fru = document.getElementById('tl-e-fru').value.trim();
+  if (!text && !pn && !fru) { Toast.error('내용을 입력하세요'); return; }
   try {
     await tlLogsRef(tlTicketId).doc(logId).update({
       type: document.getElementById('tl-e-type').value,
-      text,
+      text, pn, fru,
       ...(atVal ? { at: firebase.firestore.Timestamp.fromDate(new Date(atVal)) } : {}),
       updated_at: firebase.firestore.FieldValue.serverTimestamp(),
     });
@@ -499,18 +597,19 @@ async function tlCopyReport() {
   const t = allTickets.find(x => x.id === tlTicketId);
   if (!t) return;
   const lines = [
-    `[장애 보고] ${t.title || ''}${ticketCusts[t.customer_id] ? ' / ' + ticketCusts[t.customer_id] : ''}`,
+    `[장애 보고] ${t.title || ''}${ticketCusts[t.customer_id] ? ' / ' + ticketCusts[t.customer_id] : ''}${tkHost(t.asset_id) ? ' ' + tkHost(t.asset_id) : ''}`,
     `상태: ${t.status || '접수'}${t.priority ? ' · 우선순위 ' + t.priority : ''}${t.assignee ? ' · 담당 ' + t.assignee : ''}`,
   ];
   if (t.symptom) lines.push('', '■ 증상', t.symptom);
   lines.push('', '■ 진행 경과');
   tlAllLogs(t).forEach(l => {
-    const body = (l.text || '').split('\n').join('\n    ');
+    const parts = [l.pn ? `P/N ${l.pn}` : '', l.fru ? `FRU ${l.fru}` : ''].filter(Boolean).join(', ');
+    const body = [(l.text || '').split('\n').join('\n    '), parts ? `(${parts})` : ''].filter(Boolean).join(' ');
     lines.push(`- ${tlFmt(tlDate(l.at))} [${l.type}] ${body}`);
   });
   if (t.action) lines.push('', '■ 조치 결과', t.action);
   const el = tlElapsed(t);
-  if (el.includes('총')) lines.push('', el.replace('완료 · ', ''));
+  if (el.startsWith('총')) lines.push('', `${el} 소요`);
   const text = lines.join('\n');
   try {
     await navigator.clipboard.writeText(text);
@@ -560,7 +659,7 @@ function toggleCompletedAt() {
   }
 }
 
-function openModal(id) {
+function openModal(id, prefill) {
   document.getElementById('ticket-modal').style.display='flex';
   if (id) {
     const t = allTickets.find(x=>x.id===id);
@@ -568,6 +667,7 @@ function openModal(id) {
     document.getElementById('edit-id').value=id;
     document.getElementById('f-title').value=t.title||'';
     document.getElementById('f-customer').value=t.customer_id||'';
+    tkFillAssets(t.asset_id || '');
     document.getElementById('f-assignee').value=t.assignee||'';
     document.getElementById('f-priority').value=t.priority||'보통';
     document.getElementById('f-status').value=t.status||'접수';
@@ -580,7 +680,14 @@ function openModal(id) {
     ['f-title','f-assignee','f-symptom','f-action','f-completed-at'].forEach(i=>document.getElementById(i).value='');
     document.getElementById('f-priority').value='보통';
     document.getElementById('f-status').value='접수';
-    document.getElementById('f-customer').value='';
+    document.getElementById('f-customer').value=prefill?.customer_id||'';
+    tkFillAssets(prefill?.asset_id || '');
+    if (prefill?.assignee) document.getElementById('f-assignee').value = prefill.assignee;
+    if (prefill?.asset_id) {
+      const host = tkHost(prefill.asset_id);
+      document.getElementById('modal-title').textContent = host ? `티켓 등록 — ${host}` : '티켓 등록';
+      setTimeout(() => document.getElementById('f-title').focus(), 50);
+    }
   }
   toggleCompletedAt();
 }
@@ -593,6 +700,7 @@ async function saveTicket() {
   const data = {
     title,
     customer_id: document.getElementById('f-customer').value,
+    asset_id: document.getElementById('f-asset').value,
     assignee: document.getElementById('f-assignee').value.trim(),
     priority: document.getElementById('f-priority').value,
     status,

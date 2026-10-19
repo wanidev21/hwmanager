@@ -240,6 +240,7 @@ html[data-theme="dark"] .cust-item.active .cust-item-name, html[data-theme="dark
     <div class="modal-body"><div class="av-grid" id="av-body"></div></div>
     <div class="modal-footer">
       <button class="btn" onclick="closeAssetView()">닫기</button>
+      <button class="btn" id="av-ticket">장애 등록</button>
       <button class="btn btn-primary" id="av-edit">수정</button>
     </div>
   </div>
@@ -545,7 +546,35 @@ function viewAsset(id) {
     fields.map(([l, v]) => `<div class="av-item"><div class="av-label">${l}</div><div class="av-val">${FS.esc(v || '-')}</div></div>`).join('') +
     (a.memo ? `<div class="av-item av-full"><div class="av-label">메모</div><div class="av-val" style="white-space:pre-wrap;">${FS.esc(a.memo)}</div></div>` : '');
   document.getElementById('av-edit').onclick = () => { closeAssetView(); openAssetModal(id); };
+  document.getElementById('av-ticket').onclick = () => {
+    closeAssetView();
+    window.hwPageFilter = { page: 'tickets', newFor: { customer_id: a.customer_id, asset_id: a.id } };
+    loadPage('tickets');
+  };
   document.getElementById('asset-view-modal').style.display = 'flex';
+  avLoadTickets(id);
+}
+
+// 이 장비의 장애 이력 (1회 조회)
+async function avLoadTickets(assetId) {
+  const body = document.getElementById('av-body');
+  const box = document.createElement('div');
+  box.className = 'av-item av-full';
+  box.innerHTML = '<div class="av-label">장애 이력</div><div class="av-val" style="color:var(--text-hint);">불러오는 중...</div>';
+  body.appendChild(box);
+  try {
+    const list = (await FS.getAll('tickets', [['asset_id', '==', assetId]]))
+      .sort((a, b) => (b.created_at?.seconds || 0) - (a.created_at?.seconds || 0));
+    const BADGE = { '접수':'badge-info','진행중':'badge-warning','보류':'badge-gray','완료':'badge-success' };
+    box.innerHTML = '<div class="av-label">장애 이력 ' + (list.length ? list.length + '건' : '') + '</div>' + (list.length
+      ? list.map(t => `<div class="av-val" style="display:flex;gap:8px;align-items:center;padding:4px 0;border-top:1px solid var(--border);">
+          <span style="font-family:var(--font-mono);font-size:11px;color:var(--text-hint);">${FS.formatDate(t.created_at) || ''}</span>
+          <span style="flex:1;min-width:0;">${FS.esc(t.title || '')}</span>
+          <span class="badge ${BADGE[t.status || '접수'] || 'badge-gray'}">${FS.esc(t.status || '접수')}</span></div>`).join('')
+      : '<div class="av-val" style="color:var(--text-hint);">장애 이력 없음</div>');
+  } catch (e) {
+    box.remove();
+  }
 }
 function closeAssetView() { document.getElementById('asset-view-modal').style.display = 'none'; }
 

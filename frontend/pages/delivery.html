@@ -60,21 +60,36 @@
   position:absolute; top:0; left:0; width:794px; height:1123px;
   border:0; background:#fff; transform-origin:top left;
 }
+.dn-list-toolbar { display:flex; align-items:center; gap:10px; margin-bottom:20px; }
+.dn-list-toolbar #delivery-search { max-width:280px; }
 @media (max-width:768px) {
-  /* 폰: 목록은 터치 → 미리보기만 (인쇄·수정·삭제 숨김) */
+  /* 폰: 목록 행 터치 → 미리보기 (미리보기에서 수정·서명 가능, 목록의 인쇄·수정·삭제 버튼 열은 숨김) */
   .dn-col-opt, .dn-pc-only { display:none !important; }
+  .dn-list-toolbar { flex-wrap:wrap; gap:8px; margin-bottom:14px; }
+  .dn-list-toolbar #delivery-search { max-width:none; flex:1 1 100%; }
+  .dn-list-toolbar #status-filter { flex:1; width:auto !important; }
+  .dn-list-toolbar .dn-spacer { display:none; }
+  #list-tbody td { padding-top:12px; padding-bottom:12px; }
   .dn-grid4 { grid-template-columns:1fr 1fr !important; }
   .dn-table-scroll { overflow-x:auto; -webkit-overflow-scrolling:touch; }
-  .dn-table-scroll .item-table { min-width:620px; }
+  .dn-table-scroll .item-table { min-width:700px; }
   .dn-preview-modal .modal-body { padding:10px; }
   .sig-area { grid-template-columns:1fr; gap:12px; }
-  .edit-toolbar { flex-wrap:wrap; gap:6px; }
+  /* 편집 툴바: 줄바꿈 + 상단 고정 (긴 문서에서도 저장 버튼에 바로 닿도록) */
+  .edit-toolbar {
+    flex-wrap:wrap; gap:6px; position:sticky; top:0; z-index:20;
+    background:var(--bg); padding-top:8px; margin-top:-8px; margin-bottom:14px; padding-bottom:10px;
+  }
+  .edit-toolbar h3 { flex:1 1 auto; }
   .item-table { font-size:11px; }
   .item-table thead th, .item-table tbody td { padding:5px 6px; }
+  /* iOS는 16px 미만 입력칸에 포커스하면 화면을 확대하므로 16px 이상 */
+  .item-table input, .item-table select { font-size:16px; min-height:40px; }
 }
 .sig-box canvas {
   border:1px solid var(--border); border-radius:var(--radius);
   cursor:crosshair; display:block; width:100%; background:var(--surface);
+  touch-action:none;   /* 서명 중 화면 스크롤 방지 */
 }
 .sig-box label { font-size:12px; font-weight:500; color:var(--text-sub); display:block; margin-bottom:6px; }
 
@@ -98,19 +113,32 @@
 @media print {
   @page { size:A4 portrait; margin:0; }
 
-  body * { visibility:hidden !important; }
-  .print-doc, .print-doc * { visibility:visible !important; }
+  /* 인쇄하는 동안 dnPrint()가 #print-doc을 body 바로 아래로 옮김 → 나머지 화면은 숨기고
+     앱 레이아웃(100vh·overflow:hidden)에 잘리지 않게 해서 여러 페이지로 인쇄 */
+  html, body.dn-printing { height:auto !important; overflow:visible !important; }
+  body.dn-printing { display:block !important; background:#fff !important; }
+  body.dn-printing > *:not(.print-doc) { display:none !important; }
 
   .print-doc {
-    position:fixed; inset:0;
-    width:210mm; height:297mm;
+    display:block !important;
+    position:relative;
+    width:210mm; min-height:297mm;
     font-family:'Malgun Gothic','Apple SD Gothic Neo','Noto Sans KR',sans-serif;
     font-size:9.5pt; color:#1a1a1a;
     background:#fff;
     box-sizing:border-box;
     padding:14mm 16mm 12mm;
-    display:flex; flex-direction:column;
   }
+  /* 품목이 적으면 한 장에 맞춰 푸터를 바닥에 붙임 (품목이 많으면 블록 흐름으로 다음 장에 이어짐) */
+  .print-doc.pd-one-page {
+    display:flex !important; flex-direction:column;
+    height:297mm; overflow:hidden;
+  }
+  .print-doc:not(.pd-one-page) .pd-footer { margin-top:6mm; }
+  .pd-table thead { display:table-header-group; }   /* 다음 장에도 머리글 반복 */
+  .pd-table tr { break-inside:avoid; page-break-inside:avoid; }
+  .pd-confirm { break-after:avoid; page-break-after:avoid; }
+  .pd-sigs, .pd-sig { break-inside:avoid; page-break-inside:avoid; }
 
   /* 최상단 장식 바 */
   .pd-topbar {
@@ -252,15 +280,15 @@
 
 <!-- ── 목록 뷰 ─────────────────────────── -->
 <div class="view active" id="view-list">
-  <div style="display:flex;align-items:center;gap:10px;margin-bottom:20px;">
+  <div class="dn-list-toolbar">
     <input type="text" class="form-input" id="delivery-search"
-      placeholder="문서번호·고객사·프로젝트 검색..." oninput="renderList()" style="max-width:280px;">
+      placeholder="문서번호·고객사·프로젝트 검색..." oninput="renderList()">
     <select class="form-select" id="status-filter" onchange="renderList()" style="width:110px;">
       <option value="">전체 상태</option>
       <option value="작성중">작성중</option>
       <option value="완료">완료</option>
     </select>
-    <div style="flex:1;"></div>
+    <div class="dn-spacer" style="flex:1;"></div>
     <button class="btn btn-primary" onclick="openEditor()">+ 새 납품확인서</button>
   </div>
   <div class="card" style="padding:0;overflow:hidden;">
@@ -291,10 +319,11 @@
   <div class="edit-toolbar">
     <button class="btn" onclick="showList()">← 목록</button>
     <h3 id="edit-title">새 납품확인서</h3>
-    <button class="btn" id="btn-complete" onclick="saveDraft('완료')"
+    <button class="btn dn-save-btn" id="btn-complete" onclick="saveDraft('완료')"
       style="background:#f0fdf4;border-color:#86efac;color:#15803d;">✓ 완료 처리</button>
     <button class="btn" onclick="previewFromEditor()">👁 미리보기</button>
-    <button class="btn btn-primary" onclick="saveDraft('작성중')">저장</button>
+    <!-- 저장: 현재 상태 유지 (완료 문서를 저장해도 작성중으로 되돌리지 않음) -->
+    <button class="btn btn-primary dn-save-btn" onclick="saveDraft()">저장</button>
     <button class="btn" id="btn-print-edit" onclick="printFromEditor()" style="display:none;">🖨 인쇄</button>
   </div>
 
@@ -303,7 +332,7 @@
     <div class="dn-grid4" style="display:grid;grid-template-columns:1fr 1fr 1fr 1fr;gap:12px;">
       <div class="form-group">
         <label class="form-label">고객사</label>
-        <select class="form-select" id="h-customer"></select>
+        <select class="form-select" id="h-customer"><option value="">고객사 선택</option></select>
         <input type="text" class="form-input mt-1" id="h-customer-text" placeholder="직접 입력" style="display:none;">
         <button class="btn btn-ghost btn-sm" style="margin-top:4px;font-size:11px;" onclick="toggleCustomerInput()">직접 입력 전환</button>
       </div>
@@ -352,7 +381,7 @@
   <div class="card mb-3">
     <div class="card-header">
       <span class="card-title">납품 품목</span>
-      <button class="btn btn-sm" onclick="addItemRow()">+ 행 추가</button>
+      <button class="btn btn-sm" onclick="addItemRow();dnDirty=true;">+ 행 추가</button>
     </div>
     <div class="dn-table-scroll">
     <table class="item-table" id="item-table">
@@ -379,13 +408,13 @@
         <label>공급자 서명</label>
         <div class="form-group"><input type="text" class="form-input" id="sig-supplier-name" placeholder="이름"></div>
         <canvas id="canvas-supplier" width="400" height="110"></canvas>
-        <button class="btn btn-ghost btn-sm mt-1" onclick="clearCanvas('canvas-supplier')">지우기</button>
+        <button class="btn btn-ghost btn-sm mt-1" onclick="clearCanvas('canvas-supplier');dnDirty=true;">지우기</button>
       </div>
       <div class="sig-box">
         <label>인수자 서명</label>
         <div class="form-group"><input type="text" class="form-input" id="sig-receiver-name" placeholder="이름"></div>
         <canvas id="canvas-receiver" width="400" height="110"></canvas>
-        <button class="btn btn-ghost btn-sm mt-1" onclick="clearCanvas('canvas-receiver')">지우기</button>
+        <button class="btn btn-ghost btn-sm mt-1" onclick="clearCanvas('canvas-receiver');dnDirty=true;">지우기</button>
       </div>
     </div>
   </div>
@@ -399,12 +428,14 @@
       <button class="modal-close" onclick="closePreview()">×</button>
     </div>
     <div class="modal-body">
-      <div class="dn-preview-box" id="preview-box"><iframe id="preview-frame" title="납품확인서 미리보기"></iframe></div>
+      <div class="dn-preview-box" id="preview-box"><iframe id="preview-frame" title="납품확인서 미리보기" sandbox="allow-same-origin"></iframe></div>
     </div>
     <div class="modal-footer" id="preview-actions"></div>
   </div>
 </div>
-<div class="print-doc" id="print-doc"></div>
+<!-- 인라인 display:none: 인쇄 중 body로 옮겨진 채 페이지를 떠나도(이 페이지 CSS가 사라져도) 화면에 드러나지 않도록.
+     인쇄 CSS의 display:block !important가 인쇄 때만 이를 덮어씀 -->
+<div class="print-doc" id="print-doc" style="display:none;"></div>
 
 <script>
 FS.requireAuth();
@@ -414,6 +445,11 @@ const MODEL_OPTIONS = ['Server','Storage','GPU','Switch','NIC','HDD','SSD','NVMe
 
 let deliveryNotes = [], deliveryCusts = [];
 let editingNoteId = null, useCustomerText = false, editingStatus = '작성중';
+let dnSaving = false;        // 저장 중복 클릭 방지
+let dnDirty = false;         // 편집 화면에 저장 안 된 변경이 있는지
+let dnEditorToken = 0;       // openEditor 경합 방지 (A 열다가 B 열면 A의 늦은 결과 무시)
+const dnSigToken = {};       // 캔버스별 서명 이미지 로드 경합 방지
+const DN_ONE_PAGE_MAX = 12;  // 이 품목 수 이하면 한 장 레이아웃 (초과 시 여러 장)
 
 const AC_KEY = 'dn_desc_hist';
 
@@ -432,19 +468,42 @@ const getHist = () => { try { return JSON.parse(localStorage.getItem(AC_KEY)||'[
 const addHist = v => { if (!v) return; let h = getHist().filter(x=>x!==v); h.unshift(v); localStorage.setItem(AC_KEY, JSON.stringify(h.slice(0,100))); };
 
 function init() {
+  dnDirty = false; dnSaving = false;
+  // 이전 인쇄에서 body로 옮겨진 채 남은 인쇄 DOM 정리
+  document.querySelectorAll('body > .print-doc').forEach(el => el.remove());
+  document.body.classList.remove('dn-printing');
+  // 편집 화면 입력 변경 감지 (요소는 페이지 진입마다 새로 생기므로 여기서 한 번씩 바인딩)
+  const editView = document.getElementById('view-edit');
+  ['input','change'].forEach(t => editView.addEventListener(t, () => { dnDirty = true; }));
+  // 메뉴 이동 등으로 페이지를 떠날 때 확인 (index.html loadPage가 호출, true면 떠나도 됨)
+  window.beforePageLeave = () => dnConfirmLeave();
+
   // 목록·고객사만 실시간 반영 (작성 중인 편집 화면 입력값은 건드리지 않음)
   FS.watch([['delivery_notes'], ['customers']], ([notes, custs]) => {
     deliveryNotes = notes;
     deliveryCusts = custs;
     deliveryNotes.sort((a,b)=>(b.created_at?.seconds||0)-(a.created_at?.seconds||0));
-    const sel = document.getElementById('h-customer');
-    const prev = sel.value;
-    sel.innerHTML = '<option value="">고객사 선택</option>' +
-      deliveryCusts.map(c=>`<option value="${c.id}">${c.name||c.id}</option>`).join('');
-    sel.value = prev;
+    FS.setOptions(document.getElementById('h-customer'),
+      deliveryCusts.map(c => ({ value:c.id, label:c.name||c.id })));
     renderList();
   });
 }
+
+// 편집 화면에 저장 안 된 변경이 있는지 (다른 페이지에서 호출돼도 안전하도록 화면 존재 여부도 확인)
+function dnHasUnsaved() {
+  return dnDirty && !!document.querySelector('#page-content #view-edit.active #item-tbody');
+}
+// 떠나도 되면 true. 변경 사항이 있으면 확인 창
+async function dnConfirmLeave() {
+  if (!dnHasUnsaved()) return true;
+  const ok = await Dialog.confirm('저장하지 않은 변경 내용이 있습니다.\n저장하지 않고 나가시겠습니까?', true);
+  if (ok) dnDirty = false;
+  return ok;
+}
+// 탭 닫기·새로고침 시 브라우저 기본 경고
+window.addEventListener('beforeunload', e => {
+  if (typeof dnHasUnsaved === 'function' && dnHasUnsaved()) { e.preventDefault(); e.returnValue = ''; }
+});
 
 function toggleCustomerInput() {
   useCustomerText = !useCustomerText;
@@ -483,15 +542,25 @@ function renderList() {
   }).join('');
 }
 
-function showList() {
+// ← 목록 버튼·뒤로가기(index.html _closeTopLayer) 공용. 변경 사항이 있으면 확인 후 이동
+function showList(force) {
+  if (force !== true && dnHasUnsaved()) {
+    dnConfirmLeave().then(ok => { if (ok) showList(true); });
+    return;
+  }
+  dnDirty = false;
+  dnEditorToken++;   // 로딩 중인 openEditor 결과 무시
   document.getElementById('view-edit').classList.remove('active');
   document.getElementById('view-list').classList.add('active');
 }
 
 async function openEditor(id) {
+  const myToken = ++dnEditorToken;
+  dnDirty = false;
   editingNoteId = id || null;
   document.getElementById('view-list').classList.remove('active');
   document.getElementById('view-edit').classList.add('active');
+  document.getElementById('page-content')?.scrollTo(0, 0);   // 목록을 내려 둔 상태에서도 편집 화면 맨 위부터
   useCustomerText = false;
   ['h-customer','h-customer-text','h-project','h-date','h-docno','h-note',
    'sig-supplier-name','sig-receiver-name',
@@ -527,7 +596,13 @@ async function openEditor(id) {
       if (note.supplier_sig) drawSig('canvas-supplier', note.supplier_sig);
       if (note.receiver_sig) drawSig('canvas-receiver', note.receiver_sig);
     }
-    const items = await FS.getAll('delivery_items',[['delivery_id','==',id]]);
+    let items = [];
+    try {
+      items = await FS.getAll('delivery_items',[['delivery_id','==',id]]);
+    } catch (e) {
+      Toast.error('품목을 불러오지 못했습니다: ' + (e.code || e.message));
+    }
+    if (myToken !== dnEditorToken) return;   // 그 사이 다른 문서를 열었거나 목록으로 나감
     items.sort((a,b)=>(a.seq||0)-(b.seq||0));
     items.length ? items.forEach(addItemRow) : addItemRow();
   } else {
@@ -563,6 +638,7 @@ function addItemRow(item) {
 }
 
 function removeRow(btn) {
+  dnDirty = true;
   btn.closest('tr').remove();
   document.querySelectorAll('#item-tbody tr').forEach((tr,i)=>{ tr.cells[0].textContent=i+1; });
 }
@@ -575,7 +651,7 @@ function showAC(input) {
   list.innerHTML = '';
   hist.slice(0,8).forEach(h=>{
     const d=document.createElement('div'); d.className='ac-item'; d.textContent=h;
-    d.addEventListener('mousedown',()=>{ input.value=h; list.classList.remove('open'); });
+    d.addEventListener('mousedown',()=>{ input.value=h; dnDirty=true; list.classList.remove('open'); });
     list.appendChild(d);
   });
   list.classList.add('open');
@@ -593,7 +669,28 @@ function getItemRows() {
     .map((r, i) => ({ seq:i+1, ...r }));
 }
 
+// status 생략(저장 버튼) 시 현재 상태 유지, '완료'면 완료 처리
 async function saveDraft(status) {
+  if (dnSaving) return;
+  status = status || editingStatus || '작성중';
+  dnSaving = true;
+  const btns = [...document.querySelectorAll('#view-edit .dn-save-btn')];
+  btns.forEach(b => { b.disabled = true; });
+  const wasDirty = dnDirty;
+  dnDirty = false;   // 저장 중에 입력한 내용은 다시 변경으로 잡히도록 먼저 초기화
+  try {
+    await dnSaveNote(status);
+  } catch (e) {
+    dnDirty = dnDirty || wasDirty;
+    console.error('[delivery] save', e);
+    Toast.error('저장 실패: ' + (e.code || e.message));
+  } finally {
+    dnSaving = false;
+    btns.forEach(b => { b.disabled = false; });
+  }
+}
+
+async function dnSaveNote(status) {
   const customerId = useCustomerText ? '' : document.getElementById('h-customer').value;
   const customerName = useCustomerText
     ? document.getElementById('h-customer-text').value.trim()
@@ -619,18 +716,32 @@ async function saveDraft(status) {
     item_count:    items.length,
     status,
   };
+  // 문서 + 품목(기존 삭제·새로 기록)을 batch 하나로 커밋 → 중간 실패로 품목이 사라지거나 중복되지 않음
+  // (FS.add/update와 같은 created_at/updated_at 규칙 유지. batch 한도 500건)
+  const db  = firebase.firestore();
+  const now = firebase.firestore.FieldValue.serverTimestamp();
+  const batch = db.batch();
+  const itemsCol = db.collection('delivery_items');
+  let noteId = editingNoteId;
+  if (noteId) {
+    const old = await FS.getAll('delivery_items',[['delivery_id','==',noteId]]);
+    batch.update(db.collection('delivery_notes').doc(noteId), { ...noteData, updated_at: now });
+    old.forEach(i => batch.delete(itemsCol.doc(i.id)));
+  } else {
+    const ref = db.collection('delivery_notes').doc();
+    noteId = ref.id;
+    batch.set(ref, { ...noteData, created_at: now, updated_at: now });
+  }
+  items.forEach(item => batch.set(itemsCol.doc(), { ...item, delivery_id: noteId, created_at: now, updated_at: now }));
+  await batch.commit();
+
   if (editingNoteId) {
-    await FS.update('delivery_notes', editingNoteId, noteData);
     const idx = deliveryNotes.findIndex(n=>n.id===editingNoteId);
     if (idx>=0) deliveryNotes[idx]={...deliveryNotes[idx],...noteData};
-    const old = await FS.getAll('delivery_items',[['delivery_id','==',editingNoteId]]);
-    await Promise.all(old.map(i=>FS.remove('delivery_items',i.id)));
-    await Promise.all(items.map(item=>FS.add('delivery_items',{...item,delivery_id:editingNoteId})));
   } else {
-    const newId = await FS.add('delivery_notes', noteData);
-    editingNoteId = newId;
-    deliveryNotes.unshift({id:newId,...noteData});
-    await Promise.all(items.map(item=>FS.add('delivery_items',{...item,delivery_id:newId})));
+    editingNoteId = noteId;
+    deliveryNotes.unshift({id:noteId,...noteData});
+    document.getElementById('edit-title').textContent = '납품확인서 수정';
   }
   editingStatus = status;
   Toast.success(status==='완료' ? '완료 처리되었습니다' : '저장되었습니다');
@@ -667,7 +778,36 @@ async function printById(id) {
   const cName = deliveryCusts.find(c=>c.id===note.customer_id)?.name || note.customer_name || '';
   buildPrint(note, items, cName);
   await waitForPrintImages();
+  dnPrint();
+}
+
+// #print-doc을 인쇄 동안만 body 바로 아래로 옮겨 인쇄 (앱 레이아웃에 잘리지 않고 여러 장 인쇄)
+function dnPrint() {
+  const doc = document.getElementById('print-doc');
+  if (!doc) return;
+  const home = doc.parentNode, next = doc.nextSibling;
+  // 여러 장일 때: 2쪽부터 위·아래 여백 (1쪽은 상단 장식 바가 끝에 붙도록 위 여백 0)
+  let pageStyle = null;
+  if (!doc.classList.contains('pd-one-page')) {
+    pageStyle = document.createElement('style');
+    pageStyle.textContent = '@page { size:A4 portrait; margin:12mm 0 12mm; } @page :first { margin-top:0; }';
+    document.head.appendChild(pageStyle);
+  }
+  document.body.appendChild(doc);
+  document.body.classList.add('dn-printing');
+  let restored = false;
+  const restore = () => {
+    if (restored) return;
+    restored = true;
+    document.body.classList.remove('dn-printing');
+    if (pageStyle) pageStyle.remove();
+    // 그 사이 다른 페이지로 이동했으면 원래 자리가 없으므로 제거
+    if (home && home.isConnected) home.insertBefore(doc, next && next.parentNode === home ? next : null);
+    else doc.remove();
+  };
+  window.addEventListener('afterprint', restore, { once:true });
   window.print();
+  // afterprint가 오지 않아 body에 남아도 인라인 display:none으로 화면엔 안 보이고, init()에서 정리됨
 }
 
 // 편집 화면 입력값으로 문서 생성 (미리보기·인쇄 공용)
@@ -694,7 +834,7 @@ function buildPrintFromEditor() {
 async function printFromEditor() {
   buildPrintFromEditor();
   await waitForPrintImages();
-  window.print();
+  dnPrint();
 }
 
 // ── 미리보기 ───────────────────────────────────────────────
@@ -716,24 +856,35 @@ function getPrintCss() {
 }
 
 // #print-doc에 그려진 문서를 iframe으로 띄우고 화면 폭에 맞춰 축소
+// (iframe은 sandbox="allow-same-origin": 스크립트 실행 불가, 높이 측정을 위해 문서 접근만 허용)
 function showPreview(actionsHtml) {
-  const html = document.getElementById('print-doc').innerHTML;
-  document.getElementById('preview-frame').srcdoc =
+  const src = document.getElementById('print-doc');
+  const frame = document.getElementById('preview-frame');
+  frame.style.height = '1123px';
+  frame.onload = () => fitPreview();   // 문서 길이(여러 장)에 맞춰 높이 조정
+  frame.srcdoc =
     `<!doctype html><html><head><meta charset="utf-8"><style>
       html,body{margin:0;background:#fff;}
       ${getPrintCss()}
       .print-doc{position:relative !important;inset:auto !important;}
-    </style></head><body><div class="print-doc">${html}</div></body></html>`;
+    </style></head><body><div class="${FS.esc(src.className)}">${src.innerHTML}</div></body></html>`;
   document.getElementById('preview-actions').innerHTML = actionsHtml;
   document.getElementById('preview-modal').style.display = 'flex';
   fitPreview();
 }
 function fitPreview() {
   const box = document.getElementById('preview-box');
-  if (!box || !box.clientWidth) return;
+  const frame = document.getElementById('preview-frame');
+  if (!box || !frame || !box.clientWidth) return;
+  let h = 1123;   // A4 한 장 (794×1123px)
+  try {
+    const d = frame.contentDocument;
+    if (d && d.body && d.body.firstElementChild) h = Math.max(1123, Math.ceil(d.body.firstElementChild.offsetHeight));
+  } catch {}
+  frame.style.height = h + 'px';
   const scale = Math.min(1, box.clientWidth / 794);
-  document.getElementById('preview-frame').style.transform = `scale(${scale})`;
-  box.style.height = Math.ceil(1123 * scale) + 'px';
+  frame.style.transform = `scale(${scale})`;
+  box.style.height = Math.ceil(h * scale) + 'px';
 }
 window.addEventListener('resize', () => {
   if (document.getElementById('preview-modal')?.style.display === 'flex') fitPreview();
@@ -749,9 +900,10 @@ async function openPreview(id) {
   items.sort((a,b)=>(a.seq||0)-(b.seq||0));
   const cName = deliveryCusts.find(c=>c.id===note.customer_id)?.name || note.customer_name || '';
   buildPrint(note, items, cName);
+  // 폰에서도 수정(서명) 가능. 인쇄는 PC에서만
   showPreview(`
     <button class="btn" onclick="closePreview()">닫기</button>
-    <button class="btn dn-pc-only" onclick="closePreview();openEditor('${id}')">수정</button>
+    <button class="btn" onclick="closePreview();openEditor('${id}')">✎ 수정·서명</button>
     <button class="btn btn-primary dn-pc-only" onclick="closePreview();printById('${id}')">🖨 인쇄</button>`);
 }
 function previewFromEditor() {
@@ -779,14 +931,18 @@ function buildPrint(note, items, cName) {
     </tr>`;
   }).join('');
 
-  const supSig = !isBlank(note.supplier_sig,400,110)
-    ? `<img src="${note.supplier_sig}">`
+  // 서명은 캔버스가 만든 data:image(png/jpeg) base64만 허용 (그 외 값은 HTML·외부 URL 주입 위험 → 생략)
+  const supOk = dnSafeSig(note.supplier_sig), recOk = dnSafeSig(note.receiver_sig);
+  const supSig = supOk && !isBlank(supOk,400,110)
+    ? `<img src="${supOk}">`
     : '<div class="sig-empty-line"></div>';
-  const recSig = !isBlank(note.receiver_sig,400,110)
-    ? `<img src="${note.receiver_sig}">`
+  const recSig = recOk && !isBlank(recOk,400,110)
+    ? `<img src="${recOk}">`
     : '<div class="sig-empty-line"></div>';
 
-  document.getElementById('print-doc').innerHTML = `
+  const doc = document.getElementById('print-doc');
+  doc.className = 'print-doc' + (items.length <= DN_ONE_PAGE_MAX ? ' pd-one-page' : '');
+  doc.innerHTML = `
     <div class="pd-topbar"></div>
 
     <div class="pd-header">
@@ -868,9 +1024,17 @@ function buildPrint(note, items, cName) {
 }
 
 /* ── 캔버스 서명 ────────────────────────── */
+// 서명 값 검증: data:image/png|jpeg;base64 만 통과, 아니면 ''
+function dnSafeSig(v) {
+  return (typeof v === 'string' && /^data:image\/(png|jpeg);base64,[A-Za-z0-9+\/=]+$/.test(v)) ? v : '';
+}
+
+// 캔버스 요소마다 한 번만 리스너 등록 (openEditor 때마다 중복 등록되지 않도록)
 function initCanvases() {
   ['canvas-supplier','canvas-receiver'].forEach(id => {
     const canvas = document.getElementById(id);
+    if (!canvas || canvas.dataset.bound) return;
+    canvas.dataset.bound = '1';
     const ctx = canvas.getContext('2d');
     let drawing = false;
     function pos(e) {
@@ -879,7 +1043,7 @@ function initCanvases() {
       const s = e.touches ? e.touches[0] : e;
       return [(s.clientX-r.left)*sx, (s.clientY-r.top)*sy];
     }
-    function start(e) { e.preventDefault(); drawing=true; const [x,y]=pos(e); ctx.beginPath(); ctx.moveTo(x,y); }
+    function start(e) { e.preventDefault(); drawing=true; dnDirty=true; dnSigToken[id]=(dnSigToken[id]||0)+1; const [x,y]=pos(e); ctx.beginPath(); ctx.moveTo(x,y); }
     function move(e)  { if(!drawing) return; e.preventDefault(); const [x,y]=pos(e); ctx.lineTo(x,y); ctx.strokeStyle='#111'; ctx.lineWidth=2; ctx.lineCap='round'; ctx.lineJoin='round'; ctx.stroke(); }
     function end()    { drawing=false; }
     canvas.addEventListener('mousedown',start);
@@ -901,12 +1065,20 @@ function isBlank(dataUrl, w, h) {
 }
 
 function clearCanvas(id) {
+  dnSigToken[id] = (dnSigToken[id]||0) + 1;   // 로딩 중인 서명 이미지가 나중에 그려지지 않도록
   const c=document.getElementById(id); c.getContext('2d').clearRect(0,0,c.width,c.height);
 }
 function drawSig(id, dataUrl) {
-  const c=document.getElementById(id), img=new Image();
-  img.onload=()=>c.getContext('2d').drawImage(img,0,0,c.width,c.height);
-  img.src=dataUrl;
+  const safe = dnSafeSig(dataUrl);
+  if (!safe) return;
+  const tok = dnSigToken[id] = (dnSigToken[id]||0) + 1;
+  const img = new Image();
+  img.onload = () => {
+    if (tok !== dnSigToken[id]) return;   // 그 사이 다른 문서를 열었거나 지움·새로 서명함
+    const c = document.getElementById(id);
+    if (c) c.getContext('2d').drawImage(img,0,0,c.width,c.height);
+  };
+  img.src = safe;
 }
 
 init();

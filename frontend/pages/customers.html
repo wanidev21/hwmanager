@@ -6,7 +6,23 @@
 @media (max-width:960px) {
   .cust-layout { flex-direction:column; }
   .cust-col-left { width:100%; }
+  #cust-list { max-height:none !important; }   /* 세로 배치에서는 목록 안쪽 스크롤(이중 스크롤) 없이 */
 }
+/* 장비 검색 결과 */
+.asset-hit { padding:10px 14px; border-bottom:1px solid var(--border); cursor:pointer; }
+.asset-hit:hover { background:var(--bg); }
+.asset-hit-name { font-size:13px; font-weight:600; color:var(--text); }
+.asset-hit-meta { font-size:11px; color:var(--text-hint); margin-top:2px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.hit-group { padding:6px 14px; font-size:11px; font-weight:600; color:var(--text-hint); background:var(--bg); border-bottom:1px solid var(--border); }
+/* 고객사 담당자 연락처 */
+.cust-contact { display:flex; flex-wrap:wrap; gap:6px 14px; padding:10px 14px; border-bottom:1px solid var(--border); font-size:12px; color:var(--text-sub); }
+.cust-contact a { color:var(--primary); text-decoration:none; font-weight:500; }
+/* 장비 상세 (읽기 전용) */
+.av-grid { display:grid; grid-template-columns:repeat(2, minmax(0,1fr)); gap:12px 16px; }
+.av-item { min-width:0; }
+.av-label { font-size:10px; font-weight:600; color:var(--text-hint); text-transform:uppercase; letter-spacing:.04em; margin-bottom:2px; }
+.av-val { font-size:13px; color:var(--text); word-break:break-all; user-select:text; }
+.av-full { grid-column:1 / -1; }
 .cust-item {
   padding:10px 14px; border-bottom:1px solid var(--border);
   cursor:pointer; transition:background 0.1s;
@@ -44,7 +60,7 @@
     <div class="card" style="padding:0;overflow:hidden;">
       <div style="padding:10px 12px;border-bottom:1px solid var(--border);">
         <input type="text" class="form-input" id="cust-search"
-          placeholder="고객사 검색..." oninput="renderCustomers()" style="margin:0;">
+          placeholder="고객사 · Hostname · S/N · IP 검색" oninput="renderCustomers()" style="margin:0;">
       </div>
       <div id="cust-list" style="max-height:calc(100vh - 238px);overflow-y:auto;"></div>
       <div id="cust-empty" class="empty-state" style="display:none;">
@@ -72,6 +88,7 @@
           </div>
           <button class="btn btn-primary btn-sm" onclick="openProjModal()">+ 프로젝트 추가</button>
         </div>
+        <div id="cust-contact" class="cust-contact" style="display:none;"></div>
         <div style="overflow-x:auto;">
           <table class="table table-clickable">
             <thead>
@@ -99,7 +116,7 @@
             <span class="bc-sep">›</span>
             <span id="bc-proj-name" class="bc-cur"></span>
           </div>
-          <div class="flex gap-1">
+          <div class="flex gap-1" style="flex-wrap:wrap;">
             <button class="btn btn-sm" onclick="backToProjects()">← 프로젝트</button>
             <button class="btn btn-sm" onclick="downloadCsvTemplate()">↓ 템플릿</button>
             <button class="btn btn-sm" onclick="document.getElementById('csv-import-input').click()">CSV 일괄 추가</button>
@@ -211,6 +228,21 @@
   </div>
 </div>
 
+<!-- 장비 상세 (읽기 전용) -->
+<div class="modal-overlay" id="asset-view-modal" style="display:none;" onclick="if(event.target===this)closeAssetView()">
+  <div class="modal" style="max-width:560px;">
+    <div class="modal-header">
+      <h3 id="av-title">장비 정보</h3>
+      <button class="modal-close" onclick="closeAssetView()">×</button>
+    </div>
+    <div class="modal-body"><div class="av-grid" id="av-body"></div></div>
+    <div class="modal-footer">
+      <button class="btn" onclick="closeAssetView()">닫기</button>
+      <button class="btn btn-primary" id="av-edit">수정</button>
+    </div>
+  </div>
+</div>
+
 <!-- 장비 모달 -->
 <div class="modal-overlay" id="asset-modal" style="display:none;" onclick="if(event.target===this)closeAssetModal()">
   <div class="modal" style="max-width:640px;">
@@ -303,9 +335,7 @@ function warrantyBadge(dateStr) {
   return `<span class="badge badge-success">${d}일</span>`;
 }
 
-function escHtml(s) {
-  return (s || '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
-}
+function escHtml(s) { return FS.esc(s); }   // 숫자 등 문자열이 아닌 값도 안전하게
 
 function init() {
   // 페이지 재진입 시 패널은 초기 상태로 그려지므로 선택도 초기화
@@ -334,12 +364,26 @@ function init() {
 
 // ── 고객사 목록 ──────────────────────────────────────────────────────────────
 function renderCustomers() {
-  const q = (document.getElementById('cust-search').value || '').toLowerCase();
+  const q = (document.getElementById('cust-search').value || '').trim().toLowerCase();
+  const has = v => String(v ?? '').toLowerCase().includes(q);
+  const projHit = new Set(q ? allProjects.filter(p => has(p.name)).map(p => p.customer_id) : []);
   const data = allCustomers.filter(c =>
-    !q || (c.name || '').toLowerCase().includes(q) || (c.contact || '').toLowerCase().includes(q)
+    !q || has(c.name) || has(c.contact) || projHit.has(c.id)
   );
-  document.getElementById('cust-empty').style.display = data.length ? 'none' : '';
-  document.getElementById('cust-list').innerHTML = data.map(c => {
+  // 현장 조회용: Hostname · S/N · IP · 모델 · 위치로 장비 바로 찾기
+  const hits = q ? allAssets.filter(a =>
+    has(a.hostname) || has(a.serial) || has(a.ip_address) || has(a.model) || has(a.location)
+  ).slice(0, 30) : [];
+  const custName = id => (allCustomers.find(c => c.id === id) || {}).name || '-';
+  const projName = id => (allProjects.find(p => p.id === id) || {}).name || '-';
+  const hitHtml = hits.length ? `<div class="hit-group">장비 ${hits.length}건</div>` + hits.map(a => `
+    <div class="asset-hit" onclick="jumpToAsset('${a.id}')">
+      <div class="asset-hit-name">${FS.esc(a.hostname || '-')}</div>
+      <div class="asset-hit-meta">${FS.esc(custName(a.customer_id))} › ${FS.esc(projName(a.project_id))}${a.ip_address ? ' · ' + FS.esc(a.ip_address) : ''}${a.serial ? ' · ' + FS.esc(a.serial) : ''}</div>
+    </div>`).join('') + (data.length ? '<div class="hit-group">고객사</div>' : '') : '';
+
+  document.getElementById('cust-empty').style.display = (data.length || hits.length) ? 'none' : '';
+  document.getElementById('cust-list').innerHTML = hitHtml + data.map(c => {
     const projCount  = allProjects.filter(p => p.customer_id === c.id).length;
     const assetCount = allAssets.filter(a => a.customer_id === c.id).length;
     const active = selectedCustomerId === c.id ? ' active' : '';
@@ -362,6 +406,28 @@ function selectCustomer(id) {
   renderCustomers();
   showPanel('projects');
   renderProjects();
+  // 세로 배치(태블릿·폰)에서는 패널이 목록 아래에 있으므로 패널로 스크롤
+  if (window.innerWidth <= 960) FS.scrollToEl(document.getElementById('proj-panel'));
+}
+
+// 뒤로가기(index.html)에서 호출: 프로젝트 패널 닫고 고객사 목록으로
+function closeCustomerPanel() {
+  selectedCustomerId = null;
+  selectedProjectId  = null;
+  showPanel('none');
+  renderCustomers();
+}
+
+// 장비 검색 결과 → 해당 고객사·프로젝트의 장비 목록 + 상세
+function jumpToAsset(id) {
+  const a = allAssets.find(x => x.id === id);
+  if (!a) return;
+  selectedCustomerId = a.customer_id;
+  selectedProjectId  = a.project_id;
+  renderCustomers();
+  showPanel('assets');
+  renderAssets();
+  viewAsset(id);
 }
 
 // ── 패널 전환 ────────────────────────────────────────────────────────────────
@@ -375,6 +441,16 @@ function showPanel(panel) {
 function renderProjects() {
   const c = allCustomers.find(x => x.id === selectedCustomerId);
   document.getElementById('bc-cust-name').textContent = c?.name || '';
+  // 담당자 연락처: 현장에서 한 번 터치로 전화·메일
+  const contact = document.getElementById('cust-contact');
+  const parts = [];
+  if (c?.contact) parts.push(`<span>👤 ${FS.esc(c.contact)}</span>`);
+  if (c?.phone)   parts.push(`<a href="tel:${FS.esc(String(c.phone).replace(/[^0-9+]/g, ''))}">📞 ${FS.esc(c.phone)}</a>`);
+  if (c?.email)   parts.push(`<a href="mailto:${FS.esc(c.email)}">✉ ${FS.esc(c.email)}</a>`);
+  if (c?.address) parts.push(`<span>📍 ${FS.esc(c.address)}</span>`);
+  contact.innerHTML = parts.join('');
+  contact.style.display = parts.length ? '' : 'none';
+
   const projs = allProjects.filter(p => p.customer_id === selectedCustomerId);
   document.getElementById('proj-empty').style.display = projs.length ? 'none' : '';
   document.getElementById('proj-tbody').innerHTML = projs.map(p => {
@@ -400,6 +476,7 @@ function selectProject(id) {
   selectedProjectId = id;
   showPanel('assets');
   renderAssets();
+  if (window.innerWidth <= 960) FS.scrollToEl(document.getElementById('asset-panel'));
 }
 
 function backToProjects() {
@@ -419,7 +496,7 @@ function renderAssets() {
   document.getElementById('asset-empty').style.display = assets.length ? 'none' : '';
   document.getElementById('asset-tbody').innerHTML = assets.map(a => {
     const sc = a.status === '운영중' ? 'badge-success' : a.status === '장애' ? 'badge-danger' : 'badge-warning';
-    return `<tr>
+    return `<tr onclick="viewAsset('${a.id}')">
       <td style="font-weight:500;">${escHtml(a.hostname || '-')}</td>
       <td>${escHtml(a.serial || '-')}</td>
       <td>${escHtml(a.ip_address || '-')}</td>
@@ -435,6 +512,48 @@ function renderAssets() {
       </td>
     </tr>`;
   }).join('');
+}
+
+// ── 장비 상세 (읽기 전용: 현장에서 오터치로 수정되지 않도록 보기와 수정을 분리) ──
+function viewAsset(id) {
+  const a = allAssets.find(x => x.id === id);
+  if (!a) { Toast.error('이미 삭제된 항목입니다'); return; }
+  const c = allCustomers.find(x => x.id === a.customer_id);
+  const p = allProjects.find(x => x.id === a.project_id);
+  document.getElementById('av-title').textContent = a.hostname || '장비 정보';
+  const fields = [
+    ['고객사', c?.name], ['프로젝트', p?.name],
+    ['상태', a.status], ['장비유형', a.device_type],
+    ['모델명', a.model], ['S/N', a.serial],
+    ['IP', a.ip_address], ['위치', a.location],
+    ['OS', a.os], ['CPU', a.cpu],
+    ['메모리', a.memory], ['GPU', a.gpu],
+    ['디스크', a.disk], ['BMC', a.bmc_version],
+    ['BIOS', a.bios_version], ['드라이버', a.driver_version],
+    ['설치일', a.install_date], ['벤더케이스', a.vendor_case_no],
+  ];
+  document.getElementById('av-body').innerHTML =
+    fields.map(([l, v]) => `<div class="av-item"><div class="av-label">${l}</div><div class="av-val">${FS.esc(v || '-')}</div></div>`).join('') +
+    (a.memo ? `<div class="av-item av-full"><div class="av-label">메모</div><div class="av-val" style="white-space:pre-wrap;">${FS.esc(a.memo)}</div></div>` : '');
+  document.getElementById('av-edit').onclick = () => { closeAssetView(); openAssetModal(id); };
+  document.getElementById('asset-view-modal').style.display = 'flex';
+}
+function closeAssetView() { document.getElementById('asset-view-modal').style.display = 'none'; }
+
+// 여러 문서를 원자적으로 삭제 (batch 한도 500 → 나눠서)
+async function batchDelete(refs) {
+  const db = firebase.firestore();
+  for (let i = 0; i < refs.length; i += 450) {
+    const batch = db.batch();
+    refs.slice(i, i + 450).forEach(([col, id]) => batch.delete(db.collection(col).doc(id)));
+    await batch.commit();
+  }
+}
+
+// 삭제할 고객사에 연결된 티켓 수 (티켓은 함께 삭제하지 않고 안내만)
+async function countLinkedTickets(customerId) {
+  try { return (await FS.getAll('tickets', [['customer_id', '==', customerId]])).length; }
+  catch (e) { return 0; }
 }
 
 // ── 고객사 CRUD ───────────────────────────────────────────────────────────────
@@ -486,20 +605,27 @@ async function saveCustomer() {
 }
 
 async function deleteCustomer(id) {
+  const c = allCustomers.find(x => x.id === id);
   const projCount  = allProjects.filter(p => p.customer_id === id).length;
   const assetCount = allAssets.filter(a => a.customer_id === id).length;
-  const msg = (projCount || assetCount)
-    ? `프로젝트 ${projCount}개, 장비 ${assetCount}대가 함께 삭제됩니다. 삭제하시겠습니까?`
-    : '삭제하시겠습니까?';
+  const ticketCount = await countLinkedTickets(id);
+  let msg = `'${c?.name || ''}' 고객사를 삭제하시겠습니까?`;
+  if (projCount || assetCount) msg += `\n프로젝트 ${projCount}개, 장비 ${assetCount}대가 함께 삭제됩니다.`;
+  if (ticketCount) msg += `\n연결된 장애 티켓 ${ticketCount}건은 고객사 없이 남습니다.`;
   if (!await Dialog.confirm(msg, true)) return;
 
   const delAssets   = allAssets.filter(a => a.customer_id === id);
   const delProjects = allProjects.filter(p => p.customer_id === id);
-  await Promise.all([
-    ...delAssets.map(a => FS.remove('assets', a.id)),
-    ...delProjects.map(p => FS.remove('projects', p.id)),
-    FS.remove('customers', id),
-  ]);
+  try {
+    await batchDelete([
+      ...delAssets.map(a => ['assets', a.id]),
+      ...delProjects.map(p => ['projects', p.id]),
+      ['customers', id],
+    ]);
+  } catch (e) {
+    Toast.error('삭제 실패: ' + e.message);
+    return;
+  }
   allAssets    = allAssets.filter(a => a.customer_id !== id);
   allProjects  = allProjects.filter(p => p.customer_id !== id);
   allCustomers = allCustomers.filter(c => c.id !== id);
@@ -563,17 +689,19 @@ async function saveProject() {
 }
 
 async function deleteProject(id) {
+  const p = allProjects.find(x => x.id === id);
   const assetCount = allAssets.filter(a => a.project_id === id).length;
-  const msg = assetCount
-    ? `장비 ${assetCount}대가 함께 삭제됩니다. 삭제하시겠습니까?`
-    : '삭제하시겠습니까?';
+  let msg = `'${p?.name || ''}' 프로젝트를 삭제하시겠습니까?`;
+  if (assetCount) msg += `\n장비 ${assetCount}대가 함께 삭제됩니다.`;
   if (!await Dialog.confirm(msg, true)) return;
 
   const delAssets = allAssets.filter(a => a.project_id === id);
-  await Promise.all([
-    ...delAssets.map(a => FS.remove('assets', a.id)),
-    FS.remove('projects', id),
-  ]);
+  try {
+    await batchDelete([...delAssets.map(a => ['assets', a.id]), ['projects', id]]);
+  } catch (e) {
+    Toast.error('삭제 실패: ' + e.message);
+    return;
+  }
   allAssets   = allAssets.filter(a => a.project_id !== id);
   allProjects = allProjects.filter(p => p.id !== id);
   if (selectedProjectId === id) { selectedProjectId = null; showPanel('projects'); }
@@ -660,7 +788,8 @@ async function saveAsset() {
 }
 
 async function deleteAsset(id) {
-  if (!await Dialog.confirm('이 장비를 삭제하시겠습니까?', true)) return;
+  const a = allAssets.find(x => x.id === id);
+  if (!await Dialog.confirm(`'${a?.hostname || ''}' 장비를 삭제하시겠습니까?`, true)) return;
   await FS.remove('assets', id);
   allAssets = allAssets.filter(x => x.id !== id);
   renderAssets();
@@ -698,27 +827,25 @@ function downloadCsvTemplate() {
   URL.revokeObjectURL(a.href);
 }
 
+// 따옴표 안의 줄바꿈(엑셀 메모 칸 등)까지 처리하도록 전체 텍스트를 한 글자씩 파싱
 function parseCsv(text) {
-  const lines = text.replace(/\r\n/g, '\n').replace(/\r/g, '\n').split('\n');
+  text = text.replace(/^\uFEFF/, '');
   const result = [];
-  for (const line of lines) {
-    if (!line.trim()) continue;
-    const row = [];
-    let field = '', inQuote = false;
-    for (let i = 0; i < line.length; i++) {
-      const c = line[i];
-      if (c === '"') {
-        if (inQuote && line[i + 1] === '"') { field += '"'; i++; }
-        else inQuote = !inQuote;
-      } else if (c === ',' && !inQuote) {
-        row.push(field); field = '';
-      } else {
-        field += c;
-      }
-    }
-    row.push(field);
-    result.push(row);
+  let row = [], field = '', inQuote = false;
+  const endRow = () => { row.push(field); if (row.some(v => v.trim())) result.push(row); row = []; field = ''; };
+  for (let i = 0; i < text.length; i++) {
+    const c = text[i];
+    if (inQuote) {
+      if (c === '"' && text[i + 1] === '"') { field += '"'; i++; }
+      else if (c === '"') inQuote = false;
+      else field += c;
+    } else if (c === '"') inQuote = true;
+    else if (c === ',') { row.push(field); field = ''; }
+    else if (c === '\r') { if (text[i + 1] === '\n') i++; endRow(); }
+    else if (c === '\n') endRow();
+    else field += c;
   }
+  if (field || row.length) endRow();
   return result;
 }
 
@@ -727,16 +854,22 @@ async function importAssetCsv(input) {
   input.value = '';
   if (!file) return;
 
-  const text = await file.text();
-  const rows = parseCsv(text);
-  if (rows.length < 2) { Toast.error('데이터 행이 없습니다'); return; }
-
   // Map header row to field names (supports Korean labels or English field names)
   const headerLookup = {};
   CSV_LABELS.forEach((lbl, i) => { headerLookup[lbl.toLowerCase()] = CSV_FIELDS[i]; });
   CSV_FIELDS.forEach(f => { headerLookup[f.toLowerCase()] = f; });
+  const mapHeader = r => r.map(h => headerLookup[h.trim().toLowerCase()] || null);
 
-  const colMap = rows[0].map(h => headerLookup[h.trim().toLowerCase()] || null);
+  // 한국어 엑셀의 'CSV (쉼표로 분리)' 저장은 CP949 → UTF-8로 읽어 헤더가 안 맞으면 EUC-KR로 다시 읽기
+  const buf = await file.arrayBuffer();
+  let rows = parseCsv(new TextDecoder('utf-8').decode(buf));
+  let colMap = rows.length ? mapHeader(rows[0]) : [];
+  if (!colMap.includes('hostname')) {
+    rows = parseCsv(new TextDecoder('euc-kr').decode(buf));
+    colMap = rows.length ? mapHeader(rows[0]) : [];
+  }
+  if (rows.length < 2) { Toast.error('데이터 행이 없습니다'); return; }
+  if (!colMap.includes('hostname')) { Toast.error('Hostname 열을 찾을 수 없습니다. 템플릿 양식을 사용하세요'); return; }
 
   const validRows = [];
   const errors = [];

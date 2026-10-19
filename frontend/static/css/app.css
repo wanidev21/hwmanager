@@ -276,7 +276,7 @@ body {
 .table-wrap {
   border: 1px solid var(--border);
   border-radius: var(--radius-lg);
-  overflow: hidden;
+  overflow-x: auto;   /* 상세 패널이 열려 폭이 좁아져도 오른쪽 열이 잘리지 않고 가로 스크롤 */
   background: var(--surface);
 }
 
@@ -892,10 +892,23 @@ html[data-theme="dark"] .toast { background: #2c2c2a; border: 1px solid #3e3e3c;
   }
 
   /* 토스트 위치 */
+  /* 토스트: 하단 시트(모달)의 저장/취소 버튼을 가리지 않도록 상단에 표시 */
   .toast-container {
-    bottom: 12px;
+    top: calc(60px + env(safe-area-inset-top));
+    bottom: auto;
     right: 12px;
     left: 12px;
+  }
+
+  /* 메뉴·테마 버튼 터치 타깃 */
+  .nav-item {
+    height: 44px;
+    font-size: 14px;
+  }
+  .theme-toggle {
+    width: 40px;
+    height: 40px;
+    font-size: 16px;
   }
   .toast {
     max-width: 100%;

@@ -130,6 +130,30 @@
   font-weight:500; padding:3px 9px; background:#f0f4ff;
   border-radius:20px; border:1px solid #c7d7fd; color:#4285F4;
 }
+/* 구글에서 확인되지 않는 연동 일정 (삭제됐거나 다른 달로 옮겨짐) */
+.cal-event-pill.cal-missing { opacity:.55; }
+
+/* ── 모바일: 달력은 점으로 압축, 날짜를 누르면 그날 일정 목록 ── */
+.cal-dots { display:none; }
+@media (max-width:768px) {
+  .cal-wrap { height:auto; min-height:0; }
+  .cal-toolbar { gap:6px; }
+  #cal-filter-bar { flex-wrap:nowrap; overflow-x:auto; -webkit-overflow-scrolling:touch; padding:7px 10px; }
+  .cal-grid { flex:none; }
+  .cal-cell { min-height:58px; padding:4px 2px 6px; align-items:center; gap:3px; }
+  .cal-cell:hover { background:transparent; }
+  .cal-cell.cal-today:hover { background:#fdf0eb; }
+  .cal-cell:not(.cal-other):active { background:var(--bg); }
+  .cal-cell .cal-event-pill, .cal-cell .cal-more { display:none; }
+  .cal-date-num { font-size:13px; width:26px; height:26px; margin-bottom:0; }
+  .cal-dots { display:flex; flex-wrap:wrap; justify-content:center; align-items:center; gap:3px; max-width:100%; }
+  .cal-dot { width:6px; height:6px; border-radius:50%; flex-shrink:0; }
+  .cal-dot.cal-missing { opacity:.45; }
+  .cal-dot-more { font-size:9px; line-height:1; color:var(--text-sub); font-weight:600; }
+  .day-ev-item { padding:12px; }
+  .day-ev-title { white-space:normal; }
+  .day-ev-list { max-height:60vh; }
+}
 </style>
 
 <div class="cal-wrap">
@@ -274,6 +298,12 @@ let editingId      = null;
 let _pollTimer     = null;
 let _lastSyncTime  = null;
 let _dayEventsDate = '';
+let gcalFetched    = [];         // 이번 달 조회한 구글 일정 전체 (Firestore 연동분 포함)
+let gcalLiveById   = new Map();  // gcalId → 이번 달 구글 실데이터
+let gcalOkCals     = new Set();  // 이번 달 조회에 성공한 캘린더 ID
+let gcalFetchedYm  = '';         // 위 데이터의 조회 월 'YYYY-MM'
+let fsView         = [];         // 화면 표시용 Firestore 일정 (구글 실데이터 반영)
+let calSaving      = false;      // 저장·삭제 중복 클릭 방지
 
 // ── 초기화 ──────────────────────────────────────────────────────────────────
 async function init() {
@@ -312,13 +342,13 @@ function loadFsEvents() {
   if (_fsEventsStop) _fsEventsStop();
   return new Promise(resolve => {
     let first = true;
+    const done = () => { if (first) { first = false; resolve(); } };
+    // 구독 오류(권한·네트워크)로 첫 데이터가 오지 않아도 화면은 그리도록
+    setTimeout(done, 5000);
     _fsEventsStop = FS.watch([['calendar_events', [['user_id','==',uid]]]], ([events]) => {
       fsEvents = events;
-      if (first) { first = false; resolve(); return; }
-      // Firestore가 추적하게 된 구글 이벤트는 중복 표시 제거
-      const tracked = new Set(fsEvents.filter(e => e.gcal_id).map(e => e.gcal_id));
-      rawGcalEvents = rawGcalEvents.filter(e => !tracked.has(e.gcalId));
-      applyCalFilter();
+      if (first) { done(); return; }
+      applyCalFilter();   // 구글 일정 중복 제거·실데이터 병합도 여기서 다시 계산
       if (document.getElementById('cal-grid')) renderCalendar();
     });
   });
@@ -352,27 +382,35 @@ async function fetchCalendarList() {
   } catch { return []; }
 }
 
+// 실패 시 null (빈 배열과 구분: 조회 성공했는데 일정이 없는 것과 조회 실패를 구별)
 async function fetchEventsForCalendar(cal, timeMin, timeMax) {
   const token = localStorage.getItem('gAccessToken');
-  if (!token) return [];
+  if (!token) return null;
   const url = `${GCAL_API}/calendars/${encodeURIComponent(cal.id)}/events`
     + `?timeMin=${encodeURIComponent(timeMin)}`
     + `&timeMax=${encodeURIComponent(timeMax)}`
     + `&singleEvents=true&orderBy=startTime&maxResults=250`;
   try {
     const res = await fetch(url, { headers: { Authorization: `Bearer ${token}` } });
-    if (res.status === 401) { handleTokenExpiry(); return []; }
-    if (!res.ok) return [];
+    if (res.status === 401) { handleTokenExpiry(); return null; }
+    if (!res.ok) return null;
     const data = await res.json();
-    return (data.items || []).map(e =>
-      normalizeGcal(e, cal.id, cal.summary, cal.backgroundColor || '#4285F4')
-    );
-  } catch { return []; }
+    return {
+      events: (data.items || []).map(e =>
+        normalizeGcal(e, cal.id, cal.summary, cal.backgroundColor || '#4285F4')
+      ),
+      // 250건 초과로 일부만 받은 경우 '구글에 없음' 판단에 쓰지 않음
+      complete: !data.nextPageToken,
+    };
+  } catch { return null; }
 }
 
 async function loadGcalForMonth() {
   const token = localStorage.getItem('gAccessToken');
-  if (!token) { rawGcalEvents = []; applyCalFilter(); return; }
+  if (!token) {
+    gcalFetched = []; gcalLiveById = new Map(); gcalOkCals = new Set(); gcalFetchedYm = '';
+    applyCalFilter(); return;
+  }
 
   // 캘린더 목록 최초 로드
   if (!calendarList.length) {
@@ -384,17 +422,20 @@ async function loadGcalForMonth() {
   const timeMax = new Date(curYear, curMonth + 1, 0, 23, 59, 59).toISOString();
 
   // 모든 캘린더 병렬 fetch
+  const cals = calendarList;
   const results = await Promise.all(
-    calendarList.map(cal => fetchEventsForCalendar(cal, timeMin, timeMax))
+    cals.map(cal => fetchEventsForCalendar(cal, timeMin, timeMax))
   );
 
-  const allGcal = results.flat();
+  // 조회 중 월이 바뀌었으면(빠르게 넘긴 경우) 늦게 온 결과는 버림
+  if (timeMin !== new Date(curYear, curMonth, 1).toISOString()) return;
 
-  // Firestore에서 이미 추적 중인 이벤트 중복 제거
-  const tracked = new Set(fsEvents.filter(e => e.gcal_id).map(e => e.gcal_id));
-  rawGcalEvents = allGcal.filter(e => !tracked.has(e.gcalId));
+  gcalFetched   = results.flatMap(r => r ? r.events : []);
+  gcalLiveById  = new Map(gcalFetched.map(e => [e.gcalId, e]));
+  gcalOkCals    = new Set(cals.filter((c, i) => results[i] && results[i].complete).map(c => c.id));
+  gcalFetchedYm = `${curYear}-${pad(curMonth+1)}`;
 
-  applyCalFilter();
+  applyCalFilter();   // Firestore 연동분 중복 제거 + 실데이터 병합
   _lastSyncTime = new Date();
   renderGcalStatus();
 }
@@ -422,13 +463,32 @@ function normalizeGcal(e, calendarId, calendarName, calendarColor) {
 // ── 필터 적용 ────────────────────────────────────────────────────────────────
 function applyCalFilter() {
   const showFs = calFilterState['__fs__'] !== false;
+  // Firestore가 추적 중인(gcal_id) 구글 일정은 Firestore 쪽으로만 표시 (중복 제거)
+  const tracked = new Set(fsEvents.filter(e => e.gcal_id).map(e => e.gcal_id));
+  rawGcalEvents = gcalFetched.filter(e => !tracked.has(e.gcalId));
   gcalEvents = rawGcalEvents.filter(e =>
     calFilterState[e.calendarId] !== false
   );
-  allEvents = [
-    ...(showFs ? fsEvents : []),
-    ...gcalEvents,
-  ];
+  fsView = showFs ? mergeFsWithLive() : [];
+  allEvents = [...fsView, ...gcalEvents];
+}
+
+// Firestore 사본에 구글 실데이터를 덮어 표시 (구글에서 바꾼 내용이 사본에 가려지지 않도록)
+// 구글에서 사라진 일정은 자동 삭제하지 않고 gcal_missing 표시만 (사용자가 확인 후 삭제)
+function mergeFsWithLive() {
+  return fsEvents.map(e => {
+    if (!e.gcal_id) return e;
+    const live = gcalLiveById.get(e.gcal_id);
+    if (live) {
+      return { ...e, title: live.title, date: live.date, start_time: live.start_time,
+               end_time: live.end_time, description: live.description };
+    }
+    // 해당 캘린더의 이번 달 조회는 완전히 성공했는데 결과에 없음 → 삭제됐거나 다른 달로 옮겨짐
+    if (e.calendarId && gcalOkCals.has(e.calendarId) && (e.date || '').startsWith(gcalFetchedYm + '-')) {
+      return { ...e, gcal_missing: true };
+    }
+    return e;
+  });
 }
 
 // ── 필터 바 렌더링 ───────────────────────────────────────────────────────────
@@ -504,14 +564,18 @@ function handleTokenExpiry() {
 
 async function reconnectGcal(btn) {
   if (btn) btn.disabled = true;
+  // 모바일은 리다이렉트로 앱을 다시 열게 되므로 돌아올 화면을 기억 (index.html이 읽고 지움)
+  try { localStorage.setItem('hw-return-page', 'calendar'); } catch {}
   try {
     const token = await FS.reconnectGoogle();
     if (!token) return;   // 모바일: 리다이렉트로 이동
+    try { localStorage.removeItem('hw-return-page'); } catch {}
     calendarList = [];
     await loadGcalForMonth();
     renderCalendar();
     Toast.success('Google 캘린더가 다시 연결되었습니다');
   } catch (e) {
+    try { localStorage.removeItem('hw-return-page'); } catch {}
     if (e.code !== 'auth/popup-closed-by-user' && e.code !== 'auth/cancelled-popup-request') {
       Toast.error('Google 캘린더 연결 실패: ' + (e.code || e.message));
     }
@@ -565,9 +629,9 @@ function renderCalendar() {
   const todayStr    = `${today.getFullYear()}-${pad(today.getMonth()+1)}-${pad(today.getDate())}`;
   const ym          = `${curYear}-${pad(curMonth+1)}`;
 
-  // 이번 달 Firestore 이벤트 + 필터된 Google 이벤트 수집
-  const showFs   = calFilterState['__fs__'] !== false;
-  const monthFs  = showFs ? fsEvents.filter(e => (e.date||'').startsWith(ym)) : [];
+  // 이번 달 Firestore 이벤트(구글 실데이터 반영) + 필터된 Google 이벤트 수집
+  applyCalFilter();
+  const monthFs  = fsView.filter(e => (e.date||'').startsWith(ym));
   const visible  = [...monthFs, ...gcalEvents];
 
   const byDate = {};
@@ -605,18 +669,25 @@ function renderCalendar() {
         ? gcalPillStyle(ev.calendarColor)
         : (() => { const c = EV_COLORS[ev.color||'blue']; return `background:${c.bg};color:${c.text};`; })();
       const timeTag = ev.start_time
-        ? `<span style="opacity:.65;font-size:10px;">${ev.start_time} </span>` : '';
-      return `<div class="cal-event-pill" style="${pillSty}"
+        ? `<span style="opacity:.65;font-size:10px;">${escHtml(ev.start_time)} </span>` : '';
+      const missTip = ev.gcal_missing ? ' (Google 캘린더에서 찾을 수 없음)' : '';
+      return `<div class="cal-event-pill${ev.gcal_missing ? ' cal-missing' : ''}" style="${pillSty}"
         onclick="openEventModal('${ev.id}',null);event.stopPropagation();"
-        title="${escHtml(ev.calendarName ? ev.calendarName+': ' : '')}${escHtml(ev.title)}"
-      >${timeTag}${escHtml(ev.title)}</div>`;
+        title="${escHtml(ev.calendarName ? ev.calendarName+': ' : '')}${escHtml(ev.title)}${missTip}"
+      >${ev.gcal_missing ? '⚠ ' : ''}${timeTag}${escHtml(ev.title)}</div>`;
     }).join('');
     if (evs.length > 3) {
       evHtml += `<div class="cal-more"
         onclick="openDayEventsModal('${ds}');event.stopPropagation();">+${evs.length - 3}개 더</div>`;
     }
+    // 모바일용 점 표시 (최대 3개 + 개수)
+    if (evs.length) {
+      evHtml += `<div class="cal-dots">${evs.slice(0, 3).map(ev =>
+        `<span class="cal-dot${ev.gcal_missing ? ' cal-missing' : ''}" style="background:${evDotColor(ev)};"></span>`
+      ).join('')}${evs.length > 3 ? `<span class="cal-dot-more">+${evs.length - 3}</span>` : ''}</div>`;
+    }
 
-    html += `<div class="cal-cell${isTd ? ' cal-today' : ''}" onclick="openEventModal(null,'${ds}')">
+    html += `<div class="cal-cell${isTd ? ' cal-today' : ''}" onclick="onCalCellClick('${ds}')">
       <div class="${numCls}">${d}</div>${evHtml}</div>`;
   }
 
@@ -627,6 +698,22 @@ function renderCalendar() {
   }
 
   document.getElementById('cal-grid').innerHTML = html;
+}
+
+function calIsMobile() { return window.matchMedia('(max-width:768px)').matches; }
+
+// 날짜 칸 클릭: PC는 바로 새 일정, 폰은 그날 일정 목록(+ 추가 버튼)
+function onCalCellClick(ds) {
+  if (calIsMobile()) openDayEventsModal(ds);
+  else openEventModal(null, ds);
+}
+
+// 일정 점 색상 (구글 캘린더 색은 #hex만 허용)
+function evDotColor(ev) {
+  if (ev.source === 'google') {
+    return /^#[0-9a-f]{3,8}$/i.test(ev.calendarColor || '') ? ev.calendarColor : '#4285F4';
+  }
+  return EV_COLORS[ev.color]?.text || EV_COLORS.blue.text;
 }
 
 // ── 이벤트 수정 가능 여부 ─────────────────────────────────────────────────────
@@ -660,12 +747,13 @@ function openDayEventsModal(dateStr) {
 
   const html = evs.map(ev => {
     const isGcal   = ev.source === 'google';
-    const dotColor = isGcal ? (ev.calendarColor || '#4285F4')
-      : (EV_COLORS[ev.color||'blue']?.text || '#3b82f6');
+    const dotColor = evDotColor(ev);
     const timeStr  = ev.start_time
-      ? `${ev.start_time}${ev.end_time ? '–'+ev.end_time : ''}` : '종일';
+      ? escHtml(`${ev.start_time}${ev.end_time ? '–'+ev.end_time : ''}`) : '종일';
     const metaHtml = isGcal
-      ? `<div class="day-ev-meta">${escHtml(ev.calendarName||'Google 캘린더')}</div>` : '';
+      ? `<div class="day-ev-meta">${escHtml(ev.calendarName||'Google 캘린더')}</div>`
+      : ev.gcal_missing
+        ? '<div class="day-ev-meta" style="color:var(--warning,#b45309);">⚠ Google 캘린더에서 찾을 수 없음 (삭제·이동됨)</div>' : '';
     const editable = isEventEditable(ev);
     const lockIcon = editable ? '' : ' 🔒';
     return `<div class="day-ev-item" onclick="closeDayEventsModal();setTimeout(()=>openEventModal('${ev.id}',null),50)">
@@ -731,7 +819,7 @@ async function openEventModal(id, dateStr) {
     if (editable) document.getElementById('btn-delete-ev').style.display = '';
   } else {
     document.getElementById('ev-modal-title').textContent   = '새 일정';
-    if (dateStr) document.getElementById('f-ev-date').value = dateStr;
+    document.getElementById('f-ev-date').value = dateStr || FS.localDate();   // 날짜 미지정(+ 일정 추가) → 오늘
     document.getElementById('ev-gcal-badge').style.display  = 'none';
     document.getElementById('ev-color-group').style.display = '';
     document.getElementById('ev-calendar-group').style.display = '';
@@ -783,54 +871,84 @@ function updateCalColorDot() {
 }
 
 // ── Google Calendar CRUD ─────────────────────────────────────────────────────
-function buildGcalBody({ title, date, start_time, end_time, description }) {
-  return start_time
-    ? { summary:title, description:description||'',
-        start:{ dateTime:`${date}T${start_time}:00+09:00`, timeZone:'Asia/Seoul' },
-        end:  { dateTime:`${date}T${end_time||start_time}:00+09:00`, timeZone:'Asia/Seoul' } }
-    : { summary:title, description:description||'', start:{date}, end:{date} };
+// 'YYYY-MM-DD' 다음 날 (로컬 기준)
+function calNextDate(ds) {
+  const [y, m, d] = ds.split('-').map(Number);
+  return FS.localDate(new Date(y, m - 1, d + 1));
 }
 
-async function gcalCreate(payload, calId) {
+// forPatch: PATCH는 중첩 객체를 병합하므로 시간↔종일 전환 시 반대쪽 필드를 null로 지움
+function buildGcalBody({ title, date, start_time, end_time, description }, forPatch = false) {
+  if (start_time) {
+    return { summary:title, description:description||'',
+      start:{ dateTime:`${date}T${start_time}:00+09:00`, timeZone:'Asia/Seoul', ...(forPatch ? { date:null } : {}) },
+      end:  { dateTime:`${date}T${end_time||start_time}:00+09:00`, timeZone:'Asia/Seoul', ...(forPatch ? { date:null } : {}) } };
+  }
+  // 종일 일정: end.date는 '다음 날'(제외 기준). 같은 날이면 Google이 400 반환
+  // (읽을 때 normalizeGcal은 시작일만 쓰므로 하루 길게 표시되지 않음)
+  return { summary:title, description:description||'',
+    start:{ date, ...(forPatch ? { dateTime:null, timeZone:null } : {}) },
+    end:  { date:calNextDate(date), ...(forPatch ? { dateTime:null, timeZone:null } : {}) } };
+}
+
+// Google API 호출 공통: 성공 시 Response, 실패 시 오류 토스트 후 null
+// okStatuses: 실패 코드 중 성공으로 볼 것 (예: 삭제 시 404·410 = 이미 없음)
+async function gcalRequest(method, path, body, failMsg, okStatuses = []) {
   const token = localStorage.getItem('gAccessToken');
-  if (!token) return null;
-  const targetCal = calId || getRndCalendarId();
-  const res = await fetch(`${GCAL_API}/calendars/${encodeURIComponent(targetCal)}/events`, {
-    method:'POST',
-    headers:{ Authorization:`Bearer ${token}`, 'Content-Type':'application/json' },
-    body: JSON.stringify(buildGcalBody(payload)),
-  });
+  if (!token) {
+    Toast.error('Google 캘린더가 연결되어 있지 않습니다. "다시 연결" 후 다시 시도하세요.');
+    return null;
+  }
+  let res;
+  try {
+    res = await fetch(`${GCAL_API}${path}`, {
+      method,
+      headers: body
+        ? { Authorization:`Bearer ${token}`, 'Content-Type':'application/json' }
+        : { Authorization:`Bearer ${token}` },
+      body: body ? JSON.stringify(body) : undefined,
+    });
+  } catch {
+    Toast.error(`${failMsg} (네트워크 오류)`);
+    return null;
+  }
+  if (res.ok || okStatuses.includes(res.status)) return res;
   if (res.status === 401) { handleTokenExpiry(); return null; }
-  if (!res.ok) { Toast.error('Google 캘린더 동기화 실패'); return null; }
-  return await res.json();
+  Toast.error(`${failMsg} (${res.status === 403 ? '권한 없음' : res.status})`);
+  return null;
 }
 
-// calId: 이벤트가 속한 캘린더 ID (생략 시 r&d_attendance 또는 primary)
+function gcalEventPath(calId, gcalId) {
+  return `/calendars/${encodeURIComponent(calId || getRndCalendarId())}/events`
+    + (gcalId ? `/${encodeURIComponent(gcalId)}` : '');
+}
+
+// 생성된 이벤트 JSON, 실패 시 null
+async function gcalCreate(payload, calId) {
+  const res = await gcalRequest('POST', gcalEventPath(calId), buildGcalBody(payload), 'Google 캘린더 저장 실패');
+  return res ? await res.json() : null;
+}
+
+// calId: 이벤트가 속한 캘린더 ID (생략 시 r&d_attendance 또는 primary). 성공 시 true
 async function gcalUpdate(gcalId, payload, calId) {
-  const token = localStorage.getItem('gAccessToken');
-  if (!token) return;
-  const targetCal = calId || getRndCalendarId();
-  const res = await fetch(`${GCAL_API}/calendars/${encodeURIComponent(targetCal)}/events/${gcalId}`, {
-    method:'PATCH',
-    headers:{ Authorization:`Bearer ${token}`, 'Content-Type':'application/json' },
-    body: JSON.stringify(buildGcalBody(payload)),
-  });
-  if (res.status === 401) handleTokenExpiry();
+  return !!await gcalRequest('PATCH', gcalEventPath(calId, gcalId), buildGcalBody(payload, true), 'Google 캘린더 수정 실패');
 }
 
+// 성공(또는 이미 없음) 시 true
 async function gcalDelete(gcalId, calId) {
-  const token = localStorage.getItem('gAccessToken');
-  if (!token) return;
-  const targetCal = calId || getRndCalendarId();
-  const res = await fetch(`${GCAL_API}/calendars/${encodeURIComponent(targetCal)}/events/${gcalId}`, {
-    method:'DELETE',
-    headers:{ Authorization:`Bearer ${token}` },
-  });
-  if (res.status === 401) handleTokenExpiry();
+  return !!await gcalRequest('DELETE', gcalEventPath(calId, gcalId), null, 'Google 캘린더 삭제 실패', [404, 410]);
+}
+
+// 저장·삭제 중 버튼 잠금
+function setEvBusy(busy) {
+  calSaving = busy;
+  document.getElementById('btn-save-ev').disabled   = busy;
+  document.getElementById('btn-delete-ev').disabled = busy;
 }
 
 // ── 저장 ─────────────────────────────────────────────────────────────────────
 async function saveEvent() {
+  if (calSaving) return;
   const title = document.getElementById('f-ev-title').value.trim();
   const date  = document.getElementById('f-ev-date').value;
   if (!title) { Toast.error('제목을 입력하세요'); return; }
@@ -842,31 +960,45 @@ async function saveEvent() {
     end_time:    document.getElementById('f-ev-end').value,
     description: document.getElementById('f-ev-desc').value.trim(),
   };
+  if (payload.start_time && payload.end_time && payload.end_time < payload.start_time) {
+    Toast.error('종료 시간이 시작 시간보다 빠릅니다'); return;
+  }
 
+  setEvBusy(true);
+  try {
+    if (await saveEventInner(payload)) {
+      await loadGcalForMonth(); renderCalendar(); closeEventModal();
+    }
+  } catch (e) {
+    console.error('[calendar] save', e);
+    Toast.error('저장 실패: ' + (e.code || e.message));
+  } finally {
+    setEvBusy(false);
+  }
+}
+
+// 성공 시 true. Google 반영이 실패하면 Firestore는 건드리지 않고 false (모달 유지)
+async function saveEventInner(payload) {
   // Google 전용 이벤트 수정 (Firestore에 없는 gcal_ 이벤트)
   if (editingId?.startsWith('gcal_')) {
     const ev = allEvents.find(e => e.id === editingId);
-    if (ev) await gcalUpdate(ev.gcalId, payload, ev.calendarId);
-    await loadGcalForMonth(); renderCalendar(); closeEventModal();
+    if (!ev) { Toast.error('일정을 찾을 수 없습니다. 새로고침 후 다시 시도하세요.'); return false; }
+    if (!await gcalUpdate(ev.gcalId, payload, ev.calendarId)) return false;
     Toast.success('Google 캘린더에서 수정되었습니다');
-    return;
+    return true;
   }
 
-  // Firestore 이벤트 신규/수정
+  // Firestore 이벤트 신규/수정 (year_month는 보고 있는 달이 아니라 일정 날짜 기준)
   const uid           = FS.getCurrentUser().uid;
   const color         = document.getElementById('f-ev-color').value || 'blue';
   const selectedCalId = document.getElementById('ev-calendar-select').value;
-  const data          = { user_id:uid, color, year_month:`${curYear}-${pad(curMonth+1)}`, ...payload };
+  const data          = { user_id:uid, color, year_month:payload.date.slice(0, 7), ...payload };
 
   if (editingId) {
-    // 수정: Firestore 업데이트 + 기존 gcal_id 있으면 해당 캘린더에 PATCH
-    await FS.update('calendar_events', editingId, data);
+    // 수정: 구글 연동 일정이면 구글 먼저 PATCH → 성공해야 Firestore 업데이트
     const existing = fsEvents.find(e => e.id === editingId);
-    if (existing?.gcal_id && existing?.calendarId) {
-      await gcalUpdate(existing.gcal_id, payload, existing.calendarId);
-    } else if (existing?.gcal_id) {
-      await gcalUpdate(existing.gcal_id, payload);
-    }
+    if (existing?.gcal_id && !await gcalUpdate(existing.gcal_id, payload, existing.calendarId)) return false;
+    await FS.update('calendar_events', editingId, data);
     const idx = fsEvents.findIndex(e => e.id === editingId);
     if (idx >= 0) fsEvents[idx] = { ...fsEvents[idx], ...data };
     Toast.success('수정되었습니다');
@@ -877,53 +1009,54 @@ async function saveEvent() {
     Toast.success('일정이 추가되었습니다');
   } else {
     // 신규: 선택한 Google 캘린더에 저장 + Firestore에 gcal_id 포함 저장
-    const token = localStorage.getItem('gAccessToken');
-    const res   = await fetch(
-      `${GCAL_API}/calendars/${encodeURIComponent(selectedCalId)}/events`,
-      {
-        method:  'POST',
-        headers: { Authorization:`Bearer ${token}`, 'Content-Type':'application/json' },
-        body:    JSON.stringify(buildGcalBody(payload)),
-      }
-    );
-    if (res.status === 401) { handleTokenExpiry(); return; }
-    if (!res.ok) { Toast.error('Google 캘린더 저장 실패'); return; }
-    const created = await res.json();
+    const created = await gcalCreate(payload, selectedCalId);
+    if (!created) return false;
     const fsData  = { ...data, gcal_id: created.id, calendarId: selectedCalId };
     const newId   = await FS.add('calendar_events', fsData);
     fsEvents.push({ id:newId, ...fsData });
     Toast.success('Google 캘린더에 일정이 추가되었습니다');
   }
-
-  await loadGcalForMonth(); renderCalendar(); closeEventModal();
+  return true;
 }
 
 // ── 삭제 ─────────────────────────────────────────────────────────────────────
 async function deleteEvent() {
-  if (!editingId) return;
+  if (!editingId || calSaving) return;
   if (!await Dialog.confirm('이 일정을 삭제하시겠습니까?', true)) return;
 
-  if (editingId.startsWith('gcal_')) {
-    const ev = allEvents.find(e => e.id === editingId);
-    if (ev) await gcalDelete(ev.gcalId, ev.calendarId);
-  } else {
-    const existing = fsEvents.find(e => e.id === editingId);
-    if (existing?.gcal_id && existing?.calendarId) {
-      await gcalDelete(existing.gcal_id, existing.calendarId);
-    } else if (existing?.gcal_id) {
-      await gcalDelete(existing.gcal_id);
+  setEvBusy(true);
+  try {
+    if (editingId.startsWith('gcal_')) {
+      const ev = allEvents.find(e => e.id === editingId);
+      if (!ev || !await gcalDelete(ev.gcalId, ev.calendarId)) return;   // 실패: 모달 유지
+    } else {
+      const existing = fsEvents.find(e => e.id === editingId);
+      if (existing?.gcal_id && !await gcalDelete(existing.gcal_id, existing.calendarId)) {
+        // 구글 삭제 실패 → 사용자가 원할 때만 HW Manager 사본만 삭제 (구글 일정은 그대로 남음)
+        if (!await Dialog.confirm('Google 캘린더에서 삭제하지 못했습니다.\nHW Manager에서만 삭제할까요? (Google 일정은 남습니다)', true)) return;
+      }
+      await FS.remove('calendar_events', editingId);
+      fsEvents = fsEvents.filter(e => e.id !== editingId);
     }
-    await FS.remove('calendar_events', editingId);
-    fsEvents = fsEvents.filter(e => e.id !== editingId);
+    await loadGcalForMonth(); renderCalendar(); closeEventModal();
+    Toast.success('삭제되었습니다');
+  } catch (e) {
+    console.error('[calendar] delete', e);
+    Toast.error('삭제 실패: ' + (e.code || e.message));
+  } finally {
+    setEvBusy(false);
   }
-
-  await loadGcalForMonth(); renderCalendar(); closeEventModal();
-  Toast.success('삭제되었습니다');
 }
 
 // ── 키보드 ───────────────────────────────────────────────────────────────────
+// 스크립트는 페이지 최초 진입 때 한 번만 실행되므로 리스너가 다른 화면에서도 남음 → 캘린더 화면일 때만 동작
 document.addEventListener('keydown', e => {
-  if (document.getElementById('ev-modal').style.display !== 'none') return;
+  if (!document.getElementById('cal-grid')) return;
+  if (e.altKey || e.ctrlKey || e.metaKey || e.shiftKey) return;
+  const t = e.target;
+  if (t && (t.isContentEditable || /^(INPUT|TEXTAREA|SELECT)$/.test(t.tagName))) return;
+  // 열린 창(일정·날짜 목록·확인 창 등)이 있으면 무시
+  if ([...document.querySelectorAll('.modal-overlay')].some(m => getComputedStyle(m).display !== 'none')) return;
   if (e.key === 'ArrowLeft')  prevMonth();
   if (e.key === 'ArrowRight') nextMonth();
 });

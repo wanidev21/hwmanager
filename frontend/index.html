@@ -179,6 +179,15 @@
     async function loadPage(page, opts = {}) {
       if (currentPage === page) return;
 
+      // 페이지가 이탈 확인을 요청한 경우 (예: 납품확인서 작성 중 저장 안 한 내용)
+      if (typeof window.beforePageLeave === 'function') {
+        if (!(await window.beforePageLeave())) {
+          if (opts.fromHistory) _pushHistory(currentPage || 'overview');   // 뒤로가기로 빠진 기록 복구
+          return;
+        }
+        window.beforePageLeave = null;
+      }
+
       // 뒤로가기 지원: 화면 이동을 브라우저 기록에 남김
       if (!opts.fromHistory) _pushHistory(page);
 
@@ -216,6 +225,7 @@
         const res = await fetch('/pages/' + page + '.html', { cache: 'no-store' });
         if (!res.ok) throw new Error('Not found');
         const html = await res.text();
+        if (currentPage !== page) return;   // 로딩 중 다른 메뉴로 이동함 (늦게 온 응답이 화면을 덮지 않도록)
 
         const parser = new DOMParser();
         const doc = parser.parseFromString(html, 'text/html');
@@ -275,6 +285,8 @@
         }
       } catch (e) {
         console.error('Page load error:', page, e);
+        if (currentPage !== page) return;
+        currentPage = null;   // 같은 메뉴를 다시 눌러 재시도할 수 있도록
         content.innerHTML = '<div class="empty-state"><div class="empty-icon">⚠️</div><div>페이지를 불러올 수 없습니다</div></div>';
       }
     }
@@ -328,13 +340,10 @@
       if (_visible(document.querySelector('#page-content #asset-panel')) && typeof window.backToProjects === 'function') {
         window.backToProjects(); return true;                         // 고객사: 장비 → 프로젝트
       }
-      if (_visible(document.querySelector('#page-content #proj-panel')) && typeof window.showPanel === 'function') {
-        window.selectedCustomerId = null;                             // 고객사: 프로젝트 → 고객사 목록
-        window.showPanel('none');
-        if (typeof window.renderCustomers === 'function') window.renderCustomers();
-        return true;
+      if (_visible(document.querySelector('#page-content #proj-panel')) && typeof window.closeCustomerPanel === 'function') {
+        window.closeCustomerPanel(); return true;                     // 고객사: 프로젝트 → 고객사 목록
       }
-      for (const id of ['detail-col', 'kb-detail-col']) {             // 티켓·KB·사내장비 상세 패널
+      for (const id of ['detail-col', 'kb-detail-col', 'note-detail', 'proj-asset-panel']) {   // 티켓·KB·사내장비·기술노트·워런티 상세 패널
         const el = document.querySelector('#page-content #' + id);
         if (_visible(el)) { el.style.display = 'none'; return true; }
       }
@@ -384,6 +393,7 @@
 
     // 로그아웃
     document.getElementById('btn-logout').addEventListener('click', async () => {
+      if (!await Dialog.confirm('로그아웃하시겠습니까?')) return;   // 테마 버튼 옆이라 오터치 방지
       localStorage.removeItem('hw-last-active');
       localStorage.removeItem('gAccessToken');
       await FS.logout();
@@ -407,7 +417,7 @@
       if (_warnEl) return;
       _warnEl = document.createElement('div');
       _warnEl.style.cssText = [
-        'position:fixed;bottom:24px;right:24px;z-index:9999',
+        'position:fixed;bottom:calc(24px + env(safe-area-inset-bottom));right:24px;left:auto;z-index:9999',
         'background:#1a1a1a;color:#fff;border-radius:8px',
         'padding:12px 16px;font-size:13px;display:flex;align-items:center;gap:12px',
         'box-shadow:0 4px 24px rgba(0,0,0,0.25);'
@@ -420,6 +430,17 @@
     }
 
     async function _doLogout() {
+      // 다른 탭(또는 PWA·브라우저 동시 사용)에서 최근 활동이 있었으면 로그아웃하지 않고 타이머만 다시 설정
+      const last = parseInt(localStorage.getItem('hw-last-active') || '0');
+      if (Date.now() - last < IDLE_MS - 60000) {
+        _removeWarn();
+        clearTimeout(_warnTimer);
+        clearTimeout(_idleTimer);
+        const remain = IDLE_MS - (Date.now() - last);
+        _warnTimer = setTimeout(_showIdleWarn, Math.max(0, remain - WARN_MS));
+        _idleTimer = setTimeout(_doLogout, remain);
+        return;
+      }
       _removeWarn();
       localStorage.removeItem('hw-last-active');
       localStorage.removeItem('gAccessToken');
@@ -441,8 +462,9 @@
       _idleTimer = setTimeout(_doLogout, IDLE_MS);
     }
 
-    ['mousemove','keydown','click','touchstart','scroll'].forEach(evt => {
-      document.addEventListener(evt, _resetIdle, { passive: true });
+    // scroll은 버블링되지 않으므로 capture로 #page-content 스크롤까지 감지
+    ['mousemove','keydown','click','touchstart','wheel','scroll'].forEach(evt => {
+      document.addEventListener(evt, _resetIdle, { passive: true, capture: true });
     });
 
     // ── 다크 모드 ──
@@ -485,7 +507,8 @@
         const container = document.getElementById('toast-container');
         const el = document.createElement('div');
         el.className = `toast toast-${type}`;
-        el.innerHTML = `<span class="toast-icon">${ICONS[type] || ''}</span><span class="toast-msg">${msg}</span>`;
+        el.innerHTML = `<span class="toast-icon">${ICONS[type] || ''}</span><span class="toast-msg"></span>`;
+        el.querySelector('.toast-msg').textContent = msg;   // 사용자 입력이 섞여도 태그로 해석되지 않도록
         container.appendChild(el);
         const dismiss = () => {
           el.classList.add('toast-out');
@@ -512,13 +535,15 @@
           overlay.innerHTML = `
             <div class="modal" style="max-width:360px;">
               <div class="modal-body" style="padding:24px 24px 16px;">
-                <p style="font-size:13px;line-height:1.7;color:var(--text);">${msg}</p>
+                <p id="_dlg-msg" style="font-size:13px;line-height:1.7;color:var(--text);white-space:pre-line;"></p>
               </div>
               <div class="modal-footer">
                 <button class="btn" id="_dlg-cancel">취소</button>
                 <button class="btn ${danger ? 'btn-danger' : 'btn-primary'}" id="_dlg-ok">확인</button>
               </div>
             </div>`;
+          overlay.querySelector('#_dlg-msg').textContent = msg;   // 줄바꿈은 
+
           document.body.appendChild(overlay);
           const done = v => { overlay.remove(); resolve(v); };
           overlay.querySelector('#_dlg-cancel').onclick = () => done(false);
@@ -538,6 +563,7 @@
       if (token) {
         localStorage.setItem('gAccessToken', token);
         Toast.success('Google 캘린더가 다시 연결되었습니다');
+        if (document.getElementById('cal-grid') && typeof window.refreshCalendar === 'function') window.refreshCalendar();
       }
     }).catch(e => console.warn('redirect result', e));
 
@@ -584,11 +610,24 @@
       _lastThrottle = 0;
       _resetIdle();
 
+      // 새로고침: 기존 기록(n 번호)을 그대로 두고 보던 화면 복원
+      const st = history.state;
+      if (st && typeof st.n === 'number' && !st.guard) {
+        loadPage(st.page || 'overview', { fromHistory: true });
+        return;
+      }
       // 기본 페이지: 개요
       // 기록 구조 [보호용(guard), 개요] — 개요에서 뒤로가기 시 바로 앱이 꺼지지 않도록
       history.replaceState({ page: 'overview', guard: true, n: 0 }, '');
       _pushHistory('overview');
       loadPage('overview', { fromHistory: true });
+
+      // 리다이렉트(캘린더 재연결 등)로 앱을 잠시 떠났다 온 경우 보던 화면으로 복귀
+      const returnPage = localStorage.getItem('hw-return-page');
+      if (returnPage) {
+        localStorage.removeItem('hw-return-page');
+        if (PAGE_TITLES[returnPage]) loadPage(returnPage);
+      }
     });
   </script>
 </body>

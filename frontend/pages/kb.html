@@ -19,7 +19,7 @@
 </style>
 
 <div class="flex-between mb-3">
-  <input type="text" class="form-input" id="kb-search" placeholder="제목, 키워드로 검색..." oninput="renderTable()" style="max-width:360px;">
+  <input type="text" class="form-input" id="kb-search" placeholder="제목·증상·원인·조치·키워드 검색..." oninput="renderTable()" style="max-width:360px;">
   <button class="btn btn-primary" onclick="openModal()">+ 새 KB</button>
 </div>
 <div class="quick-filters" id="quick-filters">
@@ -93,7 +93,7 @@
     </div>
     <div class="modal-footer">
       <button class="btn" onclick="closeModal()">취소</button>
-      <button class="btn btn-primary" onclick="saveKB()">저장</button>
+      <button class="btn btn-primary" id="kb-save-btn" onclick="saveKB()">저장</button>
     </div>
   </div>
 </div>
@@ -123,8 +123,9 @@ function init() {
     allArticles = articles;
     allArticles.sort((a,b) => (b.created_at?.seconds||0) - (a.created_at?.seconds||0));
     renderTable();
-    // 열려 있는 상세 패널 갱신
-    if (kbSelectedId) showDetail(kbSelectedId);
+    // 열려 있는 상세 패널만 갱신 (✕·뒤로가기로 닫은 패널은 다시 열지 않음)
+    const col = document.getElementById('kb-detail-col');
+    if (kbSelectedId && col && col.style.display !== 'none') showDetail(kbSelectedId);
   });
 }
 
@@ -135,10 +136,15 @@ function toggleFilter(el, tag) {
 }
 
 function renderTable() {
-  const q = document.getElementById('kb-search').value.toLowerCase();
+  const q = document.getElementById('kb-search').value.trim().toLowerCase();
+  const filters = [...activeFilters].map(f => f.toLowerCase());
   let data = allArticles.filter(a => {
-    const matchQ = !q || a.title?.toLowerCase().includes(q) || toArr(a.keywords).some(k=>k.toLowerCase().includes(q));
-    const matchF = activeFilters.size === 0 || [...activeFilters].some(f => toArr(a.keywords).some(k=>k.includes(f)));
+    // 제목·증상·원인·조치·키워드·벤더 전체에서 대소문자 무시 검색
+    const hay = [a.title, a.symptom, a.cause, a.solution, ...toArr(a.keywords), ...toArr(a.related_vendors)]
+      .map(v => String(v || '').toLowerCase()).join('\n');
+    const matchQ = !q || hay.includes(q);
+    const kws = toArr(a.keywords).map(k => String(k).toLowerCase());
+    const matchF = filters.length === 0 || filters.some(f => kws.some(k => k.includes(f)));
     return matchQ && matchF;
   });
   if (kbSelectedId && !data.find(a => a.id === kbSelectedId)) {
@@ -148,7 +154,7 @@ function renderTable() {
   const tbody = document.getElementById('kb-tbody');
   document.getElementById('kb-empty').style.display = data.length ? 'none' : '';
   tbody.innerHTML = data.map(a => `
-    <tr onclick="showDetail('${a.id}')">
+    <tr onclick="showDetail('${a.id}', true)">
       <td style="font-weight:500;">${FS.esc(a.title||'')}</td>
       <td>${FS.esc(toArr(a.related_vendors).join(', ')||'-')}</td>
       <td>${toArr(a.keywords).map(k=>`<span class="keyword-tag">${FS.esc(k)}</span>`).join(' ')}</td>
@@ -156,18 +162,23 @@ function renderTable() {
     </tr>`).join('');
 }
 
-function showDetail(id) {
+// fromTap: 사용자가 목록을 눌러 연 경우만 폰에서 상세 위치로 스크롤 (실시간 갱신 때는 스크롤 안 함)
+function showDetail(id, fromTap) {
   kbSelectedId = id;
   const a = allArticles.find(x=>x.id===id);
   if (!a) return;
-  document.getElementById('kb-detail-col').style.display = '';
+  const col = document.getElementById('kb-detail-col');
+  col.style.display = '';
+  if (fromTap && window.matchMedia('(max-width:768px)').matches) {
+    requestAnimationFrame(() => FS.scrollToEl(col, 'start'));
+  }
   document.getElementById('detail-panel').innerHTML = `
     <div class="flex-between mb-3">
       <span style="font-weight:600;font-size:14px;">${esc(a.title||'')}</span>
       <div class="flex gap-1">
         <button class="btn btn-sm" onclick="openModal('${id}')">수정</button>
         <button class="btn btn-sm btn-danger" onclick="deleteKB('${id}')">삭제</button>
-        <button class="btn btn-ghost btn-sm" onclick="document.getElementById('kb-detail-col').style.display='none'">✕</button>
+        <button class="btn btn-ghost btn-sm" onclick="kbSelectedId=null;document.getElementById('kb-detail-col').style.display='none'">✕</button>
       </div>
     </div>
     ${a.symptom ? `<div class="detail-section"><h4>증상</h4><p>${esc(a.symptom)}</p></div>` : ''}
@@ -204,8 +215,22 @@ function openModal(id) {
 function closeModal() { document.getElementById('kb-modal').style.display='none'; }
 
 async function saveKB() {
+  const btn = document.getElementById('kb-save-btn');
+  if (btn.disabled) return;   // 저장 중 중복 클릭 방지
   const title = document.getElementById('f-title').value.trim();
   if (!title) { Toast.error('제목을 입력하세요'); return; }
+  btn.disabled = true;
+  try {
+    await kbSaveInner(title);
+  } catch (e) {
+    console.error('[kb] save', e);
+    Toast.error('저장 실패: ' + (e.code || e.message));
+  } finally {
+    btn.disabled = false;
+  }
+}
+
+async function kbSaveInner(title) {
   const data = {
     user_id: FS.getCurrentUser().uid,
     title,

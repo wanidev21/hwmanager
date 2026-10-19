@@ -62,7 +62,8 @@ function renderOverview(customers, projects, assets, tickets, kbArticles, delive
 
   const custMap = Object.fromEntries(customers.map(c => [c.id, c.name || c.id]));
   const warrantyProjects = projects.filter(p => p.warranty_expire);
-  const expiringSoon = warrantyProjects.filter(p => { const d = daysLeft(p.warranty_expire); return d !== null && d <= 90; });
+  // 워런티 페이지와 동일 기준: 임박 = 0~90일 (이미 만료된 건 제외)
+  const expiringSoon = warrantyProjects.filter(p => { const d = daysLeft(p.warranty_expire); return d !== null && d >= 0 && d <= 90; });
   const openTickets = tickets.filter(t => t.status !== '완료');
 
   document.getElementById('ov-stats').innerHTML = `
@@ -71,11 +72,11 @@ function renderOverview(customers, projects, assets, tickets, kbArticles, delive
         <span class="ts-count">${customers.length}</span><span class="ts-label">전체 고객사</span>
       </div>
       <div class="ts-divider"></div>
-      <div class="ts-item" onclick="loadPage('tickets')">
+      <div class="ts-item" onclick="window.hwPageFilter={page:'tickets',status:'처리중'};loadPage('tickets')">
         <span class="ts-count">${openTickets.length}</span><span class="ts-label">처리중 티켓</span>
       </div>
       <div class="ts-divider"></div>
-      <div class="ts-item" onclick="loadPage('warranty')">
+      <div class="ts-item" onclick="window.hwPageFilter={page:'warranty',status:'urgent'};loadPage('warranty')">
         <span class="ts-count">${expiringSoon.length}</span><span class="ts-label">워런티 90일 이내</span>
       </div>
       <div class="ts-divider"></div>
@@ -88,7 +89,7 @@ function renderOverview(customers, projects, assets, tickets, kbArticles, delive
   const byDate = arr => [...arr].sort((a,b) => (b.created_at?.seconds||0) - (a.created_at?.seconds||0));
   const recentCustomers = byDate(customers).slice(0,3);
   const recentTickets   = byDate(tickets).slice(0,3);
-  const criticalWarranty = [...expiringSoon].sort((a,b) => (daysLeft(a.warranty_expire)||999) - (daysLeft(b.warranty_expire)||999)).slice(0,3);
+  const criticalWarranty = [...expiringSoon].sort((a,b) => (daysLeft(a.warranty_expire) ?? 999) - (daysLeft(b.warranty_expire) ?? 999)).slice(0,3);
   const recentKB        = byDate(kbArticles).slice(0,3);
   const recentDelivery  = byDate(deliveryNotes).slice(0,3);
 

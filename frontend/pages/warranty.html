@@ -36,19 +36,14 @@
 <!-- 스탯 카드 -->
 <div class="stat-cards" id="stat-cards"></div>
 
-<!-- 필터 바 -->
-<div class="flex gap-2 mb-3" style="flex-wrap:wrap;">
+<!-- 필터 바 (상태 필터는 위 카드로) -->
+<div class="flex gap-2 mb-3 filter-row" style="flex-wrap:wrap;">
+  <input type="text" class="form-input" id="w-search" placeholder="고객사 · 프로젝트 · 벤더 검색" oninput="renderTable()" style="width:220px;">
   <select class="form-select" id="filter-customer" style="width:180px;" onchange="renderTable()">
     <option value="">전체 고객사</option>
   </select>
   <select class="form-select" id="filter-vendor" style="width:150px;" onchange="renderTable()">
     <option value="">전체 벤더</option>
-  </select>
-  <select class="form-select" id="filter-status" style="width:150px;" onchange="onStatusDropdown()">
-    <option value="">전체 상태</option>
-    <option value="expired">만료</option>
-    <option value="urgent">임박 (90일)</option>
-    <option value="ok">정상</option>
   </select>
   <select class="form-select" id="sort-by" style="width:160px;" onchange="renderTable()">
     <option value="expire">만료일순</option>
@@ -95,7 +90,18 @@ FS.requireAuth();
 let wProjects    = [];
 let wCustomers   = {};
 let wAssets      = [];
-let wCardFilter  = '';  // stat card 클릭 필터
+let wCardFilter  = '';  // stat card 클릭 필터 ('' | 'expired' | 'urgent' | 'ok')
+let wSelectedProjectId = null;  // 장비 패널에 표시 중인 프로젝트
+
+// 상태 구분 (개요 페이지와 동일 기준): 만료 < 0일 ≤ 임박 ≤ 90일 < 정상
+const W_URGENT_DAYS = 90;
+const W_BANNER_DAYS = 30;
+function wStatus(d) {
+  if (d === null) return 'none';
+  if (d < 0) return 'expired';
+  if (d <= W_URGENT_DAYS) return 'urgent';
+  return 'ok';
+}
 
 function daysLeft(dateStr) {
   if (!dateStr) return null;
@@ -118,11 +124,15 @@ function daysBadge(days) {
   return `<span class="badge badge-success">${days}일</span>`;
 }
 
-function escHtml(s) {
-  return (s || '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
-}
+function escHtml(s) { return FS.esc(s); }   // 숫자 등 문자열이 아닌 값도 안전하게
 
 function init() {
+  wSelectedProjectId = null;
+  // 개요에서 숫자를 눌러 들어온 경우 해당 상태로 필터
+  if (window.hwPageFilter && window.hwPageFilter.page === 'warranty') {
+    wCardFilter = window.hwPageFilter.status || '';
+    window.hwPageFilter = null;
+  }
   FS.watch([['projects'], ['customers'], ['assets']], ([projects, customers, assets]) => {
     wProjects  = projects;
     wAssets    = assets;
@@ -141,14 +151,18 @@ function init() {
     renderStats();
     renderBanner();
     renderTable();
+    // 열려 있는 장비 패널도 갱신 (다른 기기에서 수정·삭제된 경우)
+    const panel = document.getElementById('proj-asset-panel');
+    if (wSelectedProjectId && panel.style.display !== 'none') {
+      if (wProjects.some(p => p.id === wSelectedProjectId)) showProjectAssets(wSelectedProjectId, false);
+      else { panel.style.display = 'none'; wSelectedProjectId = null; }
+    }
   });
 }
 
 function renderStats() {
-  const total   = wProjects.length;
-  const danger  = wProjects.filter(p => { const d = daysLeft(p.warranty_expire); return d !== null && d <= 30; }).length;
-  const warning = wProjects.filter(p => { const d = daysLeft(p.warranty_expire); return d !== null && d > 30 && d <= 180; }).length;
-  const ok      = wProjects.filter(p => { const d = daysLeft(p.warranty_expire); return d !== null && d > 180; }).length;
+  const total = wProjects.length;
+  const count = st => wProjects.filter(p => wStatus(daysLeft(p.warranty_expire)) === st).length;
 
   function card(label, val, color, key) {
     const isActive = wCardFilter === key;
@@ -160,10 +174,10 @@ function renderStats() {
     </div>`;
   }
   document.getElementById('stat-cards').innerHTML =
-    card('전체 프로젝트', total,   '#3b82f6', '') +
-    card('만료·1개월이내', danger,  '#ef4444', 'danger') +
-    card('6개월이내',       warning, '#f97316', 'warning') +
-    card('정상',            ok,      '#22c55e', 'ok');
+    card('전체 프로젝트',    total,            '#3b82f6', '') +
+    card('만료',             count('expired'), '#ef4444', 'expired') +
+    card('임박 (90일 이내)', count('urgent'),  '#f97316', 'urgent') +
+    card('정상',             count('ok'),      '#22c55e', 'ok');
 }
 
 function setCardFilter(key) {
@@ -172,21 +186,17 @@ function setCardFilter(key) {
   renderTable();
 }
 
-function onStatusDropdown() {
-  renderStats();
-  renderTable();
-}
-
 // ── 배너 ──────────────────────────────────────────────────────────────────────
 function renderBanner() {
+  // 오래전에 만료된 건 때문에 배너가 계속 떠 있지 않도록, 앞으로 30일 안에 만료되는 것만
   const urgent = wProjects.filter(p => {
     const d = daysLeft(p.warranty_expire);
-    return d !== null && d <= 30;
+    return d !== null && d >= 0 && d <= W_BANNER_DAYS;
   });
   if (!urgent.length) { document.getElementById('warranty-banner').style.display = 'none'; return; }
   const totalUnits = urgent.reduce((s, p) => s + wAssets.filter(a => a.project_id === p.id).length, 0);
   document.getElementById('warranty-banner').textContent =
-    `⚠ 워런티 만료 임박: ${urgent.length}개 프로젝트 (${totalUnits}대) — 즉시 확인 필요`;
+    `⚠ 30일 내 워런티 만료: ${urgent.length}개 프로젝트 (${totalUnits}대) — 확인 필요`;
   document.getElementById('warranty-banner').style.display = '';
 }
 
@@ -194,24 +204,15 @@ function renderBanner() {
 function renderTable() {
   const cFilter = document.getElementById('filter-customer').value;
   const vFilter = document.getElementById('filter-vendor').value;
-  const sFilter = document.getElementById('filter-status').value;
   const sortBy  = document.getElementById('sort-by').value;
+  const q = (document.getElementById('w-search').value || '').trim().toLowerCase();
+  const has = v => String(v ?? '').toLowerCase().includes(q);
 
   let data = wProjects.filter(p => {
     if (cFilter && p.customer_id !== cFilter) return false;
     if (vFilter && p.vendor !== vFilter) return false;
-    if (sFilter) {
-      const d = daysLeft(p.warranty_expire);
-      if (sFilter === 'expired' && !(d !== null && d < 0))             return false;
-      if (sFilter === 'urgent'  && !(d !== null && d >= 0 && d <= 90)) return false;
-      if (sFilter === 'ok'      && !(d !== null && d > 90))            return false;
-    }
-    if (wCardFilter) {
-      const d = daysLeft(p.warranty_expire);
-      if (wCardFilter === 'danger'  && !(d !== null && d <= 30))            return false;
-      if (wCardFilter === 'warning' && !(d !== null && d > 30 && d <= 180)) return false;
-      if (wCardFilter === 'ok'      && !(d !== null && d > 180))            return false;
-    }
+    if (wCardFilter && wStatus(daysLeft(p.warranty_expire)) !== wCardFilter) return false;
+    if (q && !(has(wCustomers[p.customer_id]) || has(p.name) || has(p.vendor) || has(p.device_type) || has(p.memo))) return false;
     return true;
   });
 
@@ -240,7 +241,8 @@ function renderTable() {
 }
 
 // ── 장비 목록 패널 ────────────────────────────────────────────────────────────
-function showProjectAssets(projectId) {
+function showProjectAssets(projectId, scroll = true) {
+  wSelectedProjectId = projectId;
   const assets = wAssets.filter(a => a.project_id === projectId);
   const proj = wProjects.find(p => p.id === projectId);
   const projectName = proj ? (proj.name || '') : projectId;
@@ -276,7 +278,7 @@ function showProjectAssets(projectId) {
 
   const panel = document.getElementById('proj-asset-panel');
   panel.style.display = '';
-  FS.scrollToEl(panel, 'nearest');
+  if (scroll) FS.scrollToEl(panel, 'nearest');
 }
 
 init();

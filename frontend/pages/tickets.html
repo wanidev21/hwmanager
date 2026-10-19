@@ -22,9 +22,10 @@
 
 <div class="flex-between mb-3 ticket-toolbar">
   <div class="flex gap-2 ticket-filters">
-    <input type="text" class="form-input" id="ticket-search" placeholder="제목, 고객사 검색..." oninput="renderTickets()" style="max-width:280px;">
+    <input type="text" class="form-input" id="ticket-search" placeholder="제목·고객사·담당자·내용 검색" oninput="renderTickets()" style="max-width:280px;">
     <select class="form-select" id="filter-status" style="width:140px;" onchange="renderStats();renderTickets()">
       <option value="">전체 상태</option>
+      <option value="처리중">처리중 (완료 제외)</option>
       <option>접수</option><option>진행중</option><option>보류</option><option>완료</option>
     </select>
     <select class="form-select" id="filter-priority" style="width:130px;" onchange="renderTickets()">
@@ -72,7 +73,7 @@
       <div class="form-group"><label class="form-label">제목 *</label><input type="text" class="form-input" id="f-title" placeholder="장애 내용 요약"></div>
       <div class="form-row">
         <div class="form-group"><label class="form-label">고객사</label>
-          <select class="form-select" id="f-customer"></select>
+          <select class="form-select" id="f-customer"><option value="">선택 안 함</option></select>
         </div>
         <div class="form-group"><label class="form-label">담당자</label>
           <input type="text" class="form-input" id="f-assignee" placeholder="담당자 이름">
@@ -116,6 +117,11 @@ const PRIORITY_COLOR = { '긴급':'#dc2626','높음':'#d97706','보통':'#2563eb
 
 function init() {
   ticketSelectedId = null;
+  // 개요에서 '처리중 티켓'을 눌러 들어온 경우
+  if (window.hwPageFilter && window.hwPageFilter.page === 'tickets') {
+    document.getElementById('filter-status').value = window.hwPageFilter.status || '';
+    window.hwPageFilter = null;
+  }
   FS.watch([['tickets'], ['customers']], ([tickets, custList]) => {
     allTickets = tickets;
     allTickets.sort((a,b)=>(b.created_at?.seconds||0)-(a.created_at?.seconds||0));
@@ -180,8 +186,9 @@ function renderTickets() {
   const cf = document.getElementById('filter-customer').value;
 
   const data = allTickets.filter(t =>
-    (!q || (t.title||'').toLowerCase().includes(q) || (ticketCusts[t.customer_id]||'').toLowerCase().includes(q)) &&
-    (!sf || t.status===sf) &&
+    (!q || [t.title, ticketCusts[t.customer_id], t.assignee, t.symptom, t.action]
+      .some(v => String(v ?? '').toLowerCase().includes(q))) &&
+    (!sf || (sf === '처리중' ? t.status !== '완료' : t.status===sf)) &&
     (!pf || t.priority===pf) &&
     (!cf || t.customer_id===cf)
   );
@@ -239,7 +246,9 @@ function showDetail(id, scroll) {
 }
 
 async function changeStatus(id, status) {
-  const today = new Date().toISOString().slice(0, 10);
+  const cur = allTickets.find(x=>x.id===id);
+  if (cur && cur.status === status) return;   // 같은 상태 재선택 시 완료일 덮어쓰기 방지
+  const today = FS.localDate();
   const updateData = {
     status,
     completed_at: status === '완료' ? today : null,
@@ -259,7 +268,7 @@ function toDateInputVal(ts) {
   if (!ts) return '';
   if (typeof ts === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(ts)) return ts;
   const d = ts.toDate ? ts.toDate() : new Date(ts);
-  return d.toISOString().slice(0, 10);
+  return FS.localDate(d);
 }
 
 function toggleCompletedAt() {
@@ -267,7 +276,7 @@ function toggleCompletedAt() {
   const group = document.getElementById('completed-at-group');
   group.style.display = isDone ? '' : 'none';
   if (isDone && !document.getElementById('f-completed-at').value) {
-    document.getElementById('f-completed-at').value = new Date().toISOString().slice(0, 10);
+    document.getElementById('f-completed-at').value = FS.localDate();
   }
 }
 
@@ -313,7 +322,7 @@ async function saveTicket() {
   const id = document.getElementById('edit-id').value;
   if (status === '완료') {
     data.completed_at = document.getElementById('f-completed-at').value
-      || new Date().toISOString().slice(0, 10);
+      || FS.localDate();
   } else {
     data.completed_at = null;
   }

@@ -65,15 +65,33 @@ function renderUsers() {
 }
 
 async function changeRole(id, role) {
-  if (!await Dialog.confirm(`역할을 '${role}'로 변경하시겠습니까?`)) {
-    renderUsers();
+  if (role !== 'user' && role !== 'admin') { renderUsers(); return; }
+  // 관리자가 자기 자신을 user로 내리면 이 화면·권한을 바로 잃으므로 한 번 더 경고
+  const isSelfDemote = id === FS.getCurrentUser()?.uid && role !== 'admin';
+  const otherAdmins = allUsers.filter(u => u.id !== id && u.role === 'admin').length;
+  const msg = isSelfDemote
+    ? '본인의 관리자 권한을 해제합니다.\n해제 후에는 회원 관리 메뉴에 접근할 수 없고, '
+      + (otherAdmins ? '다른 관리자만 되돌릴 수 있습니다.' : '다른 관리자가 없어 관리 스크립트(set_admin.py)로만 복구할 수 있습니다.')
+      + '\n계속하시겠습니까?'
+    : `역할을 '${role}'로 변경하시겠습니까?`;
+  if (!await Dialog.confirm(msg, isSelfDemote)) {
+    renderUsers();   // 선택 상자를 원래 값으로 되돌림
     return;
   }
-  await FS.update('users', id, { role });
+  try {
+    await FS.update('users', id, { role });
+  } catch (e) {
+    console.error('[users] changeRole', e);
+    Toast.error('역할 변경 실패: ' + (e.code || e.message));
+    renderUsers();   // 실패: 선택 상자를 원래 값으로 되돌림
+    return;
+  }
   const u = allUsers.find(x=>x.id===id);
   if (u) u.role = role;
   renderUsers();
   Toast.success(`역할이 '${role}'로 변경되었습니다`);
+  // 본인 권한 해제: 메뉴·권한 상태를 다시 읽도록 새로고침
+  if (isSelfDemote) setTimeout(() => location.reload(), 1200);
 }
 
 init();

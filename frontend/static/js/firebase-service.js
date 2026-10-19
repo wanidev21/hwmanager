@@ -44,7 +44,8 @@ window.FS = {
     FS.unwatchAll();
     await _auth.signOut();
     // 공용 기기 대비: 로그아웃 시 로컬 캐시 삭제
-    try { await _db.terminate(); await _db.clearPersistence(); } catch (e) {}
+    try { await _db.terminate(); await _db.clearPersistence(); }
+    catch (e) { console.warn('오프라인 캐시 삭제 실패 (다른 탭이 열려 있으면 실패할 수 있음)', e); }
   },
 
   // 로그인 화면으로 이동 (앱 화면 기록을 남기지 않음)
@@ -224,6 +225,12 @@ window.FS = {
       sel.appendChild(o);
     });
     if ([...sel.options].some(o => o.value === prev)) sel.value = prev;
+  },
+
+  // 로컬(KST) 기준 'YYYY-MM-DD' (toISOString은 UTC라 오전 9시 전에는 하루 전 날짜가 됨)
+  localDate(d = new Date()) {
+    const p = n => String(n).padStart(2, '0');
+    return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}`;
   },
 
   // #page-content 안에서만 스크롤 (scrollIntoView는 overflow:hidden인 상위 요소까지 밀어

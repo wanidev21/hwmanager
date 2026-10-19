@@ -42,7 +42,7 @@
 <!-- 노트 탭 -->
 <div class="tech-panel" id="panel-notes">
   <div class="flex gap-2 mb-3">
-    <input type="text" class="form-input" id="note-search" placeholder="노트 검색..." oninput="renderNotes()" style="max-width:300px;">
+    <input type="text" class="form-input" id="note-search" placeholder="제목·내용·키워드 검색..." oninput="renderNotes()" style="max-width:300px;">
     <select class="form-select" id="note-domain-filter" style="width:160px;" onchange="renderNotes()">
       <option value="">전체 도메인</option>
     </select>
@@ -79,7 +79,7 @@
     </div>
     <div class="modal-footer">
       <button class="btn" onclick="document.getElementById('domain-modal').style.display='none'">취소</button>
-      <button class="btn btn-primary" onclick="saveDomain()">저장</button>
+      <button class="btn btn-primary" onclick="saveDomain(this)">저장</button>
     </div>
   </div>
 </div>
@@ -93,7 +93,7 @@
     </div>
     <div class="modal-footer">
       <button class="btn" onclick="document.getElementById('topic-modal').style.display='none'">취소</button>
-      <button class="btn btn-primary" onclick="saveTopic()">저장</button>
+      <button class="btn btn-primary" onclick="saveTopic(this)">저장</button>
     </div>
   </div>
 </div>
@@ -113,7 +113,7 @@
     </div>
     <div class="modal-footer">
       <button class="btn" onclick="document.getElementById('note-modal').style.display='none'">취소</button>
-      <button class="btn btn-primary" onclick="saveNote()">저장</button>
+      <button class="btn btn-primary" onclick="saveNote(this)">저장</button>
     </div>
   </div>
 </div>
@@ -134,7 +134,7 @@
     </div>
     <div class="modal-footer">
       <button class="btn" onclick="document.getElementById('release-modal').style.display='none'">취소</button>
-      <button class="btn btn-primary" onclick="saveRelease()">저장</button>
+      <button class="btn btn-primary" onclick="saveRelease(this)">저장</button>
     </div>
   </div>
 </div>
@@ -144,6 +144,24 @@ FS.requireAuth();
 
 let domains = [], topics = [], techNotes = [], releases = [];
 let selectedDomainId = null;
+let techDetailId = null;   // 열려 있는 노트 상세 ID
+
+// 저장 버튼 잠금 실행 (중복 클릭 방지 + 실패 시 오류 표시)
+async function techWithBtn(btn, fn) {
+  if (btn && btn.disabled) return;
+  if (btn) btn.disabled = true;
+  try {
+    await fn();
+  } catch (e) {
+    console.error('[tech] save', e);
+    Toast.error('저장 실패: ' + (e.code || e.message));
+  } finally {
+    if (btn) btn.disabled = false;
+  }
+}
+
+// created_at 오름차순 (저장 직후 아직 없는 값은 맨 뒤)
+const techByCreated = (a, b) => (a.created_at?.seconds ?? Infinity) - (b.created_at?.seconds ?? Infinity);
 
 const STATUS_CYCLE = { '미착수':'진행중', '진행중':'완료', '완료':'미착수' };
 const STATUS_ICONS = { '미착수':'', '진행중':'→', '완료':'✓' };
@@ -159,12 +177,18 @@ function init() {
     ['releases',     mine],
   ], ([d, t, n, r]) => {
     [domains, topics, techNotes, releases] = [d, t, n, r];
+    // 정렬: 도메인·토픽은 등록 순, 노트는 최신순, 릴리스는 날짜 최신순(같으면 최신 등록 순)
+    domains.sort(techByCreated);
+    topics.sort(techByCreated);
+    techNotes.sort((a, b) => techByCreated(b, a));
+    releases.sort((a, b) => (b.date || '').localeCompare(a.date || '') || techByCreated(b, a));
     // 다른 기기에서 선택 중인 도메인이 삭제된 경우
     if (selectedDomainId && !domains.some(x => x.id === selectedDomainId)) selectedDomainId = null;
     populateNoteDomainSelects();
     renderDomains();
     renderNotes();
     renderReleases();
+    refreshNoteDetail();
   });
 }
 
@@ -225,26 +249,30 @@ async function cycleStatus(id) {
 }
 
 function openDomainModal() { document.getElementById('domain-modal').style.display='flex'; document.getElementById('f-domain-name').value=''; }
-async function saveDomain() {
+async function saveDomain(btn) {
   const name = document.getElementById('f-domain-name').value.trim();
   if (!name) return;
-  const id = await FS.add('tech_domains', { name, user_id: FS.getCurrentUser().uid });
-  domains.push({ id, name });
-  document.getElementById('domain-modal').style.display='none';
-  renderDomains();
-  populateNoteDomainSelects();
-  Toast.success('도메인이 추가되었습니다');
+  await techWithBtn(btn, async () => {
+    const id = await FS.add('tech_domains', { name, user_id: FS.getCurrentUser().uid });
+    domains.push({ id, name });
+    document.getElementById('domain-modal').style.display='none';
+    renderDomains();
+    populateNoteDomainSelects();
+    Toast.success('도메인이 추가되었습니다');
+  });
 }
 
 function openTopicModal() { document.getElementById('topic-modal').style.display='flex'; document.getElementById('f-topic-name').value=''; }
-async function saveTopic() {
+async function saveTopic(btn) {
   const name = document.getElementById('f-topic-name').value.trim();
   if (!name || !selectedDomainId) return;
-  const id = await FS.add('tech_topics', { name, domain_id: selectedDomainId, status: '미착수', user_id: FS.getCurrentUser().uid });
-  topics.push({ id, name, domain_id: selectedDomainId, status: '미착수' });
-  document.getElementById('topic-modal').style.display='none';
-  renderTopics();
-  Toast.success('토픽이 추가되었습니다');
+  await techWithBtn(btn, async () => {
+    const id = await FS.add('tech_topics', { name, domain_id: selectedDomainId, status: '미착수', user_id: FS.getCurrentUser().uid });
+    topics.push({ id, name, domain_id: selectedDomainId, status: '미착수' });
+    document.getElementById('topic-modal').style.display='none';
+    renderTopics();
+    Toast.success('토픽이 추가되었습니다');
+  });
 }
 
 async function deleteTopic(id) {
@@ -268,16 +296,19 @@ function populateNoteDomainSelects() {
 }
 
 function renderNotes() {
-  const q = document.getElementById('note-search').value.toLowerCase();
+  const q = document.getElementById('note-search').value.trim().toLowerCase();
   const df = document.getElementById('note-domain-filter').value;
+  // 제목·내용·키워드·도메인명 전체에서 대소문자 무시 검색
+  const hay = n => [n.title, n.content, ...(n.keywords||[]), domains.find(d=>d.id===n.domain_id)?.name]
+    .map(v => String(v || '').toLowerCase()).join('\n');
   const data = techNotes.filter(n=>
-    (!q || n.title?.toLowerCase().includes(q) || (n.keywords||[]).some(k=>k.toLowerCase().includes(q))) &&
+    (!q || hay(n).includes(q)) &&
     (!df || n.domain_id===df)
   );
   document.getElementById('note-empty').style.display = data.length?'none':'';
   document.getElementById('note-grid').innerHTML = data.map(n=>{
     const domain = domains.find(d=>d.id===n.domain_id);
-    return `<div class="note-card" onclick="showNoteDetail('${n.id}')">
+    return `<div class="note-card" onclick="showNoteDetail('${n.id}', true)">
       <div style="font-size:11px;color:var(--primary);margin-bottom:4px;">${FS.esc(domain?.name||'')}</div>
       <div style="font-weight:500;font-size:13px;">${FS.esc(n.title||'')}</div>
       <div class="note-preview">${FS.esc(n.content||'')}</div>
@@ -289,12 +320,32 @@ function renderNotes() {
   }).join('');
 }
 
-function showNoteDetail(id) {
+// 실시간 갱신·수정 후: 열려 있는 상세를 최신 내용으로 다시 그림, 삭제됐으면 닫음
+function refreshNoteDetail() {
+  const panel = document.getElementById('note-detail');
+  if (!techDetailId || !panel || panel.style.display === 'none') return;
+  if (techNotes.some(x => x.id === techDetailId)) showNoteDetail(techDetailId);
+  else closeNoteDetail();
+}
+function closeNoteDetail() {
+  techDetailId = null;
+  const panel = document.getElementById('note-detail');
+  if (panel) panel.style.display = 'none';
+}
+
+// fromTap: 사용자가 카드를 눌러 연 경우만 상세 위치로 스크롤 (실시간 갱신 때는 스크롤 안 함)
+function showNoteDetail(id, fromTap) {
   const n = techNotes.find(x=>x.id===id);
   if (!n) return;
+  techDetailId = id;
   const domain = domains.find(d=>d.id===n.domain_id);
   const panel = document.getElementById('note-detail');
   panel.style.display='';
+  if (fromTap) {
+    // 상세는 카드 목록 아래에 있으므로 폰은 맨 위로, PC는 가려진 만큼만
+    const mobile = window.matchMedia('(max-width:768px)').matches;
+    requestAnimationFrame(() => FS.scrollToEl(panel, mobile ? 'start' : 'nearest'));
+  }
   panel.innerHTML=`
     <div class="flex-between mb-2">
       <div>
@@ -304,7 +355,7 @@ function showNoteDetail(id) {
       <div class="flex gap-1">
         <button class="btn btn-sm" onclick="openNoteModal('${id}')">수정</button>
         <button class="btn btn-sm btn-danger" onclick="deleteNote('${id}')">삭제</button>
-        <button class="btn btn-ghost btn-sm" onclick="document.getElementById('note-detail').style.display='none'">✕</button>
+        <button class="btn btn-ghost btn-sm" onclick="closeNoteDetail()">✕</button>
       </div>
     </div>
     <p style="font-size:13px;line-height:1.8;white-space:pre-wrap;">${FS.esc(n.content||'')}</p>
@@ -331,9 +382,13 @@ function openNoteModal(id) {
   }
 }
 
-async function saveNote() {
+async function saveNote(btn) {
   const title = document.getElementById('f-note-title').value.trim();
   if (!title) return;
+  await techWithBtn(btn, () => techSaveNoteInner(title));
+}
+
+async function techSaveNoteInner(title) {
   const data = {
     user_id: FS.getCurrentUser().uid,
     title,
@@ -354,13 +409,14 @@ async function saveNote() {
   }
   document.getElementById('note-modal').style.display='none';
   renderNotes();
+  refreshNoteDetail();   // 수정한 노트가 상세에 열려 있으면 바로 반영
 }
 
 async function deleteNote(id) {
   if (!await Dialog.confirm('이 노트를 삭제하시겠습니까?', true)) return;
   await FS.remove('tech_notes', id);
   techNotes = techNotes.filter(x=>x.id!==id);
-  document.getElementById('note-detail').style.display='none';
+  closeNoteDetail();
   renderNotes();
   Toast.success('노트가 삭제되었습니다');
 }
@@ -392,9 +448,13 @@ function openReleaseModal() {
   document.getElementById('f-rel-status').value='학습필요';
 }
 
-async function saveRelease() {
+async function saveRelease(btn) {
   const title = document.getElementById('f-rel-title').value.trim();
   if (!title) return;
+  await techWithBtn(btn, () => techSaveReleaseInner(title));
+}
+
+async function techSaveReleaseInner(title) {
   const data = {
     user_id: FS.getCurrentUser().uid,
     title,

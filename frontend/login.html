@@ -186,7 +186,11 @@
     // ── 뒤로가기 → 종료 안내 (모바일·설치된 앱) ──
     // 기록 구조 [보호용(guard), 로그인]. 뒤로가기로 guard에 오면 안내를 띄우고,
     // 거기서 한 번 더 누르면 기록 밖으로 나가 앱 종료 (스크립트로는 앱을 닫을 수 없음)
-    if (matchMedia('(display-mode: standalone)').matches || matchMedia('(pointer: coarse)').matches) {
+    // 뒤로가기로 이 페이지에 온 경우 (앱 → 뒤로 → 로그인 기록). 로그인 상태여도 앱으로 되돌려 보내지 않음
+    const navEntry = performance.getEntriesByType('navigation')[0];
+    const cameBack = !!navEntry && navEntry.type === 'back_forward';
+
+    if (!cameBack && (matchMedia('(display-mode: standalone)').matches || matchMedia('(pointer: coarse)').matches)) {
       const exitOverlay = document.getElementById('exit-overlay');
       history.replaceState({ guard: true }, '');
       history.pushState({}, '');
@@ -220,12 +224,15 @@
     async function doGoogleLogin() {
       hideError();
       btn.disabled = true;
+      // 리다이렉트 로그인 후 결과가 유실돼도 '방금 로그인한 것'임을 알 수 있도록 표시
+      sessionStorage.setItem('hw-login-pending', '1');
       try {
         const result = await FS.loginWithGoogle();
         if (!result) return; // 리다이렉트 방식: 페이지 이동 후 아래 bootstrap에서 처리
         await FS.completeLogin(result);
         window.location.replace('/');
       } catch (e) {
+        sessionStorage.removeItem('hw-login-pending');
         handleLoginError(e);
         btn.disabled = false;
       }
@@ -249,13 +256,28 @@
       btn.innerHTML = btnHtml;
       btn.disabled = false;
 
-      // 로그인 페이지에서 로그인된 상태 = 방금 로그인한 경우
-      // (모바일에서 리다이렉트 결과가 유실돼도 인증은 끝났으므로 그대로 진행.
-      //  만료 세션·로그아웃은 index.html에서 이미 signOut 후 이 페이지로 옴)
+      // 로그인 페이지에서 로그인된 상태:
+      // - 방금 로그인(hw-login-pending) → 그대로 진행 (모바일에서 리다이렉트 결과가 유실돼도 인증은 끝남)
+      // - 뒤로가기로 옴 → 앱으로 보내지 않고 계속 뒤로
+      // - 직접 열었는데 30분 넘게 미사용 → 로그아웃
       let handled = false;
+      const IDLE_MS = 30 * 60 * 1000;
       FS.onAuthChanged(async user => {
         if (!user || handled) return;
         handled = true;
+        const pending = sessionStorage.getItem('hw-login-pending');
+        sessionStorage.removeItem('hw-login-pending');
+        if (!pending) {
+          // 방금 로그인한 게 아님 → 뒤로가기로 왔으면 계속 뒤로 (앱 종료 방향)
+          if (cameBack) { history.back(); return; }
+          // 30분 넘게 쓰지 않은 세션으로 /login을 직접 열면 자동 로그아웃 우회가 되므로 로그아웃
+          const last = parseInt(localStorage.getItem('hw-last-active') || '0');
+          if (Date.now() - last > IDLE_MS) {
+            await FS.logout();
+            location.reload();   // logout()이 Firestore를 종료하므로 새로 불러와 로그인 화면으로
+            return;
+          }
+        }
         btn.disabled = true;
         btn.textContent = '로그인 중...';
         try {

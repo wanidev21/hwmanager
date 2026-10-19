@@ -12,13 +12,13 @@
 .cal-toolbar { display:flex; align-items:center; gap:8px; margin-bottom:12px; flex-wrap:wrap; }
 .cal-month-label { font-size:18px; font-weight:700; color:var(--text); min-width:140px; text-align:center; }
 .cal-nav {
-  width:30px; height:30px; border-radius:6px; border:1px solid var(--border);
+  width:30px; height:30px; border-radius:0; border:1px solid var(--border);
   background:var(--surface); color:var(--text-sub); font-size:16px; cursor:pointer;
   display:flex; align-items:center; justify-content:center; transition:background 0.1s;
 }
 .cal-nav:hover { background:var(--bg); }
 .cal-today-btn {
-  height:30px; padding:0 12px; border-radius:6px; border:1px solid var(--border);
+  height:30px; padding:0 12px; border-radius:0; border:1px solid var(--border);
   background:var(--surface); color:var(--text-sub); font-size:12px; font-weight:500;
   cursor:pointer; font-family:inherit; transition:background 0.1s;
 }
@@ -30,7 +30,7 @@
   display:none;
   align-items:center; flex-wrap:wrap; gap:6px;
   margin-bottom:12px; padding:9px 14px;
-  background:var(--surface); border:1px solid var(--border); border-radius:8px;
+  background:var(--surface); border:1px solid var(--border); border-radius:0;
 }
 .cal-filter-label {
   font-size:11px; font-weight:600; color:var(--text-hint);
@@ -39,7 +39,7 @@
 .cal-filter-item {
   display:flex; align-items:center; gap:5px;
   cursor:pointer; font-size:12px; color:var(--text-sub); font-weight:500;
-  padding:3px 9px 3px 6px; border-radius:20px; border:1px solid transparent;
+  padding:3px 9px 3px 6px; border-radius:0; border:1px solid transparent;
   transition:background 0.1s; white-space:nowrap; user-select:none;
 }
 .cal-filter-item:hover           { background:var(--bg); }
@@ -50,7 +50,7 @@
 /* ── 요일 헤더 ── */
 .cal-week-header {
   display:grid; grid-template-columns:repeat(7,1fr);
-  border:1px solid var(--border); border-bottom:none; border-radius:8px 8px 0 0; overflow:hidden;
+  border:1px solid var(--border); border-bottom:none; border-radius:0 0 0; overflow:hidden;
 }
 .cal-week-header div {
   padding:8px 0; text-align:center; font-size:11px; font-weight:600;
@@ -73,9 +73,9 @@
 }
 .cal-cell:nth-child(7n)   { border-right:none; }
 .cal-cell:hover           { background:var(--bg); }
-.cal-cell.cal-other       { background:#fafaf9; cursor:default; }
-.cal-cell.cal-other:hover { background:#fafaf9; }
-.cal-cell.cal-today       { background:#fdf0eb; }
+.cal-cell.cal-other       { background:var(--surface-2); cursor:default; }
+.cal-cell.cal-other:hover { background:var(--surface-2); }
+.cal-cell.cal-today       { background:#FFF3C4; }
 .cal-cell.cal-today:hover { background:#fce8de; }
 
 .cal-date-num {
@@ -83,26 +83,26 @@
   width:24px; height:24px; display:flex; align-items:center; justify-content:center;
   border-radius:50%; margin-bottom:2px; flex-shrink:0;
 }
-.cal-date-num.is-today { background:#e8540a; color:#fff; font-weight:700; }
+.cal-date-num.is-today { background:var(--primary); color:#111111; font-weight:800; border-radius:0; }
 .cal-date-num.is-sun   { color:#ef4444; }
 .cal-date-num.is-sat   { color:#3b82f6; }
 
 .cal-event-pill {
-  font-size:11px; font-weight:500; padding:2px 6px; border-radius:4px;
+  font-size:11px; font-weight:500; padding:2px 6px; border-radius:0;
   cursor:pointer; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; line-height:1.5;
 }
 .cal-event-pill:hover { filter:brightness(0.93); }
 .cal-more {
   font-size:10px; color:var(--text-hint); padding:1px 4px; cursor:pointer; font-weight:500;
 }
-.cal-more:hover { color:var(--primary); }
+.cal-more:hover { color:var(--primary-text); }
 .cal-loading { grid-column:span 7; display:flex; align-items:center; justify-content:center; padding:40px; color:var(--text-hint); font-size:13px; }
 
 /* ── 날짜별 일정 목록 모달 ── */
 .day-ev-list { display:flex; flex-direction:column; gap:5px; max-height:360px; overflow-y:auto; }
 .day-ev-item {
   display:flex; align-items:center; gap:10px; padding:9px 11px;
-  border-radius:7px; cursor:pointer; border:1px solid var(--border); transition:background 0.1s;
+  border-radius:0; cursor:pointer; border:1px solid var(--border); transition:background 0.1s;
 }
 .day-ev-item:hover { background:var(--bg); }
 .day-ev-dot { width:9px; height:9px; border-radius:50%; flex-shrink:0; }
@@ -113,7 +113,7 @@
 /* ── 읽기 전용 배너 ── */
 .ev-readonly-banner {
   display:flex; align-items:center; gap:6px; padding:8px 11px;
-  background:#f8f9fa; border:1px solid var(--border); border-radius:6px;
+  background:#f8f9fa; border:1px solid var(--border); border-radius:0;
   font-size:12px; color:var(--text-sub);
 }
 
@@ -128,7 +128,7 @@
 .gcal-badge {
   display:inline-flex; align-items:center; gap:5px; font-size:11px;
   font-weight:500; padding:3px 9px; background:#f0f4ff;
-  border-radius:20px; border:1px solid #c7d7fd; color:#4285F4;
+  border-radius:0; border:1px solid #c7d7fd; color:#4285F4;
 }
 /* 구글에서 확인되지 않는 연동 일정 (삭제됐거나 다른 달로 옮겨짐) */
 .cal-event-pill.cal-missing { opacity:.55; }
@@ -142,7 +142,7 @@
   .cal-grid { flex:none; }
   .cal-cell { min-height:58px; padding:4px 2px 6px; align-items:center; gap:3px; }
   .cal-cell:hover { background:transparent; }
-  .cal-cell.cal-today:hover { background:#fdf0eb; }
+  .cal-cell.cal-today:hover { background:#FFF3C4; }
   .cal-cell:not(.cal-other):active { background:var(--bg); }
   .cal-cell .cal-event-pill, .cal-cell .cal-more { display:none; }
   .cal-date-num { font-size:13px; width:26px; height:26px; margin-bottom:0; }
@@ -165,7 +165,7 @@
     <button class="cal-today-btn" onclick="goToday()">오늘</button>
     <div id="gcal-status-wrap"></div>
     <div class="cal-spacer"></div>
-    <button class="btn btn-sm" id="btn-refresh" onclick="refreshCalendar()">↻ 새로고침</button>
+    <button class="btn btn-sm" id="btn-refresh" onclick="refreshCalendar()"><i data-icon="refresh" data-size="16"></i> 새로고침</button>
     <button class="btn btn-primary" onclick="openEventModal(null,'')">+ 일정 추가</button>
   </div>
 
@@ -203,7 +203,7 @@
     </div>
     <div class="modal-body">
       <div class="ev-readonly-banner" id="ev-readonly-banner" style="display:none;">
-        🔒 이 일정은 읽기 전용입니다 (수정 권한 없음)
+        <i data-icon="lock" data-size="14"></i> 이 일정은 읽기 전용입니다 (수정 권한 없음)
       </div>
       <div class="form-group">
         <label class="form-label">제목 *</label>
@@ -599,12 +599,12 @@ async function goToday() {
 }
 async function refreshCalendar() {
   const btn = document.getElementById('btn-refresh');
-  btn.textContent = '↻ 로딩중...'; btn.disabled = true;
+  btn.innerHTML = FS.icon('refresh', 16) + ' 로딩중...'; btn.disabled = true;
   calendarList = [];   // 캘린더 목록도 재로드
   await loadFsEvents();
   await loadGcalForMonth();
   renderCalendar();
-  btn.textContent = '↻ 새로고침'; btn.disabled = false;
+  btn.innerHTML = FS.icon('refresh', 16) + ' 새로고침'; btn.disabled = false;
 }
 
 // ── 이벤트 칩 색상 헬퍼 ──────────────────────────────────────────────────────
@@ -755,7 +755,7 @@ function openDayEventsModal(dateStr) {
       : ev.gcal_missing
         ? '<div class="day-ev-meta" style="color:var(--warning,#b45309);">⚠ Google 캘린더에서 찾을 수 없음 (삭제·이동됨)</div>' : '';
     const editable = isEventEditable(ev);
-    const lockIcon = editable ? '' : ' 🔒';
+    const lockIcon = editable ? '' : ' ' + FS.icon('lock', 12);
     return `<div class="day-ev-item" onclick="closeDayEventsModal();setTimeout(()=>openEventModal('${ev.id}',null),50)">
       <div class="day-ev-dot" style="background:${dotColor};"></div>
       <div class="day-ev-info">

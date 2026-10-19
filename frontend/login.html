@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
-  <meta name="theme-color" content="#e8540a">
+  <meta name="theme-color" content="#111111">
   <meta name="mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-title" content="HW Manager">
@@ -15,147 +15,146 @@
   <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore-compat.js"></script>
   <script src="/firebase-config.js"></script>
   <script src="/static/js/firebase-service.js"></script>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Black+Han+Sans&family=Gothic+A1:wght@400;500;700;800&family=Space+Mono:wght@400;700&display=swap">
   <style>
+    /* 시그널 디자인 (app.css와 같은 톤: 콘크리트·검정·안전 주황) */
     * { box-sizing: border-box; margin: 0; padding: 0; }
 
     body {
-      font-family: -apple-system, BlinkMacSystemFont, 'Noto Sans KR', sans-serif;
-      background: #f7f7f5;
+      font-family: 'Gothic A1', -apple-system, 'Noto Sans KR', sans-serif;
+      background: #ECEAE4;
       display: flex;
       align-items: center;
       justify-content: center;
       min-height: 100vh;
-      color: #1a1a1a;
+      color: #111111;
     }
 
     .login-card {
       background: #ffffff;
-      border: 1px solid #e5e5e3;
-      border-radius: 14px;
-      box-shadow: 0 4px 24px rgba(0,0,0,0.07);
-      width: 360px;
-      padding: 44px 40px 36px;
+      border: 2px solid #111111;
+      box-shadow: 8px 8px 0 #111111;
+      width: 380px;
       display: flex;
       flex-direction: column;
-      align-items: center;
-      gap: 0;
     }
-
-    .logo-icon {
-      width: 44px;
-      height: 44px;
-      background: #e8540a;
-      border-radius: 11px;
-      color: white;
-      font-weight: 800;
-      font-size: 18px;
+    .login-stripe {
+      height: 12px;
+      background: repeating-linear-gradient(-45deg, #111111 0 10px, #FF5A1F 10px 20px);
+    }
+    .login-head {
+      background: #111111;
+      color: #ECEAE4;
+      padding: 26px 28px 22px;
       display: flex;
-      align-items: center;
-      justify-content: center;
-      margin-bottom: 16px;
+      flex-direction: column;
+      gap: 8px;
+    }
+    .login-tag {
+      font-family: 'Space Mono', monospace;
+      font-size: 11px;
+      font-weight: 700;
+      color: #FF5A1F;
+      letter-spacing: 0.08em;
     }
     .login-title {
-      font-size: 17px;
-      font-weight: 700;
-      color: #1a1a1a;
-      margin-bottom: 6px;
+      font-family: 'Black Han Sans', sans-serif;
+      font-size: 40px;
+      line-height: 1;
+      letter-spacing: 0.01em;
     }
     .login-subtitle {
-      font-size: 12px;
-      color: #9b9b9b;
-      margin-bottom: 32px;
+      font-size: 13px;
+      font-weight: 700;
+      color: #C9C5BA;
+    }
+    .login-body {
+      padding: 26px 28px 24px;
+      display: flex;
+      flex-direction: column;
     }
 
     .error-box {
       display: none;
       width: 100%;
-      background: #fef2f2;
-      border: 1px solid #fca5a5;
-      border-radius: 8px;
+      background: #FF5A1F;
+      border: 2px solid #111111;
       padding: 9px 13px;
       font-size: 12px;
-      color: #dc2626;
+      font-weight: 800;
+      color: #111111;
       margin-bottom: 14px;
-      text-align: center;
     }
     .error-box.show { display: block; }
 
     .btn-google {
       width: 100%;
-      height: 42px;
+      height: 54px;
       background: #ffffff;
-      color: #3c4043;
-      border: 1px solid #dadce0;
-      border-radius: 8px;
-      font-size: 14px;
-      font-weight: 500;
+      color: #111111;
+      border: 2px solid #111111;
+      font-size: 15px;
+      font-weight: 800;
       cursor: pointer;
       display: flex;
       align-items: center;
       justify-content: center;
       gap: 10px;
-      transition: background 0.15s, box-shadow 0.15s;
       font-family: inherit;
+      transition: transform 0.08s, box-shadow 0.08s;
     }
-    .btn-google:hover  { background: #f8f9fa; box-shadow: 0 1px 4px rgba(0,0,0,0.12); }
-    .btn-google:active { background: #f1f3f4; }
+    .btn-google:hover  { background: #FFD23F; }
+    .btn-google:active { transform: translate(2px, 2px); }
     .btn-google:disabled { opacity: 0.55; cursor: not-allowed; }
 
     .login-note {
-      margin-top: 20px;
-      font-size: 11px;
-      color: #b0b0b0;
-      text-align: center;
+      margin-top: 16px;
+      font-size: 12px;
+      font-weight: 600;
+      color: #4A4740;
     }
 
     @media (max-width: 480px) {
       body {
         align-items: flex-start;
-        padding-top: 64px;
-        padding-bottom: env(safe-area-inset-bottom);
+        padding: 56px 16px env(safe-area-inset-bottom);
       }
-      .login-card {
-        width: 100%;
-        border-radius: 0;
-        border-left: none;
-        border-right: none;
-        border-top: none;
-        box-shadow: none;
-        padding: 40px 28px 32px;
-      }
-      .btn-google {
-        height: 48px;
-        font-size: 15px;
-      }
+      .login-card { width: 100%; box-shadow: 6px 6px 0 #111111; }
+      .login-title { font-size: 36px; }
     }
 
     /* 뒤로가기 종료 안내 */
     .exit-overlay {
       position: fixed; inset: 0; z-index: 1000;
-      background: rgba(0,0,0,0.35);
+      background: rgba(17,17,17,0.45);
       display: none; align-items: center; justify-content: center;
       padding: 24px;
     }
     .exit-overlay.show { display: flex; }
     .exit-box {
-      background: #ffffff; border-radius: 14px; width: 100%; max-width: 320px;
-      padding: 24px 22px 18px; text-align: center;
-      box-shadow: 0 20px 60px rgba(0,0,0,0.15);
+      background: #ffffff; border: 2px solid #111111; width: 100%; max-width: 320px;
+      padding: 22px 20px 18px; box-shadow: 6px 6px 0 #111111;
     }
-    .exit-title { font-size: 16px; font-weight: 700; margin-bottom: 8px; }
-    .exit-msg { font-size: 13px; color: #6b6b6b; line-height: 1.6; margin-bottom: 18px; }
+    .exit-title { font-family: 'Black Han Sans', sans-serif; font-size: 22px; margin-bottom: 8px; }
+    .exit-msg { font-size: 13px; font-weight: 600; color: #4A4740; line-height: 1.6; margin-bottom: 18px; }
     .exit-btn {
-      width: 100%; height: 44px; border: none; border-radius: 8px;
-      background: #e8540a; color: #fff; font-size: 14px; font-weight: 600;
+      width: 100%; height: 48px; border: 2px solid #111111;
+      background: #FF5A1F; color: #111111; font-size: 15px; font-weight: 800;
       font-family: inherit; cursor: pointer;
     }
   </style>
 </head>
 <body>
   <div class="login-card">
-    <div class="logo-icon">X</div>
-    <div class="login-title">HW Manager</div>
-    <div class="login-subtitle">서버 H/W 엔지니어 업무 관리</div>
+    <div class="login-stripe" aria-hidden="true"></div>
+    <div class="login-head">
+      <span class="login-tag">FIELD ENGINEER TOOL</span>
+      <h1 class="login-title">HW MANAGER</h1>
+      <span class="login-subtitle">서버 H/W 엔지니어 업무 관리</span>
+    </div>
+    <div class="login-body">
 
     <div class="error-box" id="login-error"></div>
 
@@ -170,6 +169,7 @@
     </button>
 
     <p class="login-note">등록된 Google 계정만 이용할 수 있습니다</p>
+    </div>
   </div>
 
   <div class="exit-overlay" id="exit-overlay">

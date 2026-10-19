@@ -8,6 +8,48 @@ if (/^[^.]+\.(web\.app|firebaseapp\.com)$/.test(location.hostname) && !location.
 
 firebase.initializeApp(firebaseConfig);
 
+// FS.icon()용 SVG 경로 (24×24, stroke)
+const _ICONS = {
+  home:     '<path d="M3 11l9-7 9 7"/><path d="M5 10v10h14V10"/>',
+  server:   '<rect x="3" y="4" width="18" height="7" rx="1"/><rect x="3" y="13" width="18" height="7" rx="1"/><path d="M7 7.5h.01M7 16.5h.01"/>',
+  building: '<path d="M4 21V5a1 1 0 011-1h9a1 1 0 011 1v16"/><path d="M15 9h4a1 1 0 011 1v11"/><path d="M8 8h3M8 12h3M8 16h3M3 21h18"/>',
+  alert:    '<path d="M12 3l9.5 17h-19z"/><path d="M12 10v4M12 17h.01"/>',
+  shield:   '<path d="M12 3l8 3v6c0 4.5-3.4 8-8 9-4.6-1-8-4.5-8-9V6z"/>',
+  calendar: '<rect x="3" y="5" width="18" height="16" rx="1"/><path d="M3 10h18M8 3v4M16 3v4"/>',
+  book:     '<path d="M4 4h6a2 2 0 012 2v14a2 2 0 00-2-2H4z"/><path d="M20 4h-6a2 2 0 00-2 2v14a2 2 0 012-2h6z"/>',
+  notes:    '<rect x="5" y="3" width="14" height="18" rx="1"/><path d="M9 8h6M9 12h6M9 16h3"/>',
+  clipboard:'<rect x="5" y="4" width="14" height="17" rx="1"/><path d="M9 4V3h6v1M9 10h6M9 14h6M9 18h3"/>',
+  user:     '<circle cx="12" cy="8" r="4"/><path d="M4 21c0-4 3.6-6 8-6s8 2 8 6"/>',
+  users:    '<circle cx="9" cy="8" r="3.5"/><path d="M2 20c0-3.5 3-5.5 7-5.5s7 2 7 5.5"/><path d="M16 4.5a3.5 3.5 0 010 7M18 14.5c2.4.6 4 2.4 4 5.5"/>',
+  phone:    '<path d="M5 4h4l2 5-2.5 1.5a11 11 0 005 5L15 13l5 2v4a1 1 0 01-1 1A17 17 0 014 5a1 1 0 011-1z"/>',
+  mail:     '<rect x="3" y="5" width="18" height="14" rx="1"/><path d="M3 7l9 6 9-6"/>',
+  pin:      '<path d="M12 21s7-6.2 7-11.5A7 7 0 005 9.5C5 14.8 12 21 12 21z"/><circle cx="12" cy="9.5" r="2.5"/>',
+  edit:     '<path d="M4 20h4L19 9l-4-4L4 16z"/><path d="M13.5 6.5l4 4"/>',
+  trash:    '<path d="M4 7h16M9 7V4h6v3M6 7l1 13h10l1-13"/>',
+  close:    '<path d="M6 6l12 12M18 6L6 18"/>',
+  plus:     '<path d="M12 5v14M5 12h14"/>',
+  check:    '<path d="M5 12.5l4.5 4.5L19 7"/>',
+  search:   '<circle cx="11" cy="11" r="7"/><path d="M20 20l-3.5-3.5"/>',
+  scan:     '<path d="M4 7V5a1 1 0 011-1h2M17 4h2a1 1 0 011 1v2M20 17v2a1 1 0 01-1 1h-2M7 20H5a1 1 0 01-1-1v-2"/><path d="M8 8v8M11 8v8M14 8v8M17 8v8"/>',
+  menu:     '<path d="M4 6h16M4 12h16M4 18h16"/>',
+  more:     '<circle cx="5" cy="12" r="1.3"/><circle cx="12" cy="12" r="1.3"/><circle cx="19" cy="12" r="1.3"/>',
+  logout:   '<path d="M15 4h4a1 1 0 011 1v14a1 1 0 01-1 1h-4"/><path d="M10 8l-4 4 4 4M6 12h11"/>',
+  sun:      '<circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/>',
+  moon:     '<path d="M20 14.5A8 8 0 019.5 4a8 8 0 1010.5 10.5z"/>',
+  refresh:  '<path d="M20 11a8 8 0 10-2.3 5.7"/><path d="M20 4v7h-7"/>',
+  lock:     '<rect x="5" y="11" width="14" height="10" rx="1"/><path d="M8 11V7a4 4 0 018 0v4"/>',
+  printer:  '<path d="M7 9V3h10v6"/><rect x="3" y="9" width="18" height="8" rx="1"/><path d="M7 14h10v7H7z"/>',
+  eye:      '<path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7S2 12 2 12z"/><circle cx="12" cy="12" r="3"/>',
+  box:      '<path d="M3 7l9-4 9 4v10l-9 4-9-4z"/><path d="M3 7l9 4 9-4M12 11v10"/>',
+  flag:     '<path d="M5 21V4M5 4h11l-2 4 2 4H5"/>',
+  wrench:   '<path d="M14.5 6.5a4 4 0 00-5.4 5.2L3 17.8V21h3.2l6.1-6.1a4 4 0 005.2-5.4l-2.6 2.6-2.4-2.4z"/>',
+  bolt:     '<path d="M13 2L4 14h7l-1 8 9-12h-7z"/>',
+  qr:       '<rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/><path d="M14 14h3v3M21 14v7h-4M17 21h.01"/>',
+  chevron:  '<path d="M9 6l6 6-6 6"/>',
+  back:     '<path d="M15 6l-6 6 6 6"/>',
+  copy:     '<rect x="9" y="9" width="11" height="11" rx="1"/><path d="M5 15V5a1 1 0 011-1h10"/>',
+};
+
 const _auth = firebase.auth();
 const _db   = firebase.firestore();
 
@@ -227,6 +269,19 @@ window.FS = {
       sel.appendChild(o);
     });
     if ([...sel.options].some(o => o.value === prev)) sel.value = prev;
+  },
+
+  // 선 아이콘 (이모지 대신 사용 — OS마다 모양이 달라지지 않도록). 색은 currentColor
+  // 템플릿: ${FS.icon('edit')} / 정적 HTML: <i data-icon="edit"></i> (loadPage가 FS.hydrateIcons로 변환)
+  icon(name, size = 18) {
+    const p = _ICONS[name];
+    if (!p) return '';
+    return `<svg class="ico" width="${size}" height="${size}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${p}</svg>`;
+  },
+  hydrateIcons(root = document) {
+    root.querySelectorAll('i[data-icon]').forEach(el => {
+      el.outerHTML = FS.icon(el.dataset.icon, parseInt(el.dataset.size || '18'));
+    });
   },
 
   // 로컬(KST) 기준 'YYYY-MM-DD' (toISOString은 UTC라 오전 9시 전에는 하루 전 날짜가 됨)

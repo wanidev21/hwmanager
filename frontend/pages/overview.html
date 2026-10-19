@@ -1,57 +1,146 @@
-<!-- 개요 -->
+<!-- 개요 (홈): 현장에서 앱을 열자마자 볼 것 — 장비 검색, 급한 일 3가지, 먼저 확인할 목록 -->
 <style>
-  .ov-welcome { margin-bottom:24px; }
-  .ov-section-grid { display:grid; grid-template-columns:repeat(3,1fr); gap:16px; align-items:start; }
-  .ov-section-grid > .card + .card { margin-top: 0; }
+  .ov-head { display:flex; justify-content:space-between; align-items:flex-end; gap:12px; margin-bottom:14px; }
+  .ov-hello { font-family:var(--font-display); font-size:26px; line-height:1.1; }
+  .ov-date { font-family:var(--font-mono); font-size:12px; font-weight:700; background:var(--ink); color:var(--bg); padding:4px 8px; white-space:nowrap; }
+  html[data-theme="dark"] .ov-date { background:#ECEAE4; color:#111111; }
+
+  /* 장비 검색 */
+  .ov-search { display:flex; align-items:center; gap:10px; height:54px; padding:0 14px; background:var(--surface); border:2px solid var(--ink); }
+  .ov-search:focus-within { box-shadow:0 0 0 3px var(--signal); }
+  .ov-search input { flex:1; min-width:0; height:100%; border:none; outline:none; background:transparent; color:var(--text); font-family:var(--font-mono); font-size:15px; }
+  .ov-hits { border:2px solid var(--ink); border-top:none; background:var(--surface); }
+  .ov-hit { display:flex; flex-direction:column; gap:3px; padding:11px 14px; border-bottom:1px solid var(--border); cursor:pointer; }
+  .ov-hit:last-child { border-bottom:none; }
+  .ov-hit:hover { background:#FFF3EC; }
+  html[data-theme="dark"] .ov-hit:hover { background:#2A2520; }
+  .ov-hit-name { font-family:var(--font-mono); font-size:14px; font-weight:700; }
+  .ov-hit-meta { font-size:12px; color:var(--text-sub); overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+
+  /* 신호 3칸 */
+  .ov-signals { display:grid; grid-template-columns:repeat(3, minmax(0,1fr)); border:2px solid var(--ink); margin:14px 0 22px; }
+  .ov-sig { display:flex; flex-direction:column; gap:6px; padding:14px; cursor:pointer; color:#111111; border:none; text-align:left; font-family:inherit; }
+  .ov-sig + .ov-sig { border-left:2px solid var(--ink); }
+  .ov-sig-n { font-family:var(--font-display); font-size:40px; line-height:1; }
+  .ov-sig-l { font-size:12px; font-weight:800; }
+  .ov-sig.s-danger { background:var(--primary); }
+  .ov-sig.s-warn   { background:var(--signal); }
+  .ov-sig.s-plain  { background:var(--surface); color:var(--text); }
+  .ov-sig.zero { background:var(--surface); color:var(--text-hint); }
+
+  .ov-sec { font-family:var(--font-display); font-size:19px; margin:0 0 10px; display:flex; justify-content:space-between; align-items:baseline; }
+  .ov-sec small { font-family:var(--font-body); font-size:12px; font-weight:700; color:var(--text-hint); }
+
+  /* 먼저 확인 */
+  .ov-todo { display:flex; flex-direction:column; gap:8px; margin-bottom:26px; }
+  .ov-item { display:flex; flex-direction:column; background:var(--surface); border:2px solid var(--ink); cursor:pointer; }
+  .ov-item:hover { background:var(--surface-2); }
+  .ov-item-stripe { height:8px; background:repeating-linear-gradient(-45deg, #111111 0 8px, var(--primary) 8px 16px); }
+  .ov-item-body { display:flex; align-items:center; gap:12px; padding:12px 14px; }
+  .ov-item-main { flex:1; min-width:0; display:flex; flex-direction:column; gap:4px; }
+  .ov-item-title { font-size:15px; font-weight:800; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  .ov-item-meta { font-size:12px; color:var(--text-sub); overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  .ov-tag { font-size:12px; font-weight:800; padding:4px 8px; border:2px solid var(--ink); white-space:nowrap; color:#111111; }
+  .ov-tag.t-danger { background:#111111; color:var(--primary); border-color:#111111; }
+  .ov-tag.t-warn { background:var(--signal); font-family:var(--font-display); font-size:16px; font-weight:400; }
+  .ov-tag.t-plain { background:var(--surface); color:var(--text); font-family:var(--font-mono); }
+  .ov-allclear { padding:18px; border:2px dashed var(--ink); text-align:center; font-weight:700; color:var(--text-sub); }
+
+  /* 전체 현황 */
+  .ov-grid { display:grid; grid-template-columns:repeat(3, minmax(0,1fr)); gap:12px; align-items:start; }
+  .ov-grid > .card + .card { margin-top:0; }
+  .ov-card { cursor:pointer; padding:0; }
+  .ov-card:hover { box-shadow:4px 4px 0 var(--ink); transform:translate(-2px,-2px); }
+  .ov-card-head { display:flex; align-items:center; gap:8px; padding:10px 14px; background:#111111; color:#ECEAE4; font-size:13px; font-weight:800; }
+  .ov-card-head .ico { color:var(--primary); }
+  .ov-card-body { padding:12px 14px; }
+  .ov-card-count { font-family:var(--font-display); font-size:30px; line-height:1; margin-bottom:10px; }
+  .ov-card-count span { white-space:normal; font-family:var(--font-body); font-size:12px; font-weight:700; color:var(--text-hint); margin-left:6px; }
+  .ov-mini-item { display:flex; align-items:center; justify-content:space-between; gap:8px; padding:6px 0; border-top:1px solid var(--border); font-size:12px; color:var(--text-sub); }
+  .ov-mini-name { overflow:hidden; text-overflow:ellipsis; white-space:nowrap; flex:1; font-weight:600; color:var(--text); }
+
+  @media (max-width:960px) { .ov-grid { grid-template-columns:repeat(2, minmax(0,1fr)); } }
   @media (max-width:768px) {
-    .ov-section-grid { grid-template-columns:1fr; gap:12px; }
-    .ov-welcome { margin-bottom:16px; }
+    .ov-hello { font-size:22px; }
+    .ov-grid { grid-template-columns:minmax(0,1fr); }
+    .ov-sig { padding:12px; }
+    .ov-sig-n { font-size:36px; }
   }
-  .ov-card { cursor:pointer; transition:border-color 0.15s, box-shadow 0.15s; }
-  .ov-card:hover { border-color:var(--primary); box-shadow:0 4px 16px rgba(232,84,10,0.08); }
-  .ov-card-head { display:flex; align-items:center; justify-content:space-between; margin-bottom:12px; }
-  .ov-card-icon { font-size:15px; filter:grayscale(1); }
-  .ov-card-label { font-size:12px; font-weight:600; color:var(--text-sub); }
-  .ov-card-count { font-size:26px; font-weight:700; color:var(--text); line-height:1; margin-bottom:14px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
-  .ov-card-count span { font-size:13px; font-weight:400; color:var(--text-hint); margin-left:4px; }
-  .ov-mini-item { display:flex; align-items:center; justify-content:space-between; padding:5px 0; border-bottom:1px solid var(--border); font-size:12px; color:var(--text-sub); gap:8px; }
-  .ov-mini-item:last-child { border-bottom:none; }
-  .ov-mini-name { overflow:hidden; text-overflow:ellipsis; white-space:nowrap; flex:1; }
-  .ov-goto { font-size:11px; color:var(--primary); font-weight:500; white-space:nowrap; }
-  .ov-empty { font-size:12px; color:var(--text-hint); padding:12px 0; text-align:center; }
 </style>
 
-<div class="ov-welcome">
-  <div style="font-size:18px;font-weight:600;">안녕하세요, <span id="ov-name"></span>님</div>
-  <div style="font-size:13px;color:var(--text-hint);margin-top:3px;" id="ov-date"></div>
+<div class="ov-head">
+  <div class="ov-hello" id="ov-hello">오늘의 현장</div>
+  <span class="ov-date" id="ov-date"></span>
 </div>
 
-<div id="ov-stats"></div>
+<label class="ov-search">
+  <i data-icon="search" data-size="20"></i>
+  <input type="search" id="ov-q" placeholder="HOSTNAME / S/N / IP" aria-label="장비 검색" oninput="renderHits()" autocomplete="off">
+</label>
+<div class="ov-hits" id="ov-hits" style="display:none;"></div>
 
-<div class="ov-section-grid" id="ov-grid"></div>
+<div class="ov-signals" id="ov-signals"></div>
+
+<div class="ov-sec">먼저 확인 <small id="ov-todo-count"></small></div>
+<div class="ov-todo" id="ov-todo"></div>
+
+<div class="ov-sec">전체 현황</div>
+<div class="ov-grid" id="ov-grid"></div>
 
 <script>
 FS.requireAuth();
 
-function init() {
-  const user = FS.getCurrentUser();
-  document.getElementById('ov-name').textContent = user?.displayName || user?.email || '';
-  document.getElementById('ov-date').textContent =
-    new Date().toLocaleDateString('ko-KR', { year:'numeric', month:'long', day:'numeric', weekday:'long' });
+let ovData = { customers: [], projects: [], assets: [] };
 
-  const uid = FS.getCurrentUser().uid;
+function init() {
+  const d = new Date();
+  const W = ['SUN','MON','TUE','WED','THU','FRI','SAT'];
+  document.getElementById('ov-date').textContent =
+    `${String(d.getMonth()+1).padStart(2,'0')}.${String(d.getDate()).padStart(2,'0')} ${W[d.getDay()]}`;
+  const user = FS.getCurrentUser();
+  const first = (user?.displayName || '').split(' ')[0];
+  if (first) document.getElementById('ov-hello').textContent = `${first}님, 오늘의 현장`;
+
+  const uid = user.uid;
   FS.watch([
     ['customers'],
     ['projects'],
     ['assets'],
     ['tickets'],
-    ['kb_articles',  [['user_id', '==', uid]]],
+    ['kb_articles',     [['user_id', '==', uid]]],
     ['delivery_notes'],
-    ['tech_notes',   [['user_id', '==', uid]]],
+    ['tech_notes',      [['user_id', '==', uid]]],
+    ['calendar_events', [['user_id', '==', uid]]],
   ], data => renderOverview(...data));
 }
 
-function renderOverview(customers, projects, assets, tickets, kbArticles, deliveryNotes, techNotes) {
+// ── 장비 검색: 결과를 누르면 고객사 화면의 해당 장비 상세로 ──
+function renderHits() {
+  const q = document.getElementById('ov-q').value.trim().toLowerCase();
+  const box = document.getElementById('ov-hits');
+  if (!q) { box.style.display = 'none'; box.innerHTML = ''; return; }
+  const has = v => String(v ?? '').toLowerCase().includes(q);
+  const custName = id => (ovData.customers.find(c => c.id === id) || {}).name || '-';
+  const projName = id => (ovData.projects.find(p => p.id === id) || {}).name || '-';
+  const hits = ovData.assets.filter(a =>
+    has(a.hostname) || has(a.serial) || has(a.ip_address) || has(a.model) || has(a.location)).slice(0, 8);
+  box.style.display = '';
+  box.innerHTML = hits.length ? hits.map(a => `
+    <div class="ov-hit" onclick="openAssetFromHome('${a.id}')">
+      <span class="ov-hit-name">${FS.esc(a.hostname || '-')}</span>
+      <span class="ov-hit-meta">${FS.esc(custName(a.customer_id))} › ${FS.esc(projName(a.project_id))}${a.ip_address ? ' · ' + FS.esc(a.ip_address) : ''}${a.serial ? ' · ' + FS.esc(a.serial) : ''}</span>
+    </div>`).join('')
+    : '<div class="ov-hit" style="cursor:default;"><span class="ov-hit-meta">일치하는 장비가 없습니다</span></div>';
+}
+
+function openAssetFromHome(id) {
+  window.hwPageFilter = { page: 'customers', assetId: id };
+  loadPage('customers');
+}
+
+function renderOverview(customers, projects, assets, tickets, kbArticles, deliveryNotes, techNotes, events) {
+  ovData = { customers, projects, assets };
+  if (document.getElementById('ov-q').value) renderHits();
 
   const today = new Date(); today.setHours(0,0,0,0);
   function daysLeft(exp) {
@@ -59,130 +148,104 @@ function renderOverview(customers, projects, assets, tickets, kbArticles, delive
     let d = typeof exp === 'string' ? new Date(exp.replace(/-/g,'/')) : (exp.toDate ? exp.toDate() : new Date(exp));
     return Math.ceil((d - today) / 86400000);
   }
-
+  const todayStr = FS.localDate();
   const custMap = Object.fromEntries(customers.map(c => [c.id, c.name || c.id]));
   const warrantyProjects = projects.filter(p => p.warranty_expire);
   // 워런티 페이지와 동일 기준: 임박 = 0~90일 (이미 만료된 건 제외)
   const expiringSoon = warrantyProjects.filter(p => { const d = daysLeft(p.warranty_expire); return d !== null && d >= 0 && d <= 90; });
   const openTickets = tickets.filter(t => t.status !== '완료');
+  const todayEvents = events.filter(e => e.date === todayStr)
+    .sort((a, b) => (a.start_time || '').localeCompare(b.start_time || ''));
 
-  document.getElementById('ov-stats').innerHTML = `
-    <div class="stat-bar">
-      <div class="ts-item" onclick="loadPage('customers')">
-        <span class="ts-count">${customers.length}</span><span class="ts-label">전체 고객사</span>
-      </div>
-      <div class="ts-divider"></div>
-      <div class="ts-item" onclick="window.hwPageFilter={page:'tickets',status:'처리중'};loadPage('tickets')">
-        <span class="ts-count">${openTickets.length}</span><span class="ts-label">처리중 티켓</span>
-      </div>
-      <div class="ts-divider"></div>
-      <div class="ts-item" onclick="window.hwPageFilter={page:'warranty',status:'urgent'};loadPage('warranty')">
-        <span class="ts-count">${expiringSoon.length}</span><span class="ts-label">워런티 90일 이내</span>
-      </div>
-      <div class="ts-divider"></div>
-      <div class="ts-item" onclick="loadPage('kb')">
-        <span class="ts-count">${kbArticles.length}</span><span class="ts-label">KB 아티클</span>
-      </div>
-    </div>
-  `;
+  // ── 신호 3칸 (0이면 색을 빼서 '이상 없음'이 한눈에 보이도록) ──
+  const sig = (n, label, cls, onclick) =>
+    `<button class="ov-sig ${n ? cls : 'zero'}" onclick="${onclick}">
+      <span class="ov-sig-n">${n}</span><span class="ov-sig-l">${label}</span>
+    </button>`;
+  document.getElementById('ov-signals').innerHTML =
+    sig(openTickets.length, '진행중 장애', 's-danger', "window.hwPageFilter={page:'tickets',status:'처리중'};loadPage('tickets')") +
+    sig(expiringSoon.length, '워런티 임박', 's-warn', "window.hwPageFilter={page:'warranty',status:'urgent'};loadPage('warranty')") +
+    sig(todayEvents.length, '오늘 일정', 's-plain', "loadPage('calendar')");
 
+  // ── 먼저 확인: 긴급·높음 장애 → 30일 내 워런티 → 오늘 일정 ──
+  const PRI = { '긴급': 0, '높음': 1, '보통': 2, '낮음': 3 };
+  const todo = [];
+  openTickets
+    .filter(t => t.priority === '긴급' || t.priority === '높음')
+    .sort((a, b) => (PRI[a.priority] ?? 9) - (PRI[b.priority] ?? 9))
+    .slice(0, 3)
+    .forEach(t => todo.push({
+      stripe: t.priority === '긴급',
+      title: t.title || '(제목 없음)',
+      meta: `${custMap[t.customer_id] || '고객사 없음'} · ${t.status || '접수'}${t.assignee ? ' · ' + t.assignee : ''}`,
+      tag: `<span class="ov-tag t-danger">${FS.esc(t.priority)}</span>`,
+      onclick: "loadPage('tickets')",
+    }));
+  expiringSoon
+    .filter(p => daysLeft(p.warranty_expire) <= 30)
+    .sort((a, b) => daysLeft(a.warranty_expire) - daysLeft(b.warranty_expire))
+    .slice(0, 3)
+    .forEach(p => todo.push({
+      title: `${p.name || '-'} 워런티`,
+      meta: `${custMap[p.customer_id] || '-'} · ${FS.formatDate(p.warranty_expire) || ''}`,
+      tag: `<span class="ov-tag t-warn">D-${daysLeft(p.warranty_expire)}</span>`,
+      onclick: "window.hwPageFilter={page:'warranty',status:'urgent'};loadPage('warranty')",
+    }));
+  todayEvents.slice(0, 3).forEach(e => todo.push({
+    title: e.title || '(제목 없음)',
+    meta: e.description ? e.description.split('\n')[0] : '오늘 일정',
+    tag: `<span class="ov-tag t-plain">${FS.esc(e.start_time || '종일')}</span>`,
+    onclick: "loadPage('calendar')",
+  }));
+
+  document.getElementById('ov-todo-count').textContent = todo.length ? `${todo.length}건` : '';
+  document.getElementById('ov-todo').innerHTML = todo.length ? todo.map(it => `
+    <div class="ov-item" onclick="${it.onclick}">
+      ${it.stripe ? '<span class="ov-item-stripe" aria-hidden="true"></span>' : ''}
+      <div class="ov-item-body">
+        <div class="ov-item-main">
+          <span class="ov-item-title">${FS.esc(it.title)}</span>
+          <span class="ov-item-meta">${FS.esc(it.meta)}</span>
+        </div>
+        ${it.tag}
+      </div>
+    </div>`).join('')
+    : '<div class="ov-allclear">급한 일 없음 — 긴급 장애·30일 내 만료·오늘 일정이 없습니다</div>';
+
+  // ── 전체 현황 카드 ──
   const byDate = arr => [...arr].sort((a,b) => (b.created_at?.seconds||0) - (a.created_at?.seconds||0));
-  const recentCustomers = byDate(customers).slice(0,3);
-  const recentTickets   = byDate(tickets).slice(0,3);
-  const criticalWarranty = [...expiringSoon].sort((a,b) => (daysLeft(a.warranty_expire) ?? 999) - (daysLeft(b.warranty_expire) ?? 999)).slice(0,3);
-  const recentKB        = byDate(kbArticles).slice(0,3);
-  const recentDelivery  = byDate(deliveryNotes).slice(0,3);
-
   const STATUS_BADGE = { '접수':'badge-info','진행중':'badge-warning','보류':'badge-gray','완료':'badge-success' };
-
   const EMPTY_ROW = '<div class="ov-mini-item"><span class="ov-mini-name" style="color:var(--text-hint);">—</span><span></span></div>';
   function miniList(items, renderFn) {
     const rows = items.slice(0, 3).map(renderFn);
     while (rows.length < 3) rows.push(EMPTY_ROW);
     return rows.join('');
   }
-
-  document.getElementById('ov-grid').innerHTML = `
-    <div class="card ov-card" onclick="loadPage('customers')">
-      <div class="ov-card-head">
-        <div class="flex gap-2"><span class="ov-card-icon">🏢</span><span class="ov-card-label">고객사·자산</span></div>
-        <span class="ov-goto">열기 →</span>
+  const card = (page, icon, label, count, unit, rows) => `
+    <div class="card ov-card" onclick="loadPage('${page}')">
+      <div class="ov-card-head">${FS.icon(icon, 16)}${label}</div>
+      <div class="ov-card-body">
+        <div class="ov-card-count">${count}<span>${unit}</span></div>
+        ${rows}
       </div>
-      <div class="ov-card-count">${customers.length}<span>개사 · 장비 ${assets.length}개</span></div>
-      ${miniList(recentCustomers, c => `
-        <div class="ov-mini-item">
-          <span class="ov-mini-name">${FS.esc(c.name||'-')}</span>
-          <span>${FS.esc(c.contact||'-')}</span>
-        </div>`)}
-    </div>
+    </div>`;
 
-    <div class="card ov-card" onclick="loadPage('tickets')">
-      <div class="ov-card-head">
-        <div class="flex gap-2"><span class="ov-card-icon">⚠️</span><span class="ov-card-label">장애 티켓</span></div>
-        <span class="ov-goto">열기 →</span>
-      </div>
-      <div class="ov-card-count">${openTickets.length}<span>건 처리중 · 전체 ${tickets.length}건</span></div>
-      ${miniList(recentTickets, t => `
-        <div class="ov-mini-item">
-          <span class="ov-mini-name">${FS.esc(t.title||'-')}</span>
-          <span class="badge ${STATUS_BADGE[t.status]||'badge-gray'}">${FS.esc(t.status||'접수')}</span>
-        </div>`)}
-    </div>
-
-    <div class="card ov-card" onclick="loadPage('warranty')">
-      <div class="ov-card-head">
-        <div class="flex gap-2"><span class="ov-card-icon">🛡️</span><span class="ov-card-label">워런티 현황</span></div>
-        <span class="ov-goto">열기 →</span>
-      </div>
-      <div class="ov-card-count">${expiringSoon.length}<span>개 주의 · 전체 ${warrantyProjects.length}개</span></div>
-      ${miniList(criticalWarranty, p => {
+  document.getElementById('ov-grid').innerHTML =
+    card('customers', 'building', '고객사·자산', customers.length, `개사 · 장비 ${assets.length}대`,
+      miniList(byDate(customers), c => `<div class="ov-mini-item"><span class="ov-mini-name">${FS.esc(c.name||'-')}</span><span>${FS.esc(c.contact||'-')}</span></div>`)) +
+    card('tickets', 'alert', '장애 티켓', openTickets.length, `건 처리중 · 전체 ${tickets.length}건`,
+      miniList(byDate(tickets), t => `<div class="ov-mini-item"><span class="ov-mini-name">${FS.esc(t.title||'-')}</span><span class="badge ${STATUS_BADGE[t.status]||'badge-gray'}">${FS.esc(t.status||'접수')}</span></div>`)) +
+    card('warranty', 'shield', '워런티 현황', expiringSoon.length, `개 임박 · 전체 ${warrantyProjects.length}개`,
+      miniList([...expiringSoon].sort((a,b) => (daysLeft(a.warranty_expire) ?? 999) - (daysLeft(b.warranty_expire) ?? 999)), p => {
         const d = daysLeft(p.warranty_expire);
-        return `<div class="ov-mini-item">
-          <span class="ov-mini-name">${FS.esc(custMap[p.customer_id]||'')} · ${FS.esc(p.name||'-')}</span>
-          <span style="color:${d<=30?'var(--danger)':'var(--warning)'};font-weight:500;">${d<0?'만료됨':d+'일'}</span>
-        </div>`;
-      })}
-    </div>
-
-    <div class="card ov-card" onclick="loadPage('kb')">
-      <div class="ov-card-head">
-        <div class="flex gap-2"><span class="ov-card-icon">📖</span><span class="ov-card-label">지식베이스</span></div>
-        <span class="ov-goto">열기 →</span>
-      </div>
-      <div class="ov-card-count">${kbArticles.length}<span>개 아티클</span></div>
-      ${miniList(recentKB, a => `
-        <div class="ov-mini-item">
-          <span class="ov-mini-name">${FS.esc(a.title||'-')}</span>
-          <span style="color:var(--text-hint);">${FS.formatDate(a.created_at)||''}</span>
-        </div>`)}
-    </div>
-
-    <div class="card ov-card" onclick="loadPage('tech')">
-      <div class="ov-card-head">
-        <div class="flex gap-2"><span class="ov-card-icon">🎓</span><span class="ov-card-label">기술 학습</span></div>
-        <span class="ov-goto">열기 →</span>
-      </div>
-      <div class="ov-card-count">${techNotes.length}<span>개 노트</span></div>
-      ${miniList(byDate(techNotes).slice(0,3), n => `
-        <div class="ov-mini-item">
-          <span class="ov-mini-name">${FS.esc(n.title||'-')}</span>
-          <span style="color:var(--text-hint);">${FS.formatDate(n.created_at)||''}</span>
-        </div>`)}
-    </div>
-
-    <div class="card ov-card" onclick="loadPage('delivery')">
-      <div class="ov-card-head">
-        <div class="flex gap-2"><span class="ov-card-icon">📋</span><span class="ov-card-label">납품확인서</span></div>
-        <span class="ov-goto">열기 →</span>
-      </div>
-      <div class="ov-card-count">${deliveryNotes.length}<span>건</span></div>
-      ${miniList(recentDelivery, n => `
-        <div class="ov-mini-item">
-          <span class="ov-mini-name">${FS.esc(n.doc_number||'-')}</span>
-          <span style="color:var(--text-hint);">${FS.esc(n.delivery_date||'-')}</span>
-        </div>`)}
-    </div>
-  `;
+        return `<div class="ov-mini-item"><span class="ov-mini-name">${FS.esc(custMap[p.customer_id]||'')} · ${FS.esc(p.name||'-')}</span><span class="badge ${d<=30?'badge-danger':'badge-warning'}">D-${d}</span></div>`;
+      })) +
+    card('kb', 'book', '지식베이스', kbArticles.length, '개 아티클',
+      miniList(byDate(kbArticles), a => `<div class="ov-mini-item"><span class="ov-mini-name">${FS.esc(a.title||'-')}</span><span>${FS.formatDate(a.created_at)||''}</span></div>`)) +
+    card('tech', 'notes', '기술 학습', techNotes.length, '개 노트',
+      miniList(byDate(techNotes), n => `<div class="ov-mini-item"><span class="ov-mini-name">${FS.esc(n.title||'-')}</span><span>${FS.formatDate(n.created_at)||''}</span></div>`)) +
+    card('delivery', 'clipboard', '납품확인서', deliveryNotes.length, '건',
+      miniList(byDate(deliveryNotes), n => `<div class="ov-mini-item"><span class="ov-mini-name">${FS.esc(n.doc_number||'-')}</span><span>${FS.esc(n.delivery_date||'-')}</span></div>`));
 }
 
 init();

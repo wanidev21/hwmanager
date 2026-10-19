@@ -16,7 +16,7 @@
 .hit-group { padding:6px 14px; font-size:11px; font-weight:600; color:var(--text-hint); background:var(--bg); border-bottom:1px solid var(--border); }
 /* 고객사 담당자 연락처 */
 .cust-contact { display:flex; flex-wrap:wrap; gap:6px 14px; padding:10px 14px; border-bottom:1px solid var(--border); font-size:12px; color:var(--text-sub); }
-.cust-contact a { color:var(--primary); text-decoration:none; font-weight:500; }
+.cust-contact a { color:var(--primary-text); text-decoration:none; font-weight:500; }
 /* 장비 상세 (읽기 전용) */
 .av-grid { display:grid; grid-template-columns:repeat(2, minmax(0,1fr)); gap:12px 16px; }
 .av-item { min-width:0; }
@@ -30,7 +30,9 @@
 }
 .cust-item:last-child { border-bottom:none; }
 .cust-item:hover { background:var(--bg); }
-.cust-item.active { background:#fdf0eb; border-left:3px solid var(--primary); padding-left:11px; }
+.cust-item.active { background:var(--signal); border-left:6px solid var(--ink); padding-left:8px; }
+html[data-theme="dark"] .cust-item.active { color:#111111; }
+html[data-theme="dark"] .cust-item.active .cust-item-name, html[data-theme="dark"] .cust-item.active .cust-item-meta { color:#111111; }
 .cust-item-info { flex:1; min-width:0; }
 .cust-item-name { font-size:13px; font-weight:600; color:var(--text); overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
 .cust-item-meta { font-size:11px; color:var(--text-hint); margin-top:2px; }
@@ -43,7 +45,7 @@
   padding:11px 14px; border-bottom:1px solid var(--border); gap:8px; flex-wrap:wrap;
 }
 .breadcrumb { display:flex; align-items:center; gap:6px; font-size:13px; overflow:hidden; flex:1; min-width:0; }
-.bc-link { color:var(--primary); cursor:pointer; font-weight:500; white-space:nowrap; flex-shrink:0; }
+.bc-link { color:var(--primary-text); cursor:pointer; font-weight:500; white-space:nowrap; flex-shrink:0; }
 .bc-link:hover { text-decoration:underline; }
 .bc-cur { font-weight:600; color:var(--text); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
 .bc-sep { color:var(--text-hint); flex-shrink:0; }
@@ -341,6 +343,12 @@ function init() {
   // 페이지 재진입 시 패널은 초기 상태로 그려지므로 선택도 초기화
   selectedCustomerId = null;
   selectedProjectId  = null;
+  // 홈 검색에서 장비를 눌러 들어온 경우: 첫 데이터가 오면 해당 장비 상세 열기
+  let pendingAssetId = null;
+  if (window.hwPageFilter && window.hwPageFilter.page === 'customers') {
+    pendingAssetId = window.hwPageFilter.assetId || null;
+    window.hwPageFilter = null;
+  }
   FS.watch([['customers'], ['projects'], ['assets']], ([custs, projs, assets]) => {
     allCustomers = custs;
     allProjects  = projs;
@@ -359,6 +367,7 @@ function init() {
     renderCustomers();
     if (document.getElementById('proj-panel').style.display !== 'none') renderProjects();
     if (document.getElementById('asset-panel').style.display !== 'none') renderAssets();
+    if (pendingAssetId) { const id = pendingAssetId; pendingAssetId = null; jumpToAsset(id); }
   });
 }
 
@@ -393,7 +402,7 @@ function renderCustomers() {
         <div class="cust-item-meta">프로젝트 ${projCount}개 · 장비 ${assetCount}대</div>
       </div>
       <div class="cust-item-actions" onclick="event.stopPropagation()">
-        <button class="btn btn-ghost btn-sm" onclick="openCustModal('${c.id}')">✏</button>
+        <button class="btn btn-ghost btn-sm" onclick="openCustModal('${c.id}')" aria-label="수정">${FS.icon('edit', 16)}</button>
         <button class="btn btn-ghost btn-sm" style="color:var(--danger);" onclick="deleteCustomer('${c.id}')">×</button>
       </div>
     </div>`;
@@ -444,10 +453,10 @@ function renderProjects() {
   // 담당자 연락처: 현장에서 한 번 터치로 전화·메일
   const contact = document.getElementById('cust-contact');
   const parts = [];
-  if (c?.contact) parts.push(`<span>👤 ${FS.esc(c.contact)}</span>`);
-  if (c?.phone)   parts.push(`<a href="tel:${FS.esc(String(c.phone).replace(/[^0-9+]/g, ''))}">📞 ${FS.esc(c.phone)}</a>`);
-  if (c?.email)   parts.push(`<a href="mailto:${FS.esc(c.email)}">✉ ${FS.esc(c.email)}</a>`);
-  if (c?.address) parts.push(`<span>📍 ${FS.esc(c.address)}</span>`);
+  if (c?.contact) parts.push(`<span>${FS.icon('user', 14)} ${FS.esc(c.contact)}</span>`);
+  if (c?.phone)   parts.push(`<a href="tel:${FS.esc(String(c.phone).replace(/[^0-9+]/g, ''))}">${FS.icon('phone', 14)} ${FS.esc(c.phone)}</a>`);
+  if (c?.email)   parts.push(`<a href="mailto:${FS.esc(c.email)}">${FS.icon('mail', 14)} ${FS.esc(c.email)}</a>`);
+  if (c?.address) parts.push(`<span>${FS.icon('pin', 14)} ${FS.esc(c.address)}</span>`);
   contact.innerHTML = parts.join('');
   contact.style.display = parts.length ? '' : 'none';
 
@@ -464,7 +473,7 @@ function renderProjects() {
       <td>${warrantyBadge(p.warranty_expire)}</td>
       <td onclick="event.stopPropagation()">
         <div class="flex gap-1">
-          <button class="btn btn-ghost btn-sm" onclick="openProjModal('${p.id}')">✏</button>
+          <button class="btn btn-ghost btn-sm" onclick="openProjModal('${p.id}')" aria-label="수정">${FS.icon('edit', 16)}</button>
           <button class="btn btn-ghost btn-sm" style="color:var(--danger);" onclick="deleteProject('${p.id}')">×</button>
         </div>
       </td>
@@ -506,7 +515,7 @@ function renderAssets() {
       <td>${escHtml(a.driver_version || '-')}</td>
       <td onclick="event.stopPropagation()">
         <div class="flex gap-1">
-          <button class="btn btn-ghost btn-sm" onclick="openAssetModal('${a.id}')">✏</button>
+          <button class="btn btn-ghost btn-sm" onclick="openAssetModal('${a.id}')" aria-label="수정">${FS.icon('edit', 16)}</button>
           <button class="btn btn-ghost btn-sm" style="color:var(--danger);" onclick="deleteAsset('${a.id}')">×</button>
         </div>
       </td>

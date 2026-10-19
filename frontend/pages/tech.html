@@ -1,21 +1,21 @@
 <!-- 기술 학습 -->
 <style>
   .tech-tabs { display:flex; gap:6px; flex-wrap:wrap; margin-bottom:20px; }
-  .tech-tab { padding:5px 14px; border-radius:20px; font-size:13px; border:1px solid var(--border); background:var(--surface); color:var(--text-sub); cursor:pointer; transition:all 0.15s; }
+  .tech-tab { padding:5px 14px; border-radius:0; font-size:13px; border:1px solid var(--border); background:var(--surface); color:var(--text-sub); cursor:pointer; transition:all 0.15s; }
   .tech-tab:hover:not(.active) { background:var(--bg); }
-  .tech-tab.active { background:var(--primary); color:#fff; border-color:var(--primary); font-weight:500; }
+  .tech-tab.active { background:var(--primary); color:#fff; border-color:var(--primary-text); font-weight:500; }
   .tech-panel { display:none; }
   .tech-panel.active { display:block; }
   .domain-list { display:flex; gap:6px; flex-wrap:wrap; margin-bottom:16px; }
-  .domain-chip { padding:5px 14px; border-radius:20px; font-size:13px; border:1px solid var(--border); background:var(--surface); cursor:pointer; transition:all 0.15s; color:var(--text-sub); }
+  .domain-chip { padding:5px 14px; border-radius:0; font-size:13px; border:1px solid var(--border); background:var(--surface); cursor:pointer; transition:all 0.15s; color:var(--text-sub); }
   .domain-chip:hover:not(.active) { background:var(--bg); }
-  .domain-chip.active { background:var(--primary); color:#fff; border-color:var(--primary); }
-  .keyword-tag { padding:2px 8px; background:var(--primary-light); color:var(--primary); border-radius:20px; font-size:11px; }
+  .domain-chip.active { background:var(--primary); color:#fff; border-color:var(--primary-text); }
+  .keyword-tag { padding:2px 8px; background:var(--primary-light); color:var(--primary-text); border-radius:0; font-size:11px; }
   .topic-item { display:flex; align-items:center; gap:10px; padding:8px 12px; border-radius:var(--radius); border:1px solid var(--border); background:var(--surface); margin-bottom:6px; }
   .topic-status { width:20px; height:20px; border-radius:50%; border:2px solid var(--border); cursor:pointer; flex-shrink:0; display:flex; align-items:center; justify-content:center; font-size:10px; }
   .topic-status.in-progress { border-color:var(--warning); background:var(--warning-bg); }
   .topic-status.completed { border-color:var(--success); background:var(--success-bg); }
-  .progress-bar { height:4px; background:var(--border); border-radius:2px; overflow:hidden; margin-top:4px; }
+  .progress-bar { height:4px; background:var(--border); border-radius:0; overflow:hidden; margin-top:4px; }
   .progress-fill { height:100%; background:var(--primary); transition:width 0.3s; }
   .note-grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(280px,1fr)); gap:12px; }
   .note-card { background:var(--surface); border:1px solid var(--border); border-radius:var(--radius-lg); padding:16px; cursor:pointer; transition:box-shadow 0.15s; }
@@ -309,7 +309,7 @@ function renderNotes() {
   document.getElementById('note-grid').innerHTML = data.map(n=>{
     const domain = domains.find(d=>d.id===n.domain_id);
     return `<div class="note-card" onclick="showNoteDetail('${n.id}', true)">
-      <div style="font-size:11px;color:var(--primary);margin-bottom:4px;">${FS.esc(domain?.name||'')}</div>
+      <div style="font-size:11px;color:var(--primary-text);margin-bottom:4px;">${FS.esc(domain?.name||'')}</div>
       <div style="font-weight:500;font-size:13px;">${FS.esc(n.title||'')}</div>
       <div class="note-preview">${FS.esc(n.content||'')}</div>
       <div style="margin-top:8px;display:flex;gap:4px;flex-wrap:wrap;">
@@ -349,7 +349,7 @@ function showNoteDetail(id, fromTap) {
   panel.innerHTML=`
     <div class="flex-between mb-2">
       <div>
-        <div style="font-size:11px;color:var(--primary);margin-bottom:4px;">${FS.esc(domain?.name||'')}</div>
+        <div style="font-size:11px;color:var(--primary-text);margin-bottom:4px;">${FS.esc(domain?.name||'')}</div>
         <h3 style="font-size:16px;font-weight:600;">${FS.esc(n.title||'')}</h3>
       </div>
       <div class="flex gap-1">

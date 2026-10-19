@@ -5,16 +5,16 @@
 
 /* ── 목록 액션 버튼 ── */
 .dl-btn {
-  height:26px; padding:0 10px; border-radius:5px; border:1px solid var(--border);
-  font-size:11px; font-weight:500; cursor:pointer; display:inline-flex;
+  height:28px; padding:0 10px; border-radius:0; border:1.5px solid var(--ink);
+  font-size:11px; font-weight:700; cursor:pointer; display:inline-flex;
   align-items:center; gap:4px; background:var(--surface); color:var(--text-sub);
   transition:background 0.1s; font-family:inherit; white-space:nowrap;
 }
 .dl-btn:hover { background:var(--bg); }
-.dl-btn-print { background:#f0fdf4; border-color:#86efac; color:#15803d; }
+.dl-btn-print { background:var(--success-bg); border-color:var(--success); color:var(--success); }
 .dl-btn-print:hover { background:#dcfce7; }
 .dl-btn-del { color:var(--danger); border-color:#fca5a5; }
-.dl-btn-del:hover { background:#fef2f2; }
+.dl-btn-del:hover { background:var(--primary-light); }
 
 /* ── 편집 툴바 ── */
 .edit-toolbar {
@@ -37,14 +37,14 @@
   border-right:1px solid #dededc; border-bottom:1px solid #dededc;
 }
 .item-table tbody td:last-child { border-right:none; }
-.item-table tbody tr:nth-child(even) td { background:#fafaf9; }
+.item-table tbody tr:nth-child(even) td { background:var(--surface-2); }
 .item-table input, .item-table select {
-  width:100%; border:1px solid transparent; border-radius:4px; padding:5px 7px;
+  width:100%; border:1px solid transparent; border-radius:0; padding:5px 7px;
   font-size:12px; background:transparent; font-family:inherit; color:var(--text);
   transition:border-color 0.12s, background 0.12s;
 }
 .item-table input:focus, .item-table select:focus {
-  outline:none; border-color:var(--primary); background:var(--surface);
+  outline:none; border-color:var(--primary-text); background:var(--surface);
 }
 .item-table input[type=number] { text-align:center; }
 .item-table select { cursor:pointer; }
@@ -320,11 +320,11 @@
     <button class="btn" onclick="showList()">← 목록</button>
     <h3 id="edit-title">새 납품확인서</h3>
     <button class="btn dn-save-btn" id="btn-complete" onclick="saveDraft('완료')"
-      style="background:#f0fdf4;border-color:#86efac;color:#15803d;">✓ 완료 처리</button>
-    <button class="btn" onclick="previewFromEditor()">👁 미리보기</button>
+      style="background:var(--success-bg);border-color:var(--success);color:var(--success);"><i data-icon="check" data-size="16"></i> 완료 처리</button>
+    <button class="btn" onclick="previewFromEditor()"><i data-icon="eye" data-size="16"></i> 미리보기</button>
     <!-- 저장: 현재 상태 유지 (완료 문서를 저장해도 작성중으로 되돌리지 않음) -->
     <button class="btn btn-primary dn-save-btn" onclick="saveDraft()">저장</button>
-    <button class="btn" id="btn-print-edit" onclick="printFromEditor()" style="display:none;">🖨 인쇄</button>
+    <button class="btn" id="btn-print-edit" onclick="printFromEditor()" style="display:none;"><i data-icon="printer" data-size="16"></i> 인쇄</button>
   </div>
 
   <div class="card mb-3">
@@ -533,7 +533,7 @@ function renderList() {
       <td><span class="badge ${isDone?'badge-success':'badge-warning'}">${FS.esc(n.status||'작성중')}</span></td>
       <td class="dn-pc-only" onclick="event.stopPropagation()">
         <div class="flex gap-1" style="justify-content:flex-end;">
-          ${isDone?`<button class="dl-btn dl-btn-print" onclick="printById('${n.id}')">🖨 인쇄</button>`:''}
+          ${isDone?`<button class="dl-btn dl-btn-print" onclick="printById('${n.id}')">${FS.icon('printer', 14)} 인쇄</button>`:''}
           <button class="dl-btn" onclick="openEditor('${n.id}')">수정</button>
           <button class="dl-btn dl-btn-del" onclick="deleteNote('${n.id}')">삭제</button>
         </div>
@@ -903,14 +903,14 @@ async function openPreview(id) {
   // 폰에서도 수정(서명) 가능. 인쇄는 PC에서만
   showPreview(`
     <button class="btn" onclick="closePreview()">닫기</button>
-    <button class="btn" onclick="closePreview();openEditor('${id}')">✎ 수정·서명</button>
-    <button class="btn btn-primary dn-pc-only" onclick="closePreview();printById('${id}')">🖨 인쇄</button>`);
+    <button class="btn" onclick="closePreview();openEditor('${id}')">${FS.icon('edit', 16)} 수정·서명</button>
+    <button class="btn btn-primary dn-pc-only" onclick="closePreview();printById('${id}')">${FS.icon('printer', 16)} 인쇄</button>`);
 }
 function previewFromEditor() {
   buildPrintFromEditor();
   showPreview(`
     <button class="btn" onclick="closePreview()">닫기</button>
-    <button class="btn btn-primary" onclick="closePreview();printFromEditor()">🖨 인쇄</button>`);
+    <button class="btn btn-primary" onclick="closePreview();printFromEditor()">${FS.icon('printer', 16)} 인쇄</button>`);
 }
 
 function buildPrint(note, items, cName) {

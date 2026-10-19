@@ -3,10 +3,10 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
-  <meta name="theme-color" content="#e8540a">
+  <meta name="theme-color" content="#111111">
   <meta name="mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-capable" content="yes">
-  <meta name="apple-mobile-web-app-status-bar-style" content="default">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black">
   <meta name="apple-mobile-web-app-title" content="HW Manager">
   <link rel="manifest" href="/manifest.json">
   <link rel="apple-touch-icon" href="/static/icons/icon-192.png">
@@ -16,6 +16,9 @@
   <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore-compat.js"></script>
   <script src="/firebase-config.js"></script>
   <script src="/static/js/firebase-service.js"></script>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Black+Han+Sans&family=Gothic+A1:wght@400;500;700;800&family=Space+Mono:wght@400;700&display=swap">
   <link rel="stylesheet" href="/static/css/app.css">
 </head>
 <body>
@@ -30,43 +33,43 @@
       <nav class="sidebar-nav">
         <div class="nav-group-label">고객·업무</div>
         <a class="nav-item" data-page="customers" href="#">
-          <span class="nav-icon">🏢</span> 고객사·자산
+          <span class="nav-icon"><i data-icon="building"></i></span> 고객사·자산
         </a>
         <a class="nav-item" data-page="delivery" href="#">
-          <span class="nav-icon">📋</span> 납품확인서
+          <span class="nav-icon"><i data-icon="clipboard"></i></span> 납품확인서
         </a>
 
         <div class="nav-group-label">장애·현황</div>
         <a class="nav-item" data-page="tickets" href="#">
-          <span class="nav-icon">⚠️</span> 장애 티켓
+          <span class="nav-icon"><i data-icon="alert"></i></span> 장애 티켓
         </a>
         <a class="nav-item" data-page="warranty" href="#">
-          <span class="nav-icon">🛡️</span> 워런티 현황
+          <span class="nav-icon"><i data-icon="shield"></i></span> 워런티 현황
         </a>
 
         <div class="nav-group-label">일정·기록</div>
         <a class="nav-item" data-page="calendar" href="#">
-          <span class="nav-icon">📅</span> 캘린더
+          <span class="nav-icon"><i data-icon="calendar"></i></span> 캘린더
         </a>
 
         <div class="nav-group-label">지식·기술</div>
         <a class="nav-item" data-page="kb" href="#">
-          <span class="nav-icon">📖</span> 지식베이스
+          <span class="nav-icon"><i data-icon="book"></i></span> 지식베이스
         </a>
         <a class="nav-item" data-page="tech" href="#">
-          <span class="nav-icon">🎓</span> 기술 학습
+          <span class="nav-icon"><i data-icon="notes"></i></span> 기술 학습
         </a>
 
         <div id="admin-section" style="display:none;">
           <div class="nav-group-label">관리</div>
           <a class="nav-item" data-page="users" href="#">
-            <span class="nav-icon">👤</span> 회원 관리
+            <span class="nav-icon"><i data-icon="users"></i></span> 회원 관리
           </a>
         </div>
 
         <!-- PC 전용: 폰 설치용 QR -->
         <a class="nav-item nav-install" id="btn-install-qr" href="#">
-          <span class="nav-icon">📱</span> 모바일 설치
+          <span class="nav-icon"><i data-icon="qr"></i></span> 모바일 설치
         </a>
       </nav>
 
@@ -76,8 +79,8 @@
           <div class="user-name" id="user-name"></div>
           <div class="user-role" id="user-role"></div>
         </div>
-        <button class="theme-toggle" id="theme-toggle" title="다크 모드 전환">🌙</button>
-        <button class="btn btn-ghost btn-sm" id="btn-logout" title="로그아웃">↩</button>
+        <button class="theme-toggle" id="theme-toggle" title="다크 모드 전환" aria-label="다크 모드 전환"></button>
+        <button class="theme-toggle" id="btn-logout" title="로그아웃" aria-label="로그아웃"><i data-icon="logout"></i></button>
       </div>
     </aside>
 
@@ -87,19 +90,28 @@
     <!-- 메인 -->
     <main class="main">
       <div class="topbar">
-        <button class="topbar-menu-btn" id="btn-menu" title="메뉴" aria-label="메뉴 열기">☰</button>
-        <div style="display:flex;align-items:center;gap:6px;font-size:13px;">
-          <span id="page-group" style="color:var(--text-hint);"></span>
-          <span id="breadcrumb-sep" style="color:var(--text-hint);display:none;">/</span>
-          <span id="page-title" style="font-weight:600;color:var(--text);"></span>
+        <button class="topbar-menu-btn" id="btn-menu" title="메뉴" aria-label="메뉴 열기"><i data-icon="menu" data-size="22"></i></button>
+        <div class="topbar-title">
+          <span id="page-group" class="topbar-group"></span>
+          <span id="breadcrumb-sep" class="topbar-group" style="display:none;">/</span>
+          <span id="page-title" class="topbar-page"></span>
         </div>
       </div>
       <div class="content" id="page-content">
         <div class="empty-state">
-          <div class="empty-icon">⏳</div>
+          <div class="empty-icon"></div>
           <div>페이지를 불러오는 중...</div>
         </div>
       </div>
+
+      <!-- 모바일 하단 탭 바: 한 손으로 주요 화면 이동 (더보기 = 전체 메뉴) -->
+      <nav class="tabbar" aria-label="주 메뉴">
+        <a class="tab-item" data-page="overview" href="#"><i data-icon="home" data-size="22"></i>홈</a>
+        <a class="tab-item" data-page="customers" href="#"><i data-icon="server" data-size="22"></i>장비</a>
+        <a class="tab-item" data-page="tickets" href="#"><i data-icon="alert" data-size="22"></i>장애</a>
+        <a class="tab-item" data-page="calendar" href="#"><i data-icon="calendar" data-size="22"></i>일정</a>
+        <a class="tab-item" id="tab-more" href="#"><i data-icon="more" data-size="22"></i>더보기</a>
+      </nav>
     </main>
   </div>
 
@@ -115,7 +127,7 @@
              style="width:200px;height:200px;margin:4px auto 8px;display:block;">
         <div style="font-size:12px;color:var(--text-hint);margin-bottom:16px;">hwmanager-593ba.web.app</div>
         <div style="text-align:left;font-size:13px;line-height:1.7;">
-          <div style="font-weight:600;margin-bottom:2px;">📷 폰 카메라로 QR 코드를 비추고 뜨는 링크를 누르세요</div>
+          <div style="font-weight:600;margin-bottom:2px;">폰 카메라로 QR 코드를 비추고 뜨는 링크를 누르세요</div>
           <div style="margin-top:10px;"><b>아이폰</b> — Safari에서 열린 화면 아래 <b>공유 버튼(□↑) → 홈 화면에 추가</b></div>
           <div style="margin-top:6px;"><b>안드로이드</b> — Chrome 오른쪽 위 <b>⋮ → 앱 설치</b> (또는 홈 화면에 추가)</div>
           <div style="margin-top:10px;font-size:12px;color:var(--text-hint);">설치 후 홈 화면의 HW Manager 아이콘으로 실행하면 됩니다.</div>
@@ -138,6 +150,8 @@
 
 
   <script>
+    FS.hydrateIcons(document);
+
     const PAGE_TITLES = {
       overview:  '개요',
       customers: '고객사·자산',
@@ -206,7 +220,7 @@
 
       currentPage = page;
 
-      document.querySelectorAll('.nav-item').forEach(el => {
+      document.querySelectorAll('.nav-item, .tab-item').forEach(el => {
         el.classList.toggle('active', el.dataset.page === page);
       });
       const group = PAGE_GROUPS[page] || '';
@@ -238,6 +252,7 @@
 
         // HTML 삽입
         content.innerHTML = doc.body ? doc.body.innerHTML : html;
+        FS.hydrateIcons(content);
 
         // 페이지별 스타일 삽입
         styles.forEach(s => {
@@ -374,12 +389,17 @@
     });
 
     // 네비 클릭
-    document.querySelectorAll('.nav-item[data-page]').forEach(el => {
+    document.querySelectorAll('.nav-item[data-page], .tab-item[data-page]').forEach(el => {
       el.addEventListener('click', e => {
         e.preventDefault();
         closeSidebar();
         loadPage(el.dataset.page);
       });
+    });
+    // 탭 바 '더보기' → 전체 메뉴(사이드바)
+    document.getElementById('tab-more').addEventListener('click', e => {
+      e.preventDefault();
+      openSidebar();
     });
 
     // 모바일 설치 QR
@@ -467,29 +487,13 @@
       document.addEventListener(evt, _resetIdle, { passive: true, capture: true });
     });
 
-    // ── 다크 모드 ──
-    const DARK_VARS = {
-      '--bg': '#111110', '--surface': '#1c1c1a', '--border': '#2e2e2b',
-      '--text': '#ececea', '--text-sub': '#a0a09e', '--text-hint': '#686866',
-      '--primary-light': '#2c1506', '--shadow': '0 1px 3px rgba(0,0,0,0.4)',
-    };
-    const LIGHT_VARS = {
-      '--bg': '#f7f7f5', '--surface': '#ffffff', '--border': '#e5e5e3',
-      '--text': '#1a1a1a', '--text-sub': '#6b6b6b', '--text-hint': '#9b9b9b',
-      '--primary-light': '#fdf0eb', '--shadow': '0 1px 2px rgba(0,0,0,0.06)',
-    };
-
+    // ── 다크 모드 ── (색 값은 app.css의 html[data-theme="dark"]에서 관리)
     function _applyTheme(dark) {
-      const vars = dark ? DARK_VARS : LIGHT_VARS;
       const root = document.documentElement;
-      Object.entries(vars).forEach(([k, v]) => root.style.setProperty(k, v));
-      if (dark) {
-        root.setAttribute('data-theme', 'dark');
-      } else {
-        root.removeAttribute('data-theme');
-      }
+      if (dark) root.setAttribute('data-theme', 'dark');
+      else root.removeAttribute('data-theme');
       const btn = document.getElementById('theme-toggle');
-      if (btn) btn.textContent = dark ? '☀️' : '🌙';
+      if (btn) btn.innerHTML = FS.icon(dark ? 'sun' : 'moon');
     }
 
     _applyTheme(localStorage.getItem('hw-theme') === 'dark');

@@ -26,7 +26,7 @@
 }
 .asset-row:last-child { border-bottom:none; }
 .asset-row-field { display:flex; flex-direction:column; gap:2px; min-width:70px; }
-.arf-label { font-size:10px; font-weight:600; color:var(--text-hint); text-transform:uppercase; letter-spacing:.04em; }
+.arf-label { font-size:10px; font-weight:800; color:var(--text-hint); text-transform:uppercase; letter-spacing:.04em; }
 .arf-val { font-size:12px; color:var(--text); }
 .w-hist { font-size:11px; color:var(--text-hint); font-weight:600; white-space:nowrap; }
 .wp-timeline { display:flex; flex-wrap:wrap; gap:0; padding:12px 14px; border-bottom:2px solid var(--ink); background:var(--surface-2); }
@@ -36,6 +36,9 @@
 .wp-seg-type { align-self:flex-start; font-size:10px; font-weight:900; padding:1px 6px; background:var(--ink); color:var(--bg); }
 .wp-seg-range { font-family:var(--font-mono); font-size:12px; font-weight:700; }
 .wp-seg-memo { font-size:11px; opacity:0.8; }
+.wp-seg.gap { border-style:dashed; background:var(--surface-2); color:var(--text-sub); }
+.wp-seg.gap .wp-seg-type { background:var(--surface); color:var(--text-sub); border:1.5px dashed var(--ink); }
+.wp-seg.cur-gap { background:var(--primary); color:#111111; border-style:solid; }
 </style>
 
 <!-- 만료 임박 배너 -->
@@ -74,7 +77,7 @@
     </table>
   </div>
   <div id="w-empty" class="empty-state" style="display:none;">
-    <div class="empty-icon">⚡</div><div>프로젝트 데이터가 없습니다</div>
+    <div class="empty-icon"></div><div>프로젝트 데이터가 없습니다</div>
   </div>
 </div>
 
@@ -83,12 +86,12 @@
   <div class="card" style="padding:0;overflow:hidden;">
     <div style="display:flex;align-items:center;justify-content:space-between;padding:11px 14px;border-bottom:1px solid var(--border);">
       <span id="proj-asset-title" style="font-weight:600;font-size:13px;"></span>
-      <button class="btn btn-ghost btn-sm" onclick="document.getElementById('proj-asset-panel').style.display='none'">✕ 닫기</button>
+      <button class="btn btn-ghost btn-sm" onclick="document.getElementById('proj-asset-panel').style.display='none'"><i data-icon="close" data-size="14"></i> 닫기</button>
     </div>
     <div id="proj-wp-timeline"></div>
     <div id="proj-asset-list"></div>
     <div id="proj-asset-empty" class="empty-state" style="display:none;">
-      <div class="empty-icon">🖥</div><div>등록된 장비가 없습니다</div>
+      <div class="empty-icon"></div><div>등록된 장비가 없습니다</div>
     </div>
   </div>
 </div>
@@ -137,6 +140,7 @@ function escHtml(s) { return FS.esc(s); }   // 숫자 등 문자열이 아닌 �
 
 function init() {
   wSelectedProjectId = null;
+  wCardFilter = '';   // 최상위 let은 화면을 다시 열어도 남으므로 초기화 (개요에서 넘어온 필터만 아래에서 적용)
   // 개요에서 숫자를 눌러 들어온 경우 해당 상태로 필터
   if (window.hwPageFilter && window.hwPageFilter.page === 'warranty') {
     wCardFilter = window.hwPageFilter.status || '';
@@ -183,10 +187,10 @@ function renderStats() {
     </div>`;
   }
   document.getElementById('stat-cards').innerHTML =
-    card('전체 프로젝트',    total,            '#111111', '') +
-    card('만료',             count('expired'), '#FF5A1F', 'expired') +
-    card('임박 (90일 이내)', count('urgent'),  '#FFD23F', 'urgent') +
-    card('정상',             count('ok'),      '#0F6B37', 'ok');
+    card('전체 프로젝트',    total,            'var(--ink)', '') +
+    card('만료',             count('expired'), 'var(--primary)', 'expired') +
+    card('임박 (90일 이내)', count('urgent'),  'var(--signal)', 'urgent') +
+    card('정상',             count('ok'),      'var(--success)', 'ok');
 }
 
 function setCardFilter(key) {
@@ -264,8 +268,27 @@ function showProjectAssets(projectId, scroll = true) {
   // 워런티 기간 이력 (기본 → 연장 …), 오늘이 포함된 기간 강조
   const periods = proj ? FS.warrantyPeriods(proj) : [];
   const today = FS.localDate();
-  document.getElementById('proj-wp-timeline').innerHTML = periods.length ? `<div class="wp-timeline">${periods.map(w => {
+  // 기간 사이 빈 구간은 '공백'으로 표시 (워런티가 끊겼던 기간)
+  const segs = [];
+  periods.forEach((w, i) => {
+    const prev = periods[i - 1];
+    if (prev && w.start) {
+      const d = new Date(prev.end + 'T00:00:00'); d.setDate(d.getDate() + 1);
+      const gapStart = FS.localDate(d);
+      if (w.start > gapStart) {
+        const e = new Date(w.start + 'T00:00:00'); e.setDate(e.getDate() - 1);
+        segs.push({ type: '공백', start: gapStart, end: FS.localDate(e), memo: '워런티 없음', gap: true });
+      }
+    }
+    segs.push(w);
+  });
+  document.getElementById('proj-wp-timeline').innerHTML = periods.length ? `<div class="wp-timeline">${segs.map(w => {
     const cur = (!w.start || w.start <= today) && w.end >= today;
+    if (w.gap) return `<div class="wp-seg gap${cur ? ' cur-gap' : ''}">
+      <span class="wp-seg-type">공백${cur ? ' · 현재' : ''}</span>
+      <span class="wp-seg-range">${FS.formatDate(w.start)} ~ ${FS.formatDate(w.end)}</span>
+      <span class="wp-seg-memo">워런티 없음</span>
+    </div>`;
     return `<div class="wp-seg${cur ? ' cur' : ''}">
       <span class="wp-seg-type">${FS.esc(w.type)}${cur ? ' · 현재' : ''}</span>
       <span class="wp-seg-range">${w.start ? FS.formatDate(w.start) : '?'} ~ ${FS.formatDate(w.end)}</span>

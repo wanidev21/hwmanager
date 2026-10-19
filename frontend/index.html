@@ -66,6 +66,9 @@
           <a class="nav-item" data-page="users" href="#">
             <span class="nav-icon"><i data-icon="users"></i></span> 회원 관리
           </a>
+          <a class="nav-item" data-page="audit" href="#">
+            <span class="nav-icon"><i data-icon="clipboard"></i></span> 변경 이력
+          </a>
         </div>
 
         <!-- PC 전용: 폰 설치용 QR -->
@@ -163,6 +166,7 @@
       tech:      '기술 학습',
       delivery:  '납품확인서',
       users:     '회원 관리',
+      audit:     '변경 이력',
     };
 
     const PAGE_GROUPS = {
@@ -174,6 +178,7 @@
       kb:        '지식·기술',
       tech:      '지식·기술',
       users:     '관리',
+      audit:     '관리',
     };
 
     let currentPage = null;
@@ -359,6 +364,10 @@
       if (_visible(document.querySelector('#page-content #proj-panel')) && typeof window.closeCustomerPanel === 'function') {
         window.closeCustomerPanel(); return true;                     // 고객사: 프로젝트 → 고객사 목록
       }
+      // 티켓 상세는 구독 해제·목록 복귀까지 하는 전용 닫기 사용
+      if (_visible(document.querySelector('#page-content #detail-col')) && currentPage === 'tickets' && typeof window.closeTicketDetail === 'function') {
+        window.closeTicketDetail(); return true;
+      }
       for (const id of ['detail-col', 'kb-detail-col', 'note-detail', 'proj-asset-panel']) {   // 티켓·KB·사내장비·기술노트·워런티 상세 패널
         const el = document.querySelector('#page-content #' + id);
         if (_visible(el)) { el.style.display = 'none'; return true; }
@@ -437,15 +446,10 @@
     function _showIdleWarn() {
       if (_warnEl) return;
       _warnEl = document.createElement('div');
-      _warnEl.style.cssText = [
-        'position:fixed;bottom:calc(24px + env(safe-area-inset-bottom));right:24px;left:auto;z-index:9999',
-        'background:#1a1a1a;color:#fff;border-radius:8px',
-        'padding:12px 16px;font-size:13px;display:flex;align-items:center;gap:12px',
-        'box-shadow:0 4px 24px rgba(0,0,0,0.25);'
-      ].join(';');
+      _warnEl.className = 'idle-warn';   // 스타일: app.css .idle-warn (모바일은 하단 탭 바 위)
       _warnEl.innerHTML = `
         <span>5분 후 자동 로그아웃됩니다</span>
-        <button id="_stay-btn" style="background:var(--primary);color:#fff;border:none;border-radius:4px;padding:4px 12px;cursor:pointer;font-size:12px;font-family:inherit;">계속 사용</button>`;
+        <button id="_stay-btn" class="btn btn-primary btn-sm">계속 사용</button>`;
       document.body.appendChild(_warnEl);
       document.getElementById('_stay-btn').addEventListener('click', _resetIdle);
     }

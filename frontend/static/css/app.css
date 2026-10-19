@@ -13,7 +13,7 @@
   --border: #D8D5CC;         /* 얇은 구분선 */
   --text: #111111;
   --text-sub: #4A4740;
-  --text-hint: #6E6A60;
+  --text-hint: #67635A;
   --success: #0F6B37;
   --success-bg: #DDF3E4;
   --warning: #111111;
@@ -484,6 +484,7 @@ body {
 
 .modal-footer {
   padding: 14px 20px;
+  background: var(--surface);
   border-top: 2px solid var(--ink);
   display: flex;
   justify-content: flex-end;
@@ -497,6 +498,8 @@ body {
 .ts-item.active { background:var(--signal); }
 .ts-count { font-family:var(--font-display); font-size:28px; font-weight:400; color:var(--text); line-height:1; }
 .ts-label { font-size:11px; font-weight:800; color:var(--text-sub); white-space:nowrap; }
+/* 노랑 배경 위에서는 다크모드에서도 검정 글자 */
+.ts-item.active .ts-count, .ts-item.active .ts-label { color:#111111; }
 .ts-divider { width:2px; background:var(--ink); flex-shrink:0; }
 
 /* ── 스탯카드 ── */
@@ -745,10 +748,13 @@ html[data-theme="dark"] .modal-overlay { background: rgba(0,0,0,0.55); }
   max-width: 360px;
   line-height: 1.45;
 }
-html[data-theme="dark"] .toast { background: #2c2c2a; border: 1px solid #3e3e3c; }
+html[data-theme="dark"] .toast { background: #2c2c2a; border: 2px solid #5A564D; }
 .toast.toast-success .toast-icon { color: #6FD69A; }
-.toast.toast-error   { background: var(--primary); color: #111111; }
-.toast.toast-warn    { background: var(--signal); color: #111111; }
+/* 오류·경고는 다크모드에서도 주황/노랑 배경 + 검정 글자 (위 다크 .toast 배경 덮어쓰기) */
+.toast.toast-error,
+html[data-theme="dark"] .toast.toast-error { background: var(--primary); color: #111111; border-color: #111111; }
+.toast.toast-warn,
+html[data-theme="dark"] .toast.toast-warn  { background: var(--signal); color: #111111; border-color: #111111; }
 .toast.toast-info .toast-icon { color: var(--signal); }
 .toast.toast-out     { animation: toast-out 0.18s ease forwards; }
 .toast-icon { font-size: 14px; flex-shrink: 0; margin-top: 1px; }
@@ -778,11 +784,33 @@ html[data-theme="dark"] .toast { background: #2c2c2a; border: 1px solid #3e3e3c;
 .gcal-event { border-left: 3px solid #4285F4 !important; }
 
 .gcal-status {
-  font-size: 11px; padding: 4px 10px; border-radius: 20px;
-  font-weight: 500; display: inline-flex; align-items: center; gap: 5px;
+  font-size: 11px; padding: 4px 10px; border-radius: 0;
+  border: 1.5px solid var(--ink);
+  font-weight: 800; display: inline-flex; align-items: center; gap: 5px;
 }
-.gcal-status.connected    { background: #f0fdf4; color: #15803d; border: 1px solid #bbf7d0; }
-.gcal-status.disconnected { background: #fef9c3; color: #854d0e; border: 1px solid #fde68a; }
+.gcal-status.connected    { background: var(--success-bg); color: var(--success); }
+.gcal-status.disconnected { background: var(--signal); color: #111111; }
+
+/* ── 자동 로그아웃 경고 (index.html _showIdleWarn) ── */
+.idle-warn {
+  position: fixed;
+  bottom: calc(24px + env(safe-area-inset-bottom));
+  right: 24px;
+  left: auto;
+  z-index: 9999;
+  background: #111111;
+  color: #ECEAE4;
+  border: 2px solid #111111;
+  border-radius: 0;
+  box-shadow: 4px 4px 0 rgba(17,17,17,0.25);
+  padding: 12px 16px;
+  font-size: 13px;
+  font-weight: 600;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+html[data-theme="dark"] .idle-warn { border-color: #5A564D; }
 
 /* ── 햄버거 버튼 (데스크탑 숨김) ── */
 .topbar-menu-btn {
@@ -960,7 +988,8 @@ html[data-theme="dark"] .toast { background: #2c2c2a; border: 1px solid #3e3e3c;
   }
 
   /* stat-bar (수평 현황 바) 글씨 축소 */
-  .ts-count { font-size: 18px; }
+  /* 작은 크기에서 Black Han Sans는 뭉개지므로 Pretendard 900 사용 */
+  .ts-count { font-family: var(--font-heading); font-weight: 900; font-size: 20px; }
   .ts-label { font-size: 10px; }
 
   /* 카드 패딩 */
@@ -985,6 +1014,23 @@ html[data-theme="dark"] .toast { background: #2c2c2a; border: 1px solid #3e3e3c;
     box-shadow: none;
     animation: slideUp 0.28s cubic-bezier(0.4, 0, 0.2, 1);
     padding-bottom: env(safe-area-inset-bottom);
+  }
+  /* 긴 폼에서도 저장 버튼이 화면 밖으로 밀리지 않도록 하단 고정 */
+  .modal-footer {
+    position: sticky;
+    bottom: 0;
+    z-index: 2;
+    background: var(--surface);
+    padding-bottom: calc(14px + env(safe-area-inset-bottom));
+  }
+  /* 하단 여백(safe-area)은 고정 푸터가 대신 가짐 → 푸터가 홈 인디케이터 위에 붙음 */
+  .modal:has(.modal-footer) { padding-bottom: 0; }
+
+  /* 자동 로그아웃 경고: 하단 탭 바 위 */
+  .idle-warn {
+    bottom: calc(70px + env(safe-area-inset-bottom));
+    left: 12px;
+    right: 12px;
   }
 
   /* 토스트 위치 */

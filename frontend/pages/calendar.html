@@ -1,25 +1,28 @@
 <!-- 캘린더 -->
 <style>
+/* 일정 색상 중 토큰에 없는 빨강·보라 (다크모드 보정 포함) */
+:root { --ev-red-bg:#FFE1D6; --ev-red-text:#B8340B; --ev-purple-bg:#EDE3FF; --ev-purple-text:#5B2A9E; }
+html[data-theme="dark"] { --ev-red-bg:#3A1A10; --ev-red-text:#FF8A5C; --ev-purple-bg:#2A1F40; --ev-purple-text:#C9A8FF; }
 .cal-wrap { display:flex; flex-direction:column; height:calc(100vh - 120px); min-height:560px; }
 @media (max-width:768px) {
   .cal-wrap { height:calc(100dvh - 120px); min-height:400px; }
   .cal-month-label { font-size:16px; min-width:110px; }
-  .cal-nav, .cal-today-btn { height:36px; }
-  .cal-nav { width:36px; }
+  .cal-nav, .cal-today-btn { height:40px; }
+  .cal-nav { width:40px; }
 }
 
 /* ── 툴바 ── */
 .cal-toolbar { display:flex; align-items:center; gap:8px; margin-bottom:12px; flex-wrap:wrap; }
-.cal-month-label { font-size:18px; font-weight:700; color:var(--text); min-width:140px; text-align:center; }
+.cal-month-label { font-family:var(--font-heading); font-size:18px; font-weight:800; color:var(--text); min-width:140px; text-align:center; }
 .cal-nav {
-  width:30px; height:30px; border-radius:0; border:1px solid var(--border);
-  background:var(--surface); color:var(--text-sub); font-size:16px; cursor:pointer;
+  width:32px; height:32px; border-radius:0; border:2px solid var(--ink);
+  background:var(--surface); color:var(--text); font-size:16px; font-weight:800; cursor:pointer;
   display:flex; align-items:center; justify-content:center; transition:background 0.1s;
 }
 .cal-nav:hover { background:var(--bg); }
 .cal-today-btn {
-  height:30px; padding:0 12px; border-radius:0; border:1px solid var(--border);
-  background:var(--surface); color:var(--text-sub); font-size:12px; font-weight:500;
+  height:32px; padding:0 12px; border-radius:0; border:2px solid var(--ink);
+  background:var(--surface); color:var(--text); font-size:12px; font-weight:800;
   cursor:pointer; font-family:inherit; transition:background 0.1s;
 }
 .cal-today-btn:hover { background:var(--bg); }
@@ -44,26 +47,27 @@
 }
 .cal-filter-item:hover           { background:var(--bg); }
 .cal-filter-item.inactive        { opacity:0.45; }
-.cal-filter-dot                  { width:10px; height:10px; border-radius:50%; flex-shrink:0; }
+.cal-filter-dot                  { width:10px; height:10px; border-radius:0; flex-shrink:0; }
 .cal-filter-item input[type=checkbox] { width:13px; height:13px; cursor:pointer; flex-shrink:0; }
 
 /* ── 요일 헤더 ── */
 .cal-week-header {
   display:grid; grid-template-columns:repeat(7,1fr);
-  border:1px solid var(--border); border-bottom:none; border-radius:0 0 0; overflow:hidden;
+  border:2px solid var(--ink); border-bottom:none; border-radius:0; overflow:hidden;
 }
+/* 요일 머리줄: 검정 띠 (테마 무관) → 주말 색은 검정 위에서 읽히는 밝은 값 */
 .cal-week-header div {
-  padding:8px 0; text-align:center; font-size:11px; font-weight:600;
-  color:var(--text-hint); background:var(--bg); letter-spacing:0.04em;
+  padding:8px 0; text-align:center; font-size:11px; font-weight:800;
+  color:#ECEAE4; background:#111111; letter-spacing:0.04em;
 }
-.cal-week-header div:first-child { color:#ef4444; }
-.cal-week-header div:last-child  { color:#3b82f6; }
+.cal-week-header div:first-child { color:#FF8A5C; }
+.cal-week-header div:last-child  { color:#9DB5FF; }
 
 /* ── 그리드 ── */
 .cal-grid {
   display:grid; grid-template-columns:repeat(7,1fr);
-  flex:1; border:1px solid var(--border); border-top:none;
-  border-radius:0 0 8px 8px; overflow:hidden;
+  flex:1; border:2px solid var(--ink); border-top:none;
+  border-radius:0; overflow:hidden;
 }
 .cal-cell {
   border-right:1px solid var(--border); border-bottom:1px solid var(--border);
@@ -75,17 +79,17 @@
 .cal-cell:hover           { background:var(--bg); }
 .cal-cell.cal-other       { background:var(--surface-2); cursor:default; }
 .cal-cell.cal-other:hover { background:var(--surface-2); }
-.cal-cell.cal-today       { background:#FFF3C4; }
-.cal-cell.cal-today:hover { background:#fce8de; }
+.cal-cell.cal-today       { background:var(--primary-light); }
+.cal-cell.cal-today:hover { background:var(--primary-light); }
 
 .cal-date-num {
   font-size:12px; font-weight:500; color:var(--text-sub);
   width:24px; height:24px; display:flex; align-items:center; justify-content:center;
-  border-radius:50%; margin-bottom:2px; flex-shrink:0;
+  border-radius:0; margin-bottom:2px; flex-shrink:0;
 }
 .cal-date-num.is-today { background:var(--primary); color:#111111; font-weight:800; border-radius:0; }
-.cal-date-num.is-sun   { color:#ef4444; }
-.cal-date-num.is-sat   { color:#3b82f6; }
+.cal-date-num.is-sun   { color:var(--danger); }
+.cal-date-num.is-sat   { color:var(--info); }
 
 .cal-event-pill {
   font-size:11px; font-weight:500; padding:2px 6px; border-radius:0;
@@ -105,7 +109,7 @@
   border-radius:0; cursor:pointer; border:1px solid var(--border); transition:background 0.1s;
 }
 .day-ev-item:hover { background:var(--bg); }
-.day-ev-dot { width:9px; height:9px; border-radius:50%; flex-shrink:0; }
+.day-ev-dot { width:9px; height:9px; border-radius:0; flex-shrink:0; }
 .day-ev-info { flex:1; min-width:0; }
 .day-ev-title { font-size:13px; font-weight:500; color:var(--text); overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
 .day-ev-meta { font-size:11px; color:var(--text-hint); margin-top:1px; }
@@ -113,22 +117,24 @@
 /* ── 읽기 전용 배너 ── */
 .ev-readonly-banner {
   display:flex; align-items:center; gap:6px; padding:8px 11px;
-  background:#f8f9fa; border:1px solid var(--border); border-radius:0;
-  font-size:12px; color:var(--text-sub);
+  background:var(--signal); border:1.5px solid var(--ink); border-radius:0;
+  font-size:12px; font-weight:800; color:#111111;
 }
 
 /* ── 모달 ── */
-.ev-color-picker { display:flex; gap:8px; align-items:center; margin-top:4px; }
+.ev-color-picker { display:flex; gap:10px; align-items:center; margin-top:4px; flex-wrap:wrap; }
 .ev-color-dot {
-  width:22px; height:22px; border-radius:50%; border:2.5px solid transparent;
-  cursor:pointer; flex-shrink:0; transition:transform 0.1s, border-color 0.1s;
+  width:32px; height:32px; border-radius:0; border:2px solid var(--ink);
+  cursor:pointer; flex-shrink:0; transition:outline-color 0.1s;
+  outline:3px solid transparent; outline-offset:2px;
 }
-.ev-color-dot:hover    { transform:scale(1.15); }
-.ev-color-dot.selected { border-color:#1a1a1a; transform:scale(1.1); }
+.ev-color-dot:hover    { outline-color:var(--border); }
+.ev-color-dot.selected { outline-color:var(--signal); }
+/* 모달 머리(검정 띠) 안의 구글 캘린더 배지 */
 .gcal-badge {
   display:inline-flex; align-items:center; gap:5px; font-size:11px;
-  font-weight:500; padding:3px 9px; background:#f0f4ff;
-  border-radius:0; border:1px solid #c7d7fd; color:#4285F4;
+  font-weight:800; padding:3px 9px; background:#1C2540;
+  border-radius:0; border:1.5px solid #9DB5FF; color:#9DB5FF;
 }
 /* 구글에서 확인되지 않는 연동 일정 (삭제됐거나 다른 달로 옮겨짐) */
 .cal-event-pill.cal-missing { opacity:.55; }
@@ -142,12 +148,13 @@
   .cal-grid { flex:none; }
   .cal-cell { min-height:58px; padding:4px 2px 6px; align-items:center; gap:3px; }
   .cal-cell:hover { background:transparent; }
-  .cal-cell.cal-today:hover { background:#FFF3C4; }
+  .cal-cell.cal-today:hover { background:var(--primary-light); }
   .cal-cell:not(.cal-other):active { background:var(--bg); }
   .cal-cell .cal-event-pill, .cal-cell .cal-more { display:none; }
   .cal-date-num { font-size:13px; width:26px; height:26px; margin-bottom:0; }
   .cal-dots { display:flex; flex-wrap:wrap; justify-content:center; align-items:center; gap:3px; max-width:100%; }
-  .cal-dot { width:6px; height:6px; border-radius:50%; flex-shrink:0; }
+  .cal-dot { width:6px; height:6px; border-radius:0; flex-shrink:0; }
+  .ev-color-dot { width:40px; height:40px; }
   .cal-dot.cal-missing { opacity:.45; }
   .cal-dot-more { font-size:9px; line-height:1; color:var(--text-sub); font-weight:600; }
   .day-ev-item { padding:12px; }
@@ -230,20 +237,20 @@
       <div class="form-group" id="ev-color-group">
         <label class="form-label">색상</label>
         <div class="ev-color-picker">
-          <div class="ev-color-dot" data-color="blue"   style="background:#3b82f6;" onclick="setEvColor('blue')"></div>
-          <div class="ev-color-dot" data-color="orange" style="background:#e8540a;" onclick="setEvColor('orange')"></div>
-          <div class="ev-color-dot" data-color="green"  style="background:#22c55e;" onclick="setEvColor('green')"></div>
-          <div class="ev-color-dot" data-color="red"    style="background:#ef4444;" onclick="setEvColor('red')"></div>
-          <div class="ev-color-dot" data-color="purple" style="background:#a855f7;" onclick="setEvColor('purple')"></div>
+          <div class="ev-color-dot" data-color="blue"   style="background:var(--info);" onclick="setEvColor('blue')"></div>
+          <div class="ev-color-dot" data-color="orange" style="background:var(--primary);" onclick="setEvColor('orange')"></div>
+          <div class="ev-color-dot" data-color="green"  style="background:var(--success);" onclick="setEvColor('green')"></div>
+          <div class="ev-color-dot" data-color="red"    style="background:var(--ev-red-text);" onclick="setEvColor('red')"></div>
+          <div class="ev-color-dot" data-color="purple" style="background:var(--ev-purple-text);" onclick="setEvColor('purple')"></div>
         </div>
         <input type="hidden" id="f-ev-color" value="blue">
       </div>
       <div class="form-group" id="ev-calendar-group">
         <label class="form-label">저장할 캘린더</label>
         <div style="display:flex;align-items:center;gap:8px;">
-          <span id="cal-color-dot" style="display:inline-block;width:10px;height:10px;border-radius:50%;background:#e8540a;flex-shrink:0;"></span>
+          <span id="cal-color-dot" style="display:inline-block;width:10px;height:10px;border-radius:0;background:#FF5A1F;flex-shrink:0;"></span>
           <select id="ev-calendar-select" class="form-select" onchange="updateCalColorDot()" style="flex:1;">
-            <option value="__fs__" data-color="#e8540a">HW Manager (앱 전용)</option>
+            <option value="__fs__" data-color="#FF5A1F">HW Manager (앱 전용)</option>
           </select>
         </div>
       </div>
@@ -279,12 +286,13 @@ FS.requireAuth();
 const GCAL_API       = 'https://www.googleapis.com/calendar/v3';
 const CAL_FILTER_KEY = 'hw_cal_filter';
 
+// 화면 표시용 색 (Firestore에는 키 이름만 저장). 토큰이라 라이트·다크 모두 대응
 const EV_COLORS = {
-  blue:   { bg:'#dbeafe', text:'#1d4ed8' },
-  orange: { bg:'#fdf0eb', text:'#c2410c' },
-  green:  { bg:'#dcfce7', text:'#15803d' },
-  red:    { bg:'#fee2e2', text:'#dc2626' },
-  purple: { bg:'#f3e8ff', text:'#7e22ce' },
+  blue:   { bg:'var(--info-bg)',       text:'var(--info)',           dot:'var(--info)' },
+  orange: { bg:'var(--primary)',       text:'#111111',               dot:'var(--primary)' },
+  green:  { bg:'var(--success-bg)',    text:'var(--success)',        dot:'var(--success)' },
+  red:    { bg:'var(--ev-red-bg)',     text:'var(--ev-red-text)',    dot:'var(--ev-red-text)' },
+  purple: { bg:'var(--ev-purple-bg)',  text:'var(--ev-purple-text)', dot:'var(--ev-purple-text)' },
 };
 
 let curYear, curMonth;
@@ -497,7 +505,7 @@ function renderCalFilterBar() {
   if (!calendarList.length) { bar.style.display = 'none'; return; }
 
   const items = [
-    { id:'__fs__', name:'HW Manager', color:'#e8540a' },
+    { id:'__fs__', name:'HW Manager', color:'#FF5A1F' },
     ...calendarList.map(c => ({
       id:    c.id,
       name:  c.summary || c.id,
@@ -545,9 +553,9 @@ function renderGcalStatus() {
     const timeStr = _lastSyncTime
       ? _lastSyncTime.toLocaleTimeString('ko-KR', { hour: '2-digit', minute: '2-digit' })
       : '';
-    wrap.innerHTML = `<span class="gcal-status connected">● Google 캘린더 연동됨${timeStr ? ` (마지막 동기화: ${timeStr})` : ''}</span>`;
+    wrap.innerHTML = `<span class="gcal-status connected">■ Google 캘린더 연동됨${timeStr ? ` (마지막 동기화: ${timeStr})` : ''}</span>`;
   } else {
-    wrap.innerHTML = '<span class="gcal-status disconnected">○ Google 캘린더 미연결</span>' +
+    wrap.innerHTML = '<span class="gcal-status disconnected">□ Google 캘린더 미연결</span>' +
       ' <button class="btn btn-ghost btn-sm" onclick="reconnectGcal(this)">다시 연결</button>';
   }
 }
@@ -667,14 +675,14 @@ function renderCalendar() {
       const isGcal  = ev.source === 'google';
       const pillSty = isGcal && ev.calendarColor
         ? gcalPillStyle(ev.calendarColor)
-        : (() => { const c = EV_COLORS[ev.color||'blue']; return `background:${c.bg};color:${c.text};`; })();
+        : (() => { const c = EV_COLORS[ev.color] || EV_COLORS.blue; return `background:${c.bg};color:${c.text};`; })();
       const timeTag = ev.start_time
         ? `<span style="opacity:.65;font-size:10px;">${escHtml(ev.start_time)} </span>` : '';
       const missTip = ev.gcal_missing ? ' (Google 캘린더에서 찾을 수 없음)' : '';
       return `<div class="cal-event-pill${ev.gcal_missing ? ' cal-missing' : ''}" style="${pillSty}"
         onclick="openEventModal('${ev.id}',null);event.stopPropagation();"
         title="${escHtml(ev.calendarName ? ev.calendarName+': ' : '')}${escHtml(ev.title)}${missTip}"
-      >${ev.gcal_missing ? '⚠ ' : ''}${timeTag}${escHtml(ev.title)}</div>`;
+      >${ev.gcal_missing ? FS.icon('alert', 12) + ' ' : ''}${timeTag}${escHtml(ev.title)}</div>`;
     }).join('');
     if (evs.length > 3) {
       evHtml += `<div class="cal-more"
@@ -713,7 +721,7 @@ function evDotColor(ev) {
   if (ev.source === 'google') {
     return /^#[0-9a-f]{3,8}$/i.test(ev.calendarColor || '') ? ev.calendarColor : '#4285F4';
   }
-  return EV_COLORS[ev.color]?.text || EV_COLORS.blue.text;
+  return EV_COLORS[ev.color]?.dot || EV_COLORS.blue.dot;
 }
 
 // ── 이벤트 수정 가능 여부 ─────────────────────────────────────────────────────
@@ -753,7 +761,7 @@ function openDayEventsModal(dateStr) {
     const metaHtml = isGcal
       ? `<div class="day-ev-meta">${escHtml(ev.calendarName||'Google 캘린더')}</div>`
       : ev.gcal_missing
-        ? '<div class="day-ev-meta" style="color:var(--warning,#b45309);">⚠ Google 캘린더에서 찾을 수 없음 (삭제·이동됨)</div>' : '';
+        ? '<div class="day-ev-meta" style="color:var(--danger);">' + FS.icon('alert', 12) + ' Google 캘린더에서 찾을 수 없음 (삭제·이동됨)</div>' : '';
     const editable = isEventEditable(ev);
     const lockIcon = editable ? '' : ' ' + FS.icon('lock', 12);
     return `<div class="day-ev-item" onclick="closeDayEventsModal();setTimeout(()=>openEventModal('${ev.id}',null),50)">
@@ -867,7 +875,7 @@ function updateCalColorDot() {
   if (!select || !dot) return;
   const sel = select.options[select.selectedIndex];
   dot.style.background = sel?.dataset?.color ||
-    (select.value === '__fs__' ? '#e8540a' : '#4285F4');
+    (select.value === '__fs__' ? '#FF5A1F' : '#4285F4');
 }
 
 // ── Google Calendar CRUD ─────────────────────────────────────────────────────

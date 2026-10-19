@@ -9,11 +9,11 @@
   </table>
   </div>
   <div id="users-empty" class="empty-state" style="display:none;">
-    <div class="empty-icon">👥</div><div>회원 정보가 없습니다</div>
+    <div class="empty-icon"></div><div>회원 정보가 없습니다</div>
   </div>
 </div>
 
-<div class="card mt-3" style="background:var(--info-bg);border-color:#bfdbfe;">
+<div class="card mt-3" style="background:var(--info-bg);border-color:var(--info);">
   <div style="font-size:13px;color:var(--info);">
     <strong>안내:</strong> 회원 가입 시 이 목록에 자동으로 등록됩니다.
     역할을 <strong>admin</strong>으로 변경하면 회원 관리 메뉴 접근 권한이 부여됩니다.
@@ -33,7 +33,7 @@ async function init() {
     if (!me || me.role !== 'admin') {
       document.querySelector('.content').innerHTML = `
         <div class="empty-state">
-          <div class="empty-icon">🔒</div>
+          <div class="empty-icon"></div>
           <div>관리자 권한이 필요합니다</div>
         </div>`;
       return;
@@ -53,10 +53,10 @@ function renderUsers() {
     <tr>
       <td style="font-weight:500;">${FS.esc(u.displayName||u.name||'-')}</td>
       <td>${FS.esc(u.email||'-')}</td>
-      <td><span class="badge ${u.role==='admin'?'badge-danger':'badge-gray'}">${FS.esc(u.role||'user')}</span></td>
+      <td><span class="badge ${u.role==='admin'?'badge-orange':'badge-gray'}">${FS.esc(u.role||'user')}</span></td>
       <td>${FS.formatDate(u.created_at)||'-'}</td>
       <td>
-        <select class="form-select" style="font-size:12px;padding:3px 8px;" onchange="changeRole('${u.id}',this.value)">
+        <select class="form-select" onchange="changeRole('${u.id}',this.value)">
           <option ${(u.role||'user')==='user'?'selected':''} value="user">user</option>
           <option ${u.role==='admin'?'selected':''} value="admin">admin</option>
         </select>

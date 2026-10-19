@@ -47,14 +47,20 @@ service cloud.firestore {
     match /assets/{id}          { allow read, write: if allowed(); }
     match /tickets/{id} {
       allow read, write: if allowed();
-      // 진행 기록: 모두 읽기, 작성자 본인만 수정·삭제 (by == 작성자 uid)
+      // 진행 기록: 모두 읽기, 작성자 본인만 수정 (by == 작성자 uid)
       match /logs/{logId} {
         allow read: if allowed();
         allow create: if allowed() && request.resource.data.by == request.auth.uid;
         allow update: if allowed() && resource.data.by == request.auth.uid
                       && request.resource.data.by == request.auth.uid;
-        allow delete: if allowed() && (resource.data.by == request.auth.uid || isAdmin());
+        // 삭제는 팀 모두 허용 (티켓 삭제 시 다른 사람 기록도 함께 지워져야 하므로). 수정은 작성자만
+        allow delete: if allowed();
       }
+    }
+    // 변경 이력: 모두 읽기, 본인 이름으로 추가만 (수정·삭제 불가)
+    match /audit_logs/{id} {
+      allow read: if allowed();
+      allow create: if allowed() && request.resource.data.by == request.auth.uid;
     }
     match /internal_assets/{id} { allow read, write: if allowed(); }
     match /delivery_notes/{id}  { allow read, write: if allowed(); }

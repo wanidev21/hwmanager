@@ -8,12 +8,11 @@
   /* 장비 검색 */
   .ov-search { display:flex; align-items:center; gap:10px; height:54px; padding:0 14px; background:var(--surface); border:2px solid var(--ink); }
   .ov-search:focus-within { box-shadow:0 0 0 3px var(--signal); }
-  .ov-search input { flex:1; min-width:0; height:100%; border:none; outline:none; background:transparent; color:var(--text); font-family:var(--font-mono); font-size:15px; }
+  .ov-search input { flex:1; min-width:0; height:100%; border:none; outline:none; background:transparent; color:var(--text); font-family:var(--font-mono); font-size:16px; }   /* 16px 미만이면 iOS가 확대 */
   .ov-hits { border:2px solid var(--ink); border-top:none; background:var(--surface); }
   .ov-hit { display:flex; flex-direction:column; gap:3px; padding:11px 14px; border-bottom:1px solid var(--border); cursor:pointer; }
   .ov-hit:last-child { border-bottom:none; }
-  .ov-hit:hover { background:#FFF3EC; }
-  html[data-theme="dark"] .ov-hit:hover { background:#2A2520; }
+  .ov-hit:hover { background:var(--primary-light); }
   .ov-hit-name { font-family:var(--font-mono); font-size:14px; font-weight:700; }
   .ov-hit-meta { font-size:12px; color:var(--text-sub); overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
 
@@ -179,7 +178,7 @@ function renderOverview(customers, projects, assets, tickets, kbArticles, delive
       title: t.title || '(제목 없음)',
       meta: `${custMap[t.customer_id] || '고객사 없음'} · ${t.status || '접수'}${t.assignee ? ' · ' + t.assignee : ''}`,
       tag: `<span class="ov-tag t-danger">${FS.esc(t.priority)}</span>`,
-      onclick: "loadPage('tickets')",
+      onclick: `window.hwPageFilter={page:'tickets',ticketId:'${t.id}'};loadPage('tickets')`,   // 해당 티켓 바로 열기
     }));
   expiringSoon
     .filter(p => daysLeft(p.warranty_expire) <= 30)

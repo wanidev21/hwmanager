@@ -12,8 +12,8 @@
 }
 .dl-btn:hover { background:var(--bg); }
 .dl-btn-print { background:var(--success-bg); border-color:var(--success); color:var(--success); }
-.dl-btn-print:hover { background:#dcfce7; }
-.dl-btn-del { color:var(--danger); border-color:#fca5a5; }
+.dl-btn-print:hover { filter:brightness(0.95); }
+.dl-btn-del { color:var(--danger); border-color:var(--danger); }
 .dl-btn-del:hover { background:var(--primary-light); }
 
 /* ── 편집 툴바 ── */
@@ -24,17 +24,18 @@
 .edit-toolbar h3 { flex:1; font-size:15px; font-weight:600; }
 
 /* ── 품목 입력 테이블 ── */
-.item-table { width:100%; border-collapse:collapse; border:1.5px solid #d0d0ce; }
+.item-table { width:100%; border-collapse:collapse; border:2px solid var(--ink); }
+/* 머리줄: 검정 띠 (테마 무관) */
 .item-table thead th {
-  font-size:11px; font-weight:700; color:#3a3a3a; letter-spacing:0.04em;
-  padding:8px 10px; background:#f0f0ee;
-  border-right:1px solid #c8c8c5; border-bottom:2px solid #b0b0ad;
+  font-size:11px; font-weight:800; color:#ECEAE4; letter-spacing:0.04em;
+  padding:8px 10px; background:#111111;
+  border-right:1px solid #3A3833; border-bottom:2px solid var(--ink);
   text-align:left; white-space:nowrap;
 }
 .item-table thead th:last-child { border-right:none; }
 .item-table tbody td {
   padding:3px 4px; vertical-align:middle;
-  border-right:1px solid #dededc; border-bottom:1px solid #dededc;
+  border-right:1px solid var(--border); border-bottom:1px solid var(--border);
 }
 .item-table tbody td:last-child { border-right:none; }
 .item-table tbody tr:nth-child(even) td { background:var(--surface-2); }
@@ -55,7 +56,7 @@
 #list-tbody tr { cursor:pointer; }
 .dn-list-scroll { overflow-x:auto; -webkit-overflow-scrolling:touch; }
 .dn-preview-modal { max-width:860px; width:calc(100vw - 32px); }
-.dn-preview-box { position:relative; overflow:hidden; background:#e9e9e7; border-radius:var(--radius); }
+.dn-preview-box { position:relative; overflow:hidden; background:var(--surface-2); border:2px solid var(--ink); border-radius:0; }
 .dn-preview-box iframe {
   position:absolute; top:0; left:0; width:794px; height:1123px;
   border:0; background:#fff; transform-origin:top left;
@@ -86,20 +87,21 @@
   /* iOS는 16px 미만 입력칸에 포커스하면 화면을 확대하므로 16px 이상 */
   .item-table input, .item-table select { font-size:16px; min-height:40px; }
 }
+/* 서명 칸: 검정 펜으로 그리므로 다크모드에서도 흰 바탕 */
 .sig-box canvas {
-  border:1px solid var(--border); border-radius:var(--radius);
-  cursor:crosshair; display:block; width:100%; background:var(--surface);
+  border:2px solid var(--ink); border-radius:0;
+  cursor:crosshair; display:block; width:100%; background:#FFFFFF;
   touch-action:none;   /* 서명 중 화면 스크롤 방지 */
 }
-.sig-box label { font-size:12px; font-weight:500; color:var(--text-sub); display:block; margin-bottom:6px; }
+.sig-box label { font-size:12px; font-weight:800; color:var(--text-sub); display:block; margin-bottom:6px; }
 
 /* ── 자동완성 ── */
 .ac-wrap { position:relative; }
 .ac-list {
   position:absolute; top:100%; left:0; right:0; background:var(--surface);
-  border:1px solid var(--border); border-radius:var(--radius); z-index:200;
+  border:2px solid var(--ink); border-radius:0; z-index:200;
   max-height:150px; overflow-y:auto; display:none;
-  box-shadow:0 4px 12px rgba(0,0,0,0.1);
+  box-shadow:4px 4px 0 rgba(17,17,17,0.25);
 }
 .ac-list.open { display:block; }
 .ac-item { padding:6px 10px; font-size:12px; cursor:pointer; color:var(--text-sub); }
@@ -309,7 +311,7 @@
     </table>
     </div>
     <div id="list-empty" class="empty-state" style="display:none;">
-      <div class="empty-icon">📋</div><div>납품확인서가 없습니다</div>
+      <div class="empty-icon"></div><div>납품확인서가 없습니다</div>
     </div>
   </div>
 </div>

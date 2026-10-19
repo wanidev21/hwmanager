@@ -1,21 +1,23 @@
 <!-- KB 지식베이스 -->
 <style>
   .quick-filters { display:flex; gap:6px; flex-wrap:wrap; margin-bottom:16px; }
-  .quick-filter { padding:5px 14px; border-radius:0; font-size:13px; border:1px solid var(--border); background:var(--surface); cursor:pointer; transition:all 0.15s; color:var(--text-sub); }
-  .quick-filter.active { background:var(--primary); color:#fff; border-color:var(--primary-text); }
-  .quick-filter:hover:not(.active) { background:var(--bg); }
+  .quick-filter { display:inline-flex; align-items:center; height:36px; padding:0 14px; border-radius:0; font-size:13px; font-weight:800; border:1.5px solid var(--ink); background:var(--surface); cursor:pointer; transition:background 0.1s; color:var(--text); user-select:none; }
+  /* 선택: 주황 배경 + 검정 글자 (흰 글자는 대비 부족) */
+  .quick-filter.active { background:var(--primary); color:#111111; border-color:var(--ink); }
+  .quick-filter:hover:not(.active) { background:var(--surface-2); }
   .kb-layout { display:flex; gap:16px; }
   .kb-table-col { flex:1; min-width:0; }
   .kb-detail-col { width:360px; flex-shrink:0; }
   @media (max-width:768px) {
+    .quick-filter { height:40px; }
     .kb-layout { flex-direction:column; }
     .kb-detail-col { width:100%; }
   }
   .detail-section { margin-bottom:16px; }
-  .detail-section h4 { font-size:12px; font-weight:600; text-transform:uppercase; color:var(--text-hint); letter-spacing:0.05em; margin-bottom:8px; }
+  .detail-section h4 { font-family:var(--font-heading); font-size:12px; font-weight:800; text-transform:uppercase; color:var(--text-hint); letter-spacing:0.05em; margin-bottom:8px; }
   .detail-section p { font-size:13px; line-height:1.7; white-space:pre-wrap; }
   .keyword-tags { display:flex; flex-wrap:wrap; gap:4px; }
-  .keyword-tag { padding:2px 8px; background:var(--primary-light); color:var(--primary-text); border-radius:0; font-size:11px; }
+  .keyword-tag { padding:2px 8px; background:var(--primary-light); color:var(--primary-text); border-radius:0; font-size:11px; font-weight:700; }
 </style>
 
 <div class="flex-between mb-3">
@@ -46,7 +48,7 @@
       </table>
       </div>
       <div id="kb-empty" class="empty-state" style="display:none;">
-        <div class="empty-icon">📖</div><div>등록된 지식베이스가 없습니다</div>
+        <div class="empty-icon"></div><div>등록된 지식베이스가 없습니다</div>
       </div>
     </div>
   </div>
@@ -178,7 +180,7 @@ function showDetail(id, fromTap) {
       <div class="flex gap-1">
         <button class="btn btn-sm" onclick="openModal('${id}')">수정</button>
         <button class="btn btn-sm btn-danger" onclick="deleteKB('${id}')">삭제</button>
-        <button class="btn btn-ghost btn-sm" onclick="kbSelectedId=null;document.getElementById('kb-detail-col').style.display='none'">✕</button>
+        <button class="btn btn-ghost btn-sm" onclick="kbSelectedId=null;document.getElementById('kb-detail-col').style.display='none'" aria-label="닫기">${FS.icon('close', 16)}</button>
       </div>
     </div>
     ${a.symptom ? `<div class="detail-section"><h4>증상</h4><p>${esc(a.symptom)}</p></div>` : ''}

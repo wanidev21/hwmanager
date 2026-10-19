@@ -8,6 +8,11 @@ if (/^[^.]+\.(web\.app|firebaseapp\.com)$/.test(location.hostname) && !location.
 
 firebase.initializeApp(firebaseConfig);
 
+function _writeFailed(e) {
+  console.error('[FS] write failed', e);
+  if (window.Toast) Toast.error('저장 실패: ' + (e.code || e.message));
+}
+
 // FS.icon()용 SVG 경로 (24×24, stroke)
 const _ICONS = {
   home:     '<path d="M3 11l9-7 9 7"/><path d="M5 10v10h14V10"/>',
@@ -184,6 +189,37 @@ window.FS = {
       updated_at: now,
     });
     return ref.id;
+  },
+  // 변경 이력 (누가·언제·무엇을). 추가 전용 — 규칙상 수정·삭제 불가. 서버 응답을 기다리지 않음
+  // action: '등록'|'수정'|'삭제', entity: '티켓'|'장비'|'고객사'|'프로젝트', label: 화면 표시용 이름
+  audit(action, entity, entityId, label, detail = '') {
+    const u = _auth.currentUser;
+    if (!u) return;
+    _db.collection('audit_logs').add({
+      action, entity, entity_id: entityId || '', label: String(label || '').slice(0, 200),
+      detail: String(detail || '').slice(0, 500),
+      by: u.uid, by_name: u.displayName || u.email || '',
+      at: firebase.firestore.Timestamp.now(),   // 작업한 순간 (오프라인이어도 정확)
+      created_at: firebase.firestore.FieldValue.serverTimestamp(),
+    }).catch(e => console.warn('변경 이력 기록 실패', e));
+  },
+  // 등록자 정보 (문서에 함께 저장)
+  creator() {
+    const u = _auth.currentUser;
+    return u ? { created_by: u.uid, created_by_name: u.displayName || u.email || '' } : {};
+  },
+
+  // 서버 응답을 기다리지 않는 쓰기 (전산실 등 오프라인에서도 화면이 멈추지 않도록).
+  // 로컬 캐시에 즉시 반영되고 연결되면 동기화. 실패는 토스트로 알림. 새 문서 id를 바로 반환
+  addNow(collection, data) {
+    const now = firebase.firestore.FieldValue.serverTimestamp();
+    const ref = _db.collection(collection).doc();
+    ref.set({ ...data, created_at: now, updated_at: now }).catch(_writeFailed);
+    return ref.id;
+  },
+  updateNow(collection, id, data) {
+    const now = firebase.firestore.FieldValue.serverTimestamp();
+    _db.collection(collection).doc(id).update({ ...data, updated_at: now }).catch(_writeFailed);
   },
   async update(collection, id, data) {
     const now = firebase.firestore.FieldValue.serverTimestamp();

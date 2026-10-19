@@ -1,27 +1,30 @@
 <!-- 기술 학습 -->
 <style>
   .tech-tabs { display:flex; gap:6px; flex-wrap:wrap; margin-bottom:20px; }
-  .tech-tab { padding:5px 14px; border-radius:0; font-size:13px; border:1px solid var(--border); background:var(--surface); color:var(--text-sub); cursor:pointer; transition:all 0.15s; }
-  .tech-tab:hover:not(.active) { background:var(--bg); }
-  .tech-tab.active { background:var(--primary); color:#fff; border-color:var(--primary-text); font-weight:500; }
+  /* 탭·도메인 칩: 선택 시 주황 배경 + 검정 글자 (흰 글자는 대비 부족) */
+  .tech-tab, .domain-chip { display:inline-flex; align-items:center; height:36px; padding:0 14px; border-radius:0; font-size:13px; font-weight:800; border:1.5px solid var(--ink); background:var(--surface); color:var(--text); cursor:pointer; transition:background 0.1s; user-select:none; }
+  .tech-tab:hover:not(.active), .domain-chip:hover:not(.active) { background:var(--surface-2); }
+  .tech-tab.active, .domain-chip.active { background:var(--primary); color:#111111; border-color:var(--ink); }
   .tech-panel { display:none; }
   .tech-panel.active { display:block; }
   .domain-list { display:flex; gap:6px; flex-wrap:wrap; margin-bottom:16px; }
-  .domain-chip { padding:5px 14px; border-radius:0; font-size:13px; border:1px solid var(--border); background:var(--surface); cursor:pointer; transition:all 0.15s; color:var(--text-sub); }
-  .domain-chip:hover:not(.active) { background:var(--bg); }
-  .domain-chip.active { background:var(--primary); color:#fff; border-color:var(--primary-text); }
-  .keyword-tag { padding:2px 8px; background:var(--primary-light); color:var(--primary-text); border-radius:0; font-size:11px; }
-  .topic-item { display:flex; align-items:center; gap:10px; padding:8px 12px; border-radius:var(--radius); border:1px solid var(--border); background:var(--surface); margin-bottom:6px; }
-  .topic-status { width:20px; height:20px; border-radius:50%; border:2px solid var(--border); cursor:pointer; flex-shrink:0; display:flex; align-items:center; justify-content:center; font-size:10px; }
-  .topic-status.in-progress { border-color:var(--warning); background:var(--warning-bg); }
-  .topic-status.completed { border-color:var(--success); background:var(--success-bg); }
+  .keyword-tag { padding:2px 8px; background:var(--primary-light); color:var(--primary-text); border-radius:0; font-size:11px; font-weight:700; }
+  .topic-item { display:flex; align-items:center; gap:10px; padding:8px 12px; border-radius:0; border:1px solid var(--border); background:var(--surface); margin-bottom:6px; }
+  .topic-status { width:28px; height:28px; border-radius:0; border:2px solid var(--ink); background:var(--surface); color:#111111; cursor:pointer; flex-shrink:0; display:flex; align-items:center; justify-content:center; }
+  .topic-status.in-progress { background:var(--signal); }
+  .topic-status.completed { background:#6FD69A; }
   .progress-bar { height:4px; background:var(--border); border-radius:0; overflow:hidden; margin-top:4px; }
   .progress-fill { height:100%; background:var(--primary); transition:width 0.3s; }
   .note-grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(280px,1fr)); gap:12px; }
-  .note-card { background:var(--surface); border:1px solid var(--border); border-radius:var(--radius-lg); padding:16px; cursor:pointer; transition:box-shadow 0.15s; }
-  .note-card:hover { box-shadow:var(--shadow-md); }
+  .note-card { background:var(--surface); border:2px solid var(--ink); border-radius:0; padding:16px; cursor:pointer; transition:box-shadow 0.1s, transform 0.1s; }
+  .note-card:hover { box-shadow:4px 4px 0 var(--ink); transform:translate(-2px,-2px); }
   .note-preview { font-size:12px; color:var(--text-sub); margin-top:6px; overflow:hidden; display:-webkit-box; -webkit-line-clamp:3; -webkit-box-orient:vertical; }
-  .release-status select { font-size:12px; border:1px solid var(--border); border-radius:var(--radius); padding:2px 6px; background:var(--surface); }
+  .rel-status-select { min-width:110px; }
+  .tech-toolbar { display:flex; align-items:center; flex-wrap:wrap; gap:8px; }
+  @media (max-width:768px) {
+    .tech-tab, .domain-chip { height:40px; }
+    .tech-toolbar .btn { flex:0 0 auto; }
+  }
 </style>
 
 <div class="tech-tabs">
@@ -41,7 +44,7 @@
 
 <!-- 노트 탭 -->
 <div class="tech-panel" id="panel-notes">
-  <div class="flex gap-2 mb-3">
+  <div class="tech-toolbar filter-row mb-3">
     <input type="text" class="form-input" id="note-search" placeholder="제목·내용·키워드 검색..." oninput="renderNotes()" style="max-width:300px;">
     <select class="form-select" id="note-domain-filter" style="width:160px;" onchange="renderNotes()">
       <option value="">전체 도메인</option>
@@ -49,7 +52,7 @@
     <button class="btn btn-primary btn-sm" onclick="openNoteModal()">+ 노트 추가</button>
   </div>
   <div class="note-grid" id="note-grid"></div>
-  <div id="note-empty" class="empty-state" style="display:none;"><div class="empty-icon">📝</div><div>노트가 없습니다</div></div>
+  <div id="note-empty" class="empty-state" style="display:none;"><div class="empty-icon"></div><div>노트가 없습니다</div></div>
   <div id="note-detail" class="card mt-3" style="display:none;"></div>
 </div>
 
@@ -66,7 +69,7 @@
       <tbody id="release-tbody"></tbody>
     </table>
     </div>
-    <div id="release-empty" class="empty-state" style="display:none;"><div class="empty-icon">🚀</div><div>릴리스가 없습니다</div></div>
+    <div id="release-empty" class="empty-state" style="display:none;"><div class="empty-icon"></div><div>릴리스가 없습니다</div></div>
   </div>
 </div>
 
@@ -164,7 +167,7 @@ async function techWithBtn(btn, fn) {
 const techByCreated = (a, b) => (a.created_at?.seconds ?? Infinity) - (b.created_at?.seconds ?? Infinity);
 
 const STATUS_CYCLE = { '미착수':'진행중', '진행중':'완료', '완료':'미착수' };
-const STATUS_ICONS = { '미착수':'', '진행중':'→', '완료':'✓' };
+const STATUS_ICONS = { '미착수':'', '진행중':FS.icon('chevron', 14), '완료':FS.icon('check', 14) };
 const STATUS_CLASS = { '미착수':'', '진행중':'in-progress', '완료':'completed' };
 
 function init() {
@@ -232,7 +235,7 @@ function renderTopics() {
             <div class="topic-status ${STATUS_CLASS[t.status||'미착수']}" onclick="cycleStatus('${t.id}')" title="${FS.esc(t.status||'미착수')}">${STATUS_ICONS[t.status||'미착수']}</div>
             <span style="flex:1;font-size:13px;">${FS.esc(t.name||'')}</span>
             <span class="badge ${t.status==='완료'?'badge-success':t.status==='진행중'?'badge-warning':'badge-gray'}">${FS.esc(t.status||'미착수')}</span>
-            <button class="btn btn-ghost btn-sm" onclick="deleteTopic('${t.id}')">×</button>
+            <button class="btn btn-ghost btn-sm" onclick="deleteTopic('${t.id}')" aria-label="삭제">${FS.icon('trash', 14)}</button>
           </div>`).join('')}
         ${!total?'<div class="text-hint" style="padding:20px;text-align:center;">토픽이 없습니다</div>':''}
       </div>
@@ -355,7 +358,7 @@ function showNoteDetail(id, fromTap) {
       <div class="flex gap-1">
         <button class="btn btn-sm" onclick="openNoteModal('${id}')">수정</button>
         <button class="btn btn-sm btn-danger" onclick="deleteNote('${id}')">삭제</button>
-        <button class="btn btn-ghost btn-sm" onclick="closeNoteDetail()">✕</button>
+        <button class="btn btn-ghost btn-sm" onclick="closeNoteDetail()" aria-label="닫기">${FS.icon('close', 16)}</button>
       </div>
     </div>
     <p style="font-size:13px;line-height:1.8;white-space:pre-wrap;">${FS.esc(n.content||'')}</p>
@@ -432,11 +435,11 @@ function renderReleases() {
       <td style="font-weight:500;">${FS.esc(r.title||'')}</td>
       <td style="font-size:12px;color:var(--text-sub);">${FS.esc(r.description||'')}</td>
       <td>
-        <select class="form-select" style="font-size:12px;padding:2px 6px;" onchange="updateReleaseStatus('${r.id}',this.value)">
+        <select class="form-select rel-status-select" onchange="updateReleaseStatus('${r.id}',this.value)">
           ${['학습필요','추적중','파악완료','적용완료'].map(s=>`<option ${s===r.status?'selected':''}>${s}</option>`).join('')}
         </select>
       </td>
-      <td><button class="btn btn-ghost btn-sm" onclick="deleteRelease('${r.id}')">×</button></td>
+      <td><button class="btn btn-ghost btn-sm" onclick="deleteRelease('${r.id}')" aria-label="삭제">${FS.icon('trash', 14)}</button></td>
     </tr>`).join('');
 }
 

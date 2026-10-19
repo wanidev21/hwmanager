@@ -1,6 +1,8 @@
-// Firebase Hosting 도메인에서는 authDomain을 현재 도메인으로 맞춤
+// 운영 Hosting 도메인에서는 authDomain을 현재 도메인으로 맞춤
 // (iOS Safari 등 서드파티 저장소 차단 환경에서 리다이렉트 로그인이 동작하도록)
-if (/\.(web\.app|firebaseapp\.com)$/.test(location.hostname)) {
+// 미리보기 채널(프로젝트--채널-xxxx.web.app)은 OAuth 리디렉션 URI에 등록되어 있지 않아
+// redirect_uri_mismatch가 나므로 기본 authDomain(firebaseapp.com) 사용
+if (/^[^.]+\.(web\.app|firebaseapp\.com)$/.test(location.hostname) && !location.hostname.includes('--')) {
   firebaseConfig.authDomain = location.hostname;
 }
 

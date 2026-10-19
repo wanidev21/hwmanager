@@ -2,7 +2,7 @@
 <style>
   .ticket-layout { display:flex; gap:16px; }
   .ticket-list-col { flex:1; min-width:0; }
-  .ticket-detail-col { width:380px; flex-shrink:0; }
+  .ticket-detail-col { width:420px; flex-shrink:0; }
   @media (max-width:768px) {
     .ticket-layout { flex-direction:column; }
     /* 세로 배치에서 flex:1(기준 0)이면 iOS Safari가 높이를 잘못 계산해 상세 하단이 잘림 */
@@ -14,8 +14,36 @@
     .ticket-filters > * { width:100% !important; max-width:none !important; }
   }
   .priority-dot { width:8px; height:8px; border-radius:50%; display:inline-block; margin-right:6px; }
-  .history-item { padding:8px 0; border-bottom:1px solid var(--border); font-size:12px; }
-  .history-item:last-child { border-bottom:none; }
+
+  /* ── 진행 기록 (타임라인) ── */
+  .td-elapsed { font-family:var(--font-mono); font-size:12px; font-weight:700; background:var(--ink); color:var(--bg); padding:3px 7px; white-space:nowrap; }
+  html[data-theme="dark"] .td-elapsed { background:#ECEAE4; color:#111111; }
+  .tl-compose { border:2px solid var(--ink); background:var(--surface-2); padding:10px; margin-top:16px; display:flex; flex-direction:column; gap:8px; }
+  .tl-types { display:flex; flex-wrap:wrap; gap:6px; }
+  .tl-chip { height:32px; padding:0 11px; border:1.5px solid var(--ink); background:var(--surface); color:var(--text); font-family:inherit; font-size:12px; font-weight:800; cursor:pointer; }
+  .tl-chip.on { background:var(--ink); color:var(--bg); }
+  html[data-theme="dark"] .tl-chip.on { background:#ECEAE4; color:#111111; }
+  .tl-compose textarea { min-height:60px; }
+  .tl-compose-foot { display:flex; align-items:center; gap:8px; flex-wrap:wrap; }
+  .tl-when-btn { background:none; border:none; padding:0; font-family:inherit; font-size:12px; font-weight:700; color:var(--text-sub); text-decoration:underline; cursor:pointer; }
+  .tl-when { height:32px !important; width:auto !important; font-size:13px !important; }
+  .tl-head { display:flex; justify-content:space-between; align-items:center; margin:18px 0 6px; font-size:14px; font-weight:900; }
+  .tl-list { border-left:3px solid var(--ink); margin-left:6px; }
+  .tl-item { position:relative; padding:8px 0 10px 16px; }
+  .tl-item::before { content:''; position:absolute; left:-8px; top:13px; width:11px; height:11px; background:var(--surface); border:2.5px solid var(--ink); }
+  .tl-item.auto::before { background:var(--ink); }
+  .tl-item.t-부품::before, .tl-item.t-조치::before { background:var(--primary); }
+  .tl-meta { display:flex; align-items:center; gap:6px; flex-wrap:wrap; font-size:11px; color:var(--text-hint); }
+  .tl-time { font-family:var(--font-mono); font-weight:700; color:var(--text-sub); }
+  .tl-type { font-size:11px; font-weight:800; padding:1px 6px; border:1.5px solid var(--ink); color:var(--text); background:var(--surface); }
+  .tl-item.auto .tl-type { background:var(--surface-2); color:var(--text-sub); border-color:var(--border); }
+  .tl-text { margin-top:4px; font-size:13px; line-height:1.55; white-space:pre-wrap; word-break:break-word; }
+  .tl-item.auto .tl-text { color:var(--text-sub); }
+  .tl-actions { margin-left:auto; display:flex; gap:2px; }
+  .tl-actions button { width:30px; height:30px; border:none; background:none; color:var(--text-hint); cursor:pointer; display:flex; align-items:center; justify-content:center; }
+  .tl-actions button:hover { color:var(--text); background:var(--surface-2); }
+  .tl-edit { display:flex; flex-direction:column; gap:6px; margin-top:6px; }
+  .tl-empty { font-size:12px; color:var(--text-hint); padding:6px 0 4px 16px; }
 </style>
 
 <div id="stat-grid"></div>
@@ -117,6 +145,7 @@ const PRIORITY_COLOR = { '긴급':'#E8430A','높음':'#C99A00','보통':'#1D3A8A
 
 function init() {
   ticketSelectedId = null;
+  tlStop = null; tlTicketId = null; tlLogs = [];   // 페이지 재진입 시 (구독은 loadPage가 해제)
   // 개요에서 '처리중 티켓'을 눌러 들어온 경우
   if (window.hwPageFilter && window.hwPageFilter.page === 'tickets') {
     document.getElementById('filter-status').value = window.hwPageFilter.status || '';
@@ -207,41 +236,291 @@ function renderTickets() {
     </tr>`).join('');
 }
 
+// 진행 기록 종류 (자동: 등록·상태)
+const TL_TYPES = ['점검', '조치', '벤더', '부품', '고객연락', '메모'];
+let tlStop = null;          // 열린 티켓의 기록 구독 해제 함수
+let tlTicketId = null;
+let tlLogs = [];
+let tlType = '점검';        // 마지막으로 고른 종류 유지 (점검 기록을 연달아 남기기 편하도록)
+let tlEditingId = null;
+let tlSaving = false;
+
+function tlUid() { return FS.getCurrentUser()?.uid; }
+function tlDate(v) { if (!v) return null; return v.toDate ? v.toDate() : new Date(v); }
+function tlFmt(d) {
+  if (!d) return '';
+  const p = n => String(n).padStart(2, '0');
+  return `${p(d.getMonth()+1)}.${p(d.getDate())} ${p(d.getHours())}:${p(d.getMinutes())}`;
+}
+function tlLocalInput(d) {   // datetime-local 입력값
+  const p = n => String(n).padStart(2, '0');
+  return `${d.getFullYear()}-${p(d.getMonth()+1)}-${p(d.getDate())}T${p(d.getHours())}:${p(d.getMinutes())}`;
+}
+function tlDur(ms) {
+  if (!(ms > 0)) return '';
+  const m = Math.floor(ms / 60000), h = Math.floor(m / 60), d = Math.floor(h / 24);
+  if (d) return `${d}일 ${h % 24}시간`;
+  if (h) return `${h}시간 ${m % 60}분`;
+  return `${m}분`;
+}
+
+// 등록 시각을 첫 기록으로 합쳐서 시간순(오래된 것 먼저) 정렬
+function tlAllLogs(t) {
+  const created = tlDate(t.created_at);
+  const list = [...tlLogs];
+  if (created) list.push({ id: '_created', type: '등록', text: '티켓 등록', at: created, auto: true });
+  return list.sort((a, b) => (tlDate(a.at) || 0) - (tlDate(b.at) || 0));
+}
+
+function tlElapsed(t) {
+  const created = tlDate(t.created_at);
+  if (!created) return '';
+  if (t.status === '완료') {
+    const done = [...tlLogs].filter(l => l.auto && l.to === '완료').sort((a, b) => tlDate(b.at) - tlDate(a.at))[0];
+    return done ? `완료 · 총 ${tlDur(tlDate(done.at) - created)}` : '완료';
+  }
+  const d = Math.floor((Date.now() - created) / 86400000);
+  return `${t.status || '접수'} · ${d ? d + 1 + '일째' : '오늘 접수'}`;
+}
+
 function showDetail(id, scroll) {
   ticketSelectedId = id;
   const t = allTickets.find(x=>x.id===id);
   if (!t) return;
   document.getElementById('detail-col').style.display='';
-  document.getElementById('detail-panel').innerHTML=`
+
+  // 다른 티켓을 열면 패널 뼈대를 새로 만들고 기록 구독을 바꿈.
+  // 같은 티켓의 실시간 갱신이면 정보 영역만 다시 그림 (입력 중인 기록이 지워지지 않도록)
+  if (tlTicketId !== id || !document.getElementById('td-info')) {
+    if (tlStop) tlStop();
+    tlTicketId = id; tlLogs = []; tlEditingId = null;
+    document.getElementById('detail-panel').innerHTML = `
+      <div id="td-info"></div>
+      <div class="tl-compose">
+        <div class="tl-types" id="tl-types"></div>
+        <textarea class="form-textarea" id="tl-text" rows="2" placeholder="예: HDD fail 확인 (Slot 3)" onkeydown="if((event.ctrlKey||event.metaKey)&&event.key==='Enter')tlAdd()"></textarea>
+        <div class="tl-compose-foot">
+          <button class="tl-when-btn" id="tl-when-btn" onclick="tlToggleWhen()">시간 지정</button>
+          <input type="datetime-local" class="form-input tl-when" id="tl-when" style="display:none;">
+          <span style="flex:1;"></span>
+          <button class="btn btn-primary btn-sm" id="tl-save" onclick="tlAdd()">${FS.icon('plus', 14)} 기록</button>
+        </div>
+      </div>
+      <div class="tl-head">
+        <span>진행 기록</span>
+        <button class="btn btn-sm" onclick="tlCopyReport()">${FS.icon('copy', 14)} 보고용 복사</button>
+      </div>
+      <div id="td-timeline" class="tl-list"></div>`;
+    tlRenderTypes();
+    tlStop = FS.watch([[`tickets/${id}/logs`]], ([logs]) => {
+      if (tlTicketId !== id) return;
+      tlLogs = logs;
+      tlRenderInfo();
+      tlRenderTimeline();
+    });
+  }
+  tlRenderInfo();
+  tlRenderTimeline();
+
+  // 모바일: 상세가 목록 아래에 붙으므로 상세 위치로 스크롤
+  if (scroll && window.innerWidth <= 768) {
+    FS.scrollToEl(document.getElementById('detail-col'));
+  }
+}
+
+function closeTicketDetail() {
+  document.getElementById('detail-col').style.display = 'none';
+  if (tlStop) tlStop();
+  tlStop = null; tlTicketId = null; ticketSelectedId = null;
+}
+
+function tlRenderInfo() {
+  const id = tlTicketId;
+  const t = allTickets.find(x => x.id === id);
+  const box = document.getElementById('td-info');
+  if (!t || !box) return;
+  box.innerHTML = `
     <div class="flex-between mb-2">
-      <span class="badge ${STATUS_BADGE[t.status||'접수']||'badge-gray'}">${FS.esc(t.status||'접수')}</span>
+      <div class="flex gap-2">
+        <span class="badge ${STATUS_BADGE[t.status||'접수']||'badge-gray'}">${FS.esc(t.status||'접수')}</span>
+        <span class="td-elapsed">${FS.esc(tlElapsed(t))}</span>
+      </div>
       <div class="flex gap-1">
         <button class="btn btn-sm" onclick="openModal('${id}')">수정</button>
         <button class="btn btn-sm btn-danger" onclick="deleteTicket('${id}')">삭제</button>
-        <button class="btn btn-ghost btn-sm" onclick="document.getElementById('detail-col').style.display='none'">✕</button>
+        <button class="btn btn-ghost btn-sm" onclick="closeTicketDetail()" aria-label="닫기">${FS.icon('close', 16)}</button>
       </div>
     </div>
-    <h3 style="font-size:15px;font-weight:600;margin-bottom:12px;">${FS.esc(t.title||'')}</h3>
+    <h3 style="font-size:16px;font-weight:800;margin-bottom:12px;line-height:1.4;">${FS.esc(t.title||'')}</h3>
     <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:12px;font-size:12px;">
       <div><span class="text-hint">고객사</span><br>${FS.esc(ticketCusts[t.customer_id]||'-')}</div>
       <div><span class="text-hint">담당자</span><br>${FS.esc(t.assignee||'-')}</div>
-      <div><span class="text-hint">우선순위</span><br><span style="color:${PRIORITY_COLOR[t.priority]||'inherit'}">${FS.esc(t.priority||'-')}</span></div>
+      <div><span class="text-hint">우선순위</span><br><span style="color:${PRIORITY_COLOR[t.priority]||'inherit'};font-weight:800;">${FS.esc(t.priority||'-')}</span></div>
       <div><span class="text-hint">등록일</span><br>${FS.formatDate(t.created_at)||'-'}</div>
-      ${t.completed_at?`<div><span class="text-hint">완료일</span><br><span style="color:var(--success);font-weight:500;">${FS.formatDate(t.completed_at)||'-'}</span></div>`:''}
+      ${t.completed_at?`<div><span class="text-hint">완료일</span><br><span style="color:var(--success);font-weight:700;">${FS.formatDate(t.completed_at)||'-'}</span></div>`:''}
     </div>
-    ${t.symptom?`<div class="mb-2"><div class="text-hint" style="font-size:11px;font-weight:600;text-transform:uppercase;margin-bottom:4px;">증상</div><p style="font-size:13px;white-space:pre-wrap;line-height:1.6;">${FS.esc(t.symptom)}</p></div>`:''}
-    ${t.action?`<div class="mb-2"><div class="text-hint" style="font-size:11px;font-weight:600;text-transform:uppercase;margin-bottom:4px;">조치내용</div><p style="font-size:13px;white-space:pre-wrap;line-height:1.6;">${FS.esc(t.action)}</p></div>`:''}
+    ${t.symptom?`<div class="mb-2"><div class="text-hint" style="font-size:11px;font-weight:800;margin-bottom:4px;">증상</div><p style="font-size:13px;white-space:pre-wrap;line-height:1.6;">${FS.esc(t.symptom)}</p></div>`:''}
+    ${t.action?`<div class="mb-2"><div class="text-hint" style="font-size:11px;font-weight:800;margin-bottom:4px;">조치내용 (최종)</div><p style="font-size:13px;white-space:pre-wrap;line-height:1.6;">${FS.esc(t.action)}</p></div>`:''}
     <div class="mt-3">
       <label class="form-label">상태 변경</label>
-      <div class="flex gap-1">
+      <div class="flex gap-1" style="flex-wrap:wrap;">
         ${['접수','진행중','보류','완료'].map(s=>`
           <button class="btn btn-sm ${t.status===s?'btn-primary':''}" onclick="changeStatus('${id}','${s}')">${s}</button>
         `).join('')}
       </div>
     </div>`;
-  // 모바일: 상세가 목록 아래에 붙으므로 상세 위치로 스크롤
-  if (scroll && window.innerWidth <= 768) {
-    FS.scrollToEl(document.getElementById('detail-col'));
+}
+
+function tlRenderTypes() {
+  document.getElementById('tl-types').innerHTML = TL_TYPES.map(ty =>
+    `<button class="tl-chip${ty === tlType ? ' on' : ''}" onclick="tlPickType('${ty}')">${ty}</button>`).join('');
+}
+function tlPickType(ty) { tlType = ty; tlRenderTypes(); document.getElementById('tl-text').focus(); }
+
+function tlToggleWhen() {
+  const el = document.getElementById('tl-when');
+  const show = el.style.display === 'none';
+  el.style.display = show ? '' : 'none';
+  document.getElementById('tl-when-btn').textContent = show ? '지금 시간으로' : '시간 지정';
+  if (show && !el.value) el.value = tlLocalInput(new Date());
+  if (!show) el.value = '';
+}
+
+function tlRenderTimeline() {
+  const t = allTickets.find(x => x.id === tlTicketId);
+  const box = document.getElementById('td-timeline');
+  if (!t || !box) return;
+  const uid = tlUid();
+  const list = tlAllLogs(t).reverse();   // 최신이 위
+  box.innerHTML = list.length ? list.map(l => {
+    const mine = !l.auto && l.by === uid;
+    if (l.id === tlEditingId) {
+      return `<div class="tl-item t-${FS.esc(l.type)}">
+        <div class="tl-edit">
+          <div class="flex gap-1" style="flex-wrap:wrap;">
+            <select class="form-select" id="tl-e-type" style="width:auto;height:32px;">${TL_TYPES.map(ty => `<option${ty === l.type ? ' selected' : ''}>${ty}</option>`).join('')}</select>
+            <input type="datetime-local" class="form-input tl-when" id="tl-e-at" value="${tlLocalInput(tlDate(l.at) || new Date())}">
+          </div>
+          <textarea class="form-textarea" id="tl-e-text" rows="2">${FS.esc(l.text || '')}</textarea>
+          <div class="flex gap-1" style="justify-content:flex-end;">
+            <button class="btn btn-sm" onclick="tlEditingId=null;tlRenderTimeline()">취소</button>
+            <button class="btn btn-primary btn-sm" onclick="tlSaveEdit('${l.id}')">저장</button>
+          </div>
+        </div>
+      </div>`;
+    }
+    return `<div class="tl-item t-${FS.esc(l.type)}${l.auto ? ' auto' : ''}">
+      <div class="tl-meta">
+        <span class="tl-time">${tlFmt(tlDate(l.at))}</span>
+        <span class="tl-type">${FS.esc(l.type)}</span>
+        ${l.by_name ? `<span>${FS.esc(l.by_name)}</span>` : ''}
+        ${mine ? `<span class="tl-actions">
+          <button onclick="tlEditingId='${l.id}';tlRenderTimeline()" aria-label="기록 수정">${FS.icon('edit', 15)}</button>
+          <button onclick="tlDelete('${l.id}')" aria-label="기록 삭제">${FS.icon('trash', 15)}</button>
+        </span>` : ''}
+      </div>
+      <div class="tl-text">${FS.esc(l.text || '')}</div>
+    </div>`;
+  }).join('') : '<div class="tl-empty">아직 기록이 없습니다</div>';
+}
+
+function tlLogsRef(ticketId) { return firebase.firestore().collection('tickets').doc(ticketId).collection('logs'); }
+function tlAuthor() {
+  const u = FS.getCurrentUser();
+  return { by: u.uid, by_name: u.displayName || u.email || '' };
+}
+
+async function tlAdd() {
+  if (tlSaving || !tlTicketId) return;
+  const textEl = document.getElementById('tl-text');
+  const text = textEl.value.trim();
+  if (!text) { Toast.error('내용을 입력하세요'); textEl.focus(); return; }
+  const whenEl = document.getElementById('tl-when');
+  const when = whenEl.style.display !== 'none' && whenEl.value ? new Date(whenEl.value) : null;
+  tlSaving = true;
+  document.getElementById('tl-save').disabled = true;
+  try {
+    await tlLogsRef(tlTicketId).add({
+      type: tlType, text,
+      at: when ? firebase.firestore.Timestamp.fromDate(when) : firebase.firestore.FieldValue.serverTimestamp(),
+      ...tlAuthor(), auto: false,
+      created_at: firebase.firestore.FieldValue.serverTimestamp(),
+    });
+    textEl.value = '';
+    if (when) tlToggleWhen();
+    textEl.focus();   // 같은 종류로 바로 다음 기록
+  } catch (e) {
+    Toast.error('기록 실패: ' + (e.code || e.message));
+  } finally {
+    tlSaving = false;
+    const b = document.getElementById('tl-save');
+    if (b) b.disabled = false;
+  }
+}
+
+// 상태가 바뀔 때 자동 기록
+async function tlAutoStatus(ticketId, from, to) {
+  try {
+    await tlLogsRef(ticketId).add({
+      type: '상태', text: `${from || '접수'} → ${to}`, to,
+      at: firebase.firestore.FieldValue.serverTimestamp(),
+      ...tlAuthor(), auto: true,
+      created_at: firebase.firestore.FieldValue.serverTimestamp(),
+    });
+  } catch (e) { console.warn('상태 기록 실패', e); }
+}
+
+async function tlSaveEdit(logId) {
+  const text = document.getElementById('tl-e-text').value.trim();
+  const atVal = document.getElementById('tl-e-at').value;
+  if (!text) { Toast.error('내용을 입력하세요'); return; }
+  try {
+    await tlLogsRef(tlTicketId).doc(logId).update({
+      type: document.getElementById('tl-e-type').value,
+      text,
+      ...(atVal ? { at: firebase.firestore.Timestamp.fromDate(new Date(atVal)) } : {}),
+      updated_at: firebase.firestore.FieldValue.serverTimestamp(),
+    });
+    tlEditingId = null;
+    tlRenderTimeline();
+  } catch (e) {
+    Toast.error('수정 실패: ' + (e.code || e.message));
+  }
+}
+
+async function tlDelete(logId) {
+  if (!await Dialog.confirm('이 기록을 삭제하시겠습니까?', true)) return;
+  try { await tlLogsRef(tlTicketId).doc(logId).delete(); }
+  catch (e) { Toast.error('삭제 실패: ' + (e.code || e.message)); }
+}
+
+// 보고서·메일에 붙여 넣을 수 있는 시간순 정리
+async function tlCopyReport() {
+  const t = allTickets.find(x => x.id === tlTicketId);
+  if (!t) return;
+  const lines = [
+    `[장애 보고] ${t.title || ''}${ticketCusts[t.customer_id] ? ' / ' + ticketCusts[t.customer_id] : ''}`,
+    `상태: ${t.status || '접수'}${t.priority ? ' · 우선순위 ' + t.priority : ''}${t.assignee ? ' · 담당 ' + t.assignee : ''}`,
+  ];
+  if (t.symptom) lines.push('', '■ 증상', t.symptom);
+  lines.push('', '■ 진행 경과');
+  tlAllLogs(t).forEach(l => {
+    const body = (l.text || '').split('\n').join('\n    ');
+    lines.push(`- ${tlFmt(tlDate(l.at))} [${l.type}] ${body}`);
+  });
+  if (t.action) lines.push('', '■ 조치 결과', t.action);
+  const el = tlElapsed(t);
+  if (el.includes('총')) lines.push('', el.replace('완료 · ', ''));
+  const text = lines.join('\n');
+  try {
+    await navigator.clipboard.writeText(text);
+    Toast.success('진행 경과를 복사했습니다');
+  } catch (e) {
+    // 클립보드 권한이 없으면 선택 가능한 창으로
+    const ta = document.createElement('textarea');
+    ta.value = text; document.body.appendChild(ta); ta.select();
+    document.execCommand('copy'); ta.remove();
+    Toast.success('진행 경과를 복사했습니다');
   }
 }
 
@@ -254,6 +533,7 @@ async function changeStatus(id, status) {
     completed_at: status === '완료' ? today : null,
   };
   await FS.update('tickets', id, updateData);
+  tlAutoStatus(id, cur?.status, status);
   const t = allTickets.find(x=>x.id===id);
   if (t) {
     t.status = status;
@@ -327,7 +607,9 @@ async function saveTicket() {
     data.completed_at = null;
   }
   if (id) {
+    const before = allTickets.find(x=>x.id===id);
     await FS.update('tickets', id, data);
+    if (before && (before.status || '접수') !== status) tlAutoStatus(id, before.status, status);
     const idx = allTickets.findIndex(x=>x.id===id);
     if (idx >= 0) allTickets[idx] = {...allTickets[idx], ...data};
     Toast.success('티켓이 수정되었습니다');
@@ -343,10 +625,18 @@ async function saveTicket() {
 }
 
 async function deleteTicket(id) {
-  if (!await Dialog.confirm('이 티켓을 삭제하시겠습니까?', true)) return;
-  await FS.remove('tickets', id);
+  const t = allTickets.find(x=>x.id===id);
+  if (!await Dialog.confirm(`'${t?.title || ''}' 티켓을 삭제하시겠습니까?\n진행 기록도 함께 삭제됩니다.`, true)) return;
+  try {
+    const logs = await tlLogsRef(id).get();
+    await Promise.allSettled(logs.docs.map(d => d.ref.delete()));
+    await FS.remove('tickets', id);
+  } catch (e) {
+    Toast.error('삭제 실패: ' + (e.code || e.message));
+    return;
+  }
   allTickets = allTickets.filter(x=>x.id!==id);
-  document.getElementById('detail-col').style.display='none';
+  closeTicketDetail();
   renderStats();
   renderTickets();
   Toast.success('티켓이 삭제되었습니다');

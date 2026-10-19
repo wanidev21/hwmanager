@@ -183,18 +183,51 @@
   <script>
     const btn = document.getElementById('btn-google');
 
+    // ── 로그인 후 기록 정리 ──
+    // 모바일 리다이렉트 로그인은 [로그인, Google 화면들, 로그인(복귀)] 기록을 남긴다.
+    // 그대로 앱으로 가면 앱에서 '한 번 더 뒤로'가 종료가 아니라 이 기록들로 돌아가므로,
+    // 로그인 성공 시 처음 로그인 기록(base)까지 되감은 뒤 그 자리를 앱(/)으로 교체한다.
+    // 되감기로 base 문서가 다시 열리면 hw-go-home 표시를 보고 바로 앱으로 교체
+    if (sessionStorage.getItem('hw-go-home')) {
+      sessionStorage.removeItem('hw-go-home');
+      location.replace('/');
+    }
+    window.addEventListener('pageshow', e => {
+      if (e.persisted && sessionStorage.getItem('hw-go-home')) {
+        sessionStorage.removeItem('hw-go-home');
+        location.replace('/');
+      }
+    });
+    const HIST_KEY = 'hw-login-base';
+    function goHome() {
+      const base = parseInt(sessionStorage.getItem(HIST_KEY) ?? '-1');
+      sessionStorage.removeItem(HIST_KEY);
+      const delta = base - (history.length - 1);
+      if (base >= 0 && delta < 0) {
+        sessionStorage.setItem('hw-go-home', '1');
+        setTimeout(() => location.replace('/'), 1500);   // 되감기가 안 된 경우 대비
+        history.go(delta);
+      } else {
+        location.replace('/');
+      }
+    }
+
     // ── 뒤로가기 → 종료 안내 (모바일·설치된 앱) ──
     // 기록 구조 [보호용(guard), 로그인]. 뒤로가기로 guard에 오면 안내를 띄우고,
     // 거기서 한 번 더 누르면 기록 밖으로 나가 앱 종료 (스크립트로는 앱을 닫을 수 없음)
     // 뒤로가기로 이 페이지에 온 경우 (앱 → 뒤로 → 로그인 기록). 로그인 상태여도 앱으로 되돌려 보내지 않음
     const navEntry = performance.getEntriesByType('navigation')[0];
     const cameBack = !!navEntry && navEntry.type === 'back_forward';
+    // 리다이렉트 로그인에서 돌아온 경우가 아니면 지금 위치를 기준(base)으로 기록
+    const returning = !!sessionStorage.getItem('hw-login-pending');
+    if (!cameBack && !returning) sessionStorage.setItem(HIST_KEY, String(history.length - 1));
 
-    if (!cameBack && (matchMedia('(display-mode: standalone)').matches || matchMedia('(pointer: coarse)').matches)) {
+    if (!cameBack && !returning && (matchMedia('(display-mode: standalone)').matches || matchMedia('(pointer: coarse)').matches)) {
       const exitOverlay = document.getElementById('exit-overlay');
       history.replaceState({ guard: true }, '');
       history.pushState({}, '');
       window.addEventListener('popstate', e => {
+        if (sessionStorage.getItem('hw-go-home')) { sessionStorage.removeItem('hw-go-home'); location.replace('/'); return; }
         if (e.state && e.state.guard) exitOverlay.classList.add('show');
       });
       document.getElementById('exit-stay').addEventListener('click', () => {
@@ -230,7 +263,7 @@
         const result = await FS.loginWithGoogle();
         if (!result) return; // 리다이렉트 방식: 페이지 이동 후 아래 bootstrap에서 처리
         await FS.completeLogin(result);
-        window.location.replace('/');
+        goHome();
       } catch (e) {
         sessionStorage.removeItem('hw-login-pending');
         handleLoginError(e);
@@ -247,7 +280,7 @@
         const result = await FS.handleRedirectResult();
         if (result && result.user) {
           await FS.completeLogin(result);
-          window.location.replace('/');
+          goHome();
           return;
         }
       } catch (e) {
@@ -282,7 +315,7 @@
         btn.textContent = '로그인 중...';
         try {
           await FS.completeLogin({ user });
-          window.location.replace('/');
+          goHome();
         } catch (e) {
           handled = false;
           handleLoginError(e);

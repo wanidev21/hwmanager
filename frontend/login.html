@@ -17,13 +17,15 @@
   <script src="/static/js/firebase-service.js"></script>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Black+Han+Sans&family=Gothic+A1:wght@400;500;700;800&family=Space+Mono:wght@400;700&display=swap">
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Black+Han+Sans&family=Space+Mono:wght@400;700&display=swap">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/variable/pretendardvariable-dynamic-subset.min.css">
   <style>
     /* 시그널 디자인 (app.css와 같은 톤: 콘크리트·검정·안전 주황) */
     * { box-sizing: border-box; margin: 0; padding: 0; }
 
     body {
-      font-family: 'Gothic A1', -apple-system, 'Noto Sans KR', sans-serif;
+      font-family: 'Pretendard Variable', Pretendard, -apple-system, 'Noto Sans KR', sans-serif;
+      font-synthesis: none;   /* 굵기가 없는 글꼴을 억지로 두껍게 그려 뭉개지는 것 방지 */
       background: #ECEAE4;
       display: flex;
       align-items: center;
@@ -137,7 +139,7 @@
       background: #ffffff; border: 2px solid #111111; width: 100%; max-width: 320px;
       padding: 22px 20px 18px; box-shadow: 6px 6px 0 #111111;
     }
-    .exit-title { font-family: 'Black Han Sans', sans-serif; font-size: 22px; margin-bottom: 8px; }
+    .exit-title { font-size: 20px; font-weight: 900; letter-spacing: -0.02em; margin-bottom: 8px; }
     .exit-msg { font-size: 13px; font-weight: 600; color: #4A4740; line-height: 1.6; margin-bottom: 18px; }
     .exit-btn {
       width: 100%; height: 48px; border: 2px solid #111111;

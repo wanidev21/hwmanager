@@ -25,8 +25,9 @@
   --radius: 0px;
   --radius-lg: 0px;
   --shadow: none;
-  --font-body: 'Gothic A1', -apple-system, 'Noto Sans KR', sans-serif;
-  --font-display: 'Black Han Sans', 'Gothic A1', sans-serif;
+  --font-body: 'Pretendard Variable', Pretendard, -apple-system, 'Noto Sans KR', sans-serif;
+  --font-display: 'Black Han Sans', 'Pretendard Variable', sans-serif;   /* 큰 숫자·대형 제목(28px+) 전용: 작게 쓰면 윈도우에서 뭉개짐 */
+  --font-heading: 'Pretendard Variable', Pretendard, sans-serif;           /* 작은 제목: 800 굵기 */
   --font-mono: 'Space Mono', ui-monospace, monospace;
 }
 
@@ -36,6 +37,8 @@ a { cursor: pointer; }
 
 body {
   font-family: var(--font-body);
+  font-synthesis: none;   /* 굵기가 없는 글꼴(Black Han Sans 등)을 억지로 두껍게 그려 뭉개지는 것 방지 */
+  -webkit-font-smoothing: antialiased;
   font-size: 13px;
   color: var(--text);
   background: var(--bg);
@@ -110,10 +113,10 @@ body {
   flex-shrink: 0;
 }
 .sidebar-logo .logo-text {
-  font-family: var(--font-display);
-  font-size: 18px;
-  font-weight: 400;
-  letter-spacing: 0.01em;
+  font-family: var(--font-heading);
+  font-size: 17px;
+  font-weight: 900;
+  letter-spacing: -0.02em;
   color: #ECEAE4;
 }
 
@@ -210,9 +213,10 @@ body {
 
 /* ── 콘텐츠 ── */
 .page-title {
-  font-family: var(--font-display);
+  font-family: var(--font-heading);
   font-size: 22px;
-  font-weight: 400;
+  font-weight: 800;
+  letter-spacing: -0.02em;
   color: var(--text);
   margin-bottom: 20px;
 }
@@ -453,10 +457,10 @@ body {
 }
 .modal-title,
 .modal-header h3 {
-  font-family: var(--font-display);
-  font-size: 18px;
-  font-weight: 400;
-  letter-spacing: 0.01em;
+  font-family: var(--font-heading);
+  font-size: 17px;
+  font-weight: 800;
+  letter-spacing: -0.01em;
 }
 
 .modal-close {
@@ -803,7 +807,7 @@ html[data-theme="dark"] .toast { background: #2c2c2a; border: 1px solid #3e3e3c;
 /* 상단 제목 */
 .topbar-title { display:flex; align-items:baseline; gap:8px; min-width:0; }
 .topbar-group { font-size:12px; font-weight:700; color:var(--text-hint); white-space:nowrap; }
-.topbar-page  { font-family:var(--font-display); font-size:20px; color:var(--text); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.topbar-page  { font-family:var(--font-heading); font-size:18px; font-weight:800; letter-spacing:-0.02em; color:var(--text); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
 
 /* 하단 탭 바 (모바일 전용, 데스크탑 숨김) */
 .tabbar { display:none; }

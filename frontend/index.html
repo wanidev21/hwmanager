@@ -56,7 +56,7 @@
           <span class="nav-icon"><i data-icon="calendar"></i></span> 캘린더
         </a>
 
-        <div class="nav-group-label">지식·기술</div>
+        <div class="nav-group-label">지식·기술 <span class="nav-group-note">개인</span></div>
         <a class="nav-item" data-page="kb" href="#">
           <span class="nav-icon"><i data-icon="book"></i></span> 지식베이스
         </a>
@@ -98,6 +98,8 @@
     <main class="main">
       <div class="topbar">
         <button class="topbar-menu-btn" id="btn-menu" title="메뉴" aria-label="메뉴 열기"><i data-icon="menu" data-size="22"></i></button>
+        <!-- 뒤로 가기: 상세를 열었거나 다른 화면에서 넘어온 경우에만 표시. 동작은 폰 뒤로 가기와 같음 -->
+        <button class="topbar-back" id="btn-back" aria-label="뒤로"><i data-icon="back" data-size="18"></i><span id="btn-back-label"></span></button>
         <div class="topbar-title">
           <span id="page-group" class="topbar-group"></span>
           <span id="breadcrumb-sep" class="topbar-group" style="display:none;">/</span>
@@ -200,21 +202,34 @@
     }
 
     // 페이지 로드
-    // opts.fromHistory: 뒤로가기로 온 경우 (기록을 새로 쌓지 않음)
+    // opts.fromHistory: 뒤로가기로 온 경우 (기록을 새로 쌓지 않음, opts.leaving = 떠난 기록)
+    // opts.nav: 메뉴·탭으로 이동 (뒤로 가기 버튼 없음). 그 외(화면 안의 링크)는 '‹ 원래 화면' 버튼 표시
+    // opts.scroll: 복원할 스크롤 위치
     async function loadPage(page, opts = {}) {
       if (currentPage === page) return;
 
       // 페이지가 이탈 확인을 요청한 경우 (예: 납품확인서 작성 중 저장 안 한 내용)
       if (typeof window.beforePageLeave === 'function') {
         if (!(await window.beforePageLeave())) {
-          if (opts.fromHistory) _pushHistory(currentPage || 'overview');   // 뒤로가기로 빠진 기록 복구
+          if (opts.fromHistory && opts.leaving) _pushState(opts.leaving);   // 뒤로가기로 빠진 기록 복구
           return;
         }
         window.beforePageLeave = null;
       }
 
-      // 뒤로가기 지원: 화면 이동을 브라우저 기록에 남김
-      if (!opts.fromHistory) _pushHistory(page);
+      // 뒤로가기 지원: 화면 이동을 브라우저 기록에 남김.
+      // 떠나는 화면의 상태(열린 상세·필터·스크롤)는 그 기록에 저장 → 돌아오면 그대로 복원
+      if (!opts.fromHistory) {
+        const v = _viewState();
+        if (currentPage) _replaceState({ ...(history.state || {}), view: v });
+        const f = window.hwPageFilter && window.hwPageFilter.page === page ? { ...window.hwPageFilter } : null;
+        if (f) delete f.newFor;   // 등록 창 미리 채우기는 한 번만 (앞으로 가기·새로고침 때 다시 열리지 않도록)
+        const arrivalKey = !f ? '' : f.ticketId ? 'ticket:' + f.ticketId : f.jobId ? 'job:' + f.jobId : f.assetId ? 'asset:' + f.assetId : '';
+        _pushHistory(page, (opts.nav || !currentPage) ? {} : {
+          link: true, filter: f, arrivalKey,
+          from: { page: currentPage, label: v.label || PAGE_TITLES[currentPage] || '' },
+        });
+      }
 
       // 이전 페이지의 실시간 구독 해제
       FS.unwatchAll();
@@ -230,6 +245,7 @@
       }
 
       currentPage = page;
+      window.pageViewState = null;   // 이 화면이 정의하지 않으면 이전 화면 것이 남지 않도록 (스냅샷 저장 뒤)
 
       document.querySelectorAll('.nav-item, .tab-item').forEach(el => {
         el.classList.toggle('active', el.dataset.page === page);
@@ -309,6 +325,8 @@
           Object.assign(window, _pageGlobals[page]);
           if (typeof window.init === 'function') window.init();
         }
+        if (opts.scroll) _restoreScroll(page, opts.scroll);
+        _updateBack();
       } catch (e) {
         console.error('Page load error:', page, e);
         if (currentPage !== page) return;
@@ -343,7 +361,7 @@
       document.querySelectorAll('.nav-item').forEach(el => el.classList.remove('active'));
       currentPage = null;
       closeSidebar();
-      loadPage('overview');
+      loadPage('overview', { nav: true });
     });
 
     // ── 뒤로가기 (안드로이드 뒤로 버튼·브라우저 뒤로) ──
@@ -360,40 +378,85 @@
       // 3) 모바일 사이드 메뉴
       if (sidebar.classList.contains('open')) { closeSidebar(); return true; }
       // 4) 화면별 한 단계 뒤로
-      if (document.querySelector('#page-content #view-edit.active') && typeof window.showList === 'function') {
-        window.showList(); return true;                               // 납품확인서 편집 → 목록
-      }
-      if (_visible(document.querySelector('#page-content #asset-panel')) && typeof window.backToProjects === 'function') {
-        window.backToProjects(); return true;                         // 고객사: 장비 → 프로젝트
-      }
-      if (_visible(document.querySelector('#page-content #proj-panel')) && typeof window.closeCustomerPanel === 'function') {
-        window.closeCustomerPanel(); return true;                     // 고객사: 프로젝트 → 고객사 목록
-      }
-      // 티켓 상세는 구독 해제·목록 복귀까지 하는 전용 닫기 사용
-      if (_visible(document.querySelector('#page-content #job-detail-col')) && typeof window.closeJobDetail === 'function') {
-        window.closeJobDetail(); return true;                         // 작업 상세 → 목록
-      }
-      if (_visible(document.querySelector('#page-content #detail-col')) && currentPage === 'tickets' && typeof window.closeTicketDetail === 'function') {
-        window.closeTicketDetail(); return true;
-      }
-      for (const id of ['detail-col', 'kb-detail-col', 'note-detail', 'proj-asset-panel']) {   // 티켓·KB·사내장비·기술노트·워런티 상세 패널
-        const el = document.querySelector('#page-content #' + id);
-        if (_visible(el)) { el.style.display = 'none'; return true; }
-      }
+      const layer = _pageLayer();
+      if (layer) { layer.close(); return true; }
       return false;
     }
 
+    // 화면 안에서 열린 단계 (상세·패널). label = 뒤로 가기 버튼에 표시할 '돌아갈 곳'
+    function _pageLayer() {
+      const q = id => document.querySelector('#page-content #' + id);
+      const fn = name => typeof window[name] === 'function';
+      if (document.querySelector('#page-content #view-edit.active') && fn('showList'))
+        return { label: '목록', close: () => window.showList() };                     // 납품확인서 편집 → 목록
+      if (_visible(q('asset-panel')) && fn('backToProjects'))
+        return { label: '프로젝트', close: () => window.backToProjects() };          // 고객사: 장비 → 프로젝트
+      if (_visible(q('proj-panel')) && fn('closeCustomerPanel'))
+        return { label: '고객사 목록', close: () => window.closeCustomerPanel() };   // 고객사: 프로젝트 → 고객사 목록
+      if (_visible(q('job-detail-col')) && fn('closeJobDetail'))
+        return { label: '작업 목록', close: () => window.closeJobDetail() };
+      // 티켓 상세는 구독 해제·목록 복귀까지 하는 전용 닫기 사용
+      if (_visible(q('detail-col')) && currentPage === 'tickets' && fn('closeTicketDetail'))
+        return { label: '티켓 목록', close: () => window.closeTicketDetail() };
+      for (const id of ['detail-col', 'kb-detail-col', 'note-detail', 'proj-asset-panel']) {   // KB·사내장비·기술노트·워런티 상세 패널
+        const el = q(id);
+        if (_visible(el)) return { label: '목록', close: () => { el.style.display = 'none'; } };
+      }
+      return null;
+    }
+
+    // 화면이 알려 주는 현재 상태 {filter, key, label} + 스크롤 (pageViewState()를 정의한 화면만)
+    function _pageView() {
+      try { return typeof window.pageViewState === 'function' ? (window.pageViewState() || null) : null; }
+      catch (e) { console.warn('pageViewState', e); return null; }
+    }
+    function _viewState() {
+      const box = document.getElementById('page-content');
+      return { ...(_pageView() || {}), scroll: box ? box.scrollTop : 0 };
+    }
+
     // 기록마다 순번 n을 둠 (FS.toLogin()이 로그아웃 때 첫 기록까지 되감는 데 사용)
-    function _pushHistory(page) {
-      history.pushState({ page, n: ((history.state && history.state.n) || 0) + 1 }, '');
+    let _curState = history.state;   // 지금 보고 있는 기록 (뒤로 갈 때 '떠나는 기록'을 알기 위해)
+    function _pushState(st) { history.pushState(st, ''); _curState = st; }
+    function _replaceState(st) { history.replaceState(st, ''); _curState = st; }
+    function _pushHistory(page, extra = {}) {
+      _pushState({ page, n: ((history.state && history.state.n) || 0) + 1, ...extra });
+    }
+    // 기록에 저장된 상태를 다음에 열 화면에 넘김 (각 화면 init()이 hwPageFilter로 복원)
+    function _restoreFilter(st) {
+      const f = { ...(st.filter || {}), ...((st.view && st.view.filter) || {}) };
+      window.hwPageFilter = Object.keys(f).length ? { ...f, page: st.page } : null;
+    }
+    // 목록이 실시간 데이터로 그려진 뒤 스크롤 위치 복원 (최대 3초 대기)
+    function _restoreScroll(page, y) {
+      const box = document.getElementById('page-content');
+      const started = Date.now();
+      (function tryIt() {
+        if (currentPage !== page) return;
+        if (box.scrollHeight - box.clientHeight >= y - 4) { box.scrollTop = y; return; }
+        if (Date.now() - started < 3000) setTimeout(tryIt, 100);
+      })();
+    }
+
+    // 다른 화면에서 '이것'을 열려고 넘어온 상태 그대로인가 (예: 홈 → 티켓 A 상세)
+    // → 뒤로 가기는 목록을 거치지 않고 바로 원래 화면으로
+    function _isArrivalView(st) {
+      if (!st || !st.link || !st.arrivalKey || st.page !== currentPage) return false;
+      if (document.getElementById('_dlg-cancel') || sidebar.classList.contains('open')) return false;
+      // 입력 창 등이 열려 있으면 그것부터 닫음 (장비 상세처럼 '보기' 창은 data-view-layer로 표시해 예외)
+      if ([...document.querySelectorAll('.modal-overlay')].some(m => _visible(m) && !m.hasAttribute('data-view-layer'))) return false;
+      return (_pageView() || {}).key === st.arrivalKey;
     }
 
     window.addEventListener('popstate', e => {
       if (FS._leaving) return;   // 로그아웃으로 기록을 되감는 중
       const state = e.state || {};
-      // 창·메뉴를 닫았으면 현재 화면에 머무름 (소비된 기록을 다시 채움)
-      if (_closeTopLayer()) {
-        _pushHistory(currentPage || 'overview');
+      const leaving = _curState || {};
+      _curState = state;
+      // 창·메뉴·상세를 닫았으면 현재 화면에 머무름 (소비된 기록을 다시 채움)
+      if (!_isArrivalView(leaving) && _closeTopLayer()) {
+        _pushState(leaving);
+        _updateBack();
         return;
       }
       if (state.guard) {
@@ -403,15 +466,52 @@
         return;
       }
       closeSidebar();
-      loadPage(state.page || 'overview', { fromHistory: true });
+      if (state.page === currentPage) { _updateBack(); return; }
+      _restoreFilter(state);
+      loadPage(state.page || 'overview', { fromHistory: true, leaving, scroll: state.view && state.view.scroll });
     });
+
+    // ── 상단 뒤로 가기 버튼 ── 누르면 폰 뒤로 가기와 똑같이 처리 (위 popstate)
+    const btnBack = document.getElementById('btn-back');
+    const btnBackLabel = document.getElementById('btn-back-label');
+    function _updateBack() {
+      const st = history.state || {};
+      const fromLabel = st.link && st.from ? (st.from.label || PAGE_TITLES[st.from.page] || '이전 화면') : '';
+      let label = '';
+      if (_isArrivalView(st)) label = fromLabel;
+      else { const l = _pageLayer(); label = l ? l.label : fromLabel; }
+      btnBack.classList.toggle('show', !!label);
+      btnBackLabel.textContent = label;
+      btnBack.title = label ? label + '(으)로 돌아가기' : '';
+    }
+    btnBack.addEventListener('click', () => history.back());
+    // 화면 안에서 상세를 열고 닫을 때마다 버튼 갱신 (각 화면 코드를 고치지 않도록 DOM 변화를 감지)
+    let _backTimer = 0;
+    new MutationObserver(() => {
+      _scheduleSaveView();
+      if (_backTimer) return;
+      _backTimer = setTimeout(() => { _backTimer = 0; _updateBack(); }, 30);
+    }).observe(document.getElementById('page-content'), { subtree: true, childList: true, attributes: true, attributeFilter: ['style', 'class'] });
+
+    // 지금 화면 상태를 현재 기록에 저장 → 새로고침·앱 재실행 때 그대로 (화면이 바뀌거나 스크롤할 때마다, 잠시 모아서)
+    // pagehide만으로는 새로고침 때 저장되지 않는 경우가 있어 변화가 있을 때마다 저장
+    const _saveView = () => {
+      clearTimeout(_saveViewTimer);
+      if (currentPage && history.state && !history.state.guard && history.state.page === currentPage && !FS._leaving)
+        _replaceState({ ...history.state, view: _viewState() });
+    };
+    let _saveViewTimer = 0;
+    function _scheduleSaveView() { clearTimeout(_saveViewTimer); _saveViewTimer = setTimeout(_saveView, 400); }
+    document.getElementById('page-content').addEventListener('scroll', _scheduleSaveView, { passive: true });
+    window.addEventListener('pagehide', _saveView);
+    document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'hidden') _saveView(); });
 
     // 네비 클릭
     document.querySelectorAll('.nav-item[data-page], .tab-item[data-page]').forEach(el => {
       el.addEventListener('click', e => {
         e.preventDefault();
         closeSidebar();
-        loadPage(el.dataset.page);
+        loadPage(el.dataset.page, { nav: true });
       });
     });
     // 탭 바 '더보기' → 전체 메뉴(사이드바)
@@ -433,7 +533,6 @@
     document.getElementById('btn-logout').addEventListener('click', async () => {
       if (!await Dialog.confirm('로그아웃하시겠습니까?')) return;   // 테마 버튼 옆이라 오터치 방지
       localStorage.removeItem('hw-last-active');
-      localStorage.removeItem('gAccessToken');
       await FS.logout();
       FS.toLogin();
     });
@@ -476,7 +575,6 @@
       }
       _removeWarn();
       localStorage.removeItem('hw-last-active');
-      localStorage.removeItem('gAccessToken');
       await FS.logout();
       FS.toLogin();
     }
@@ -574,16 +672,6 @@
       }
     };
 
-    // 모바일 Google 캘린더 재연결(리다이렉트) 후 돌아온 경우 토큰 저장
-    FS.handleRedirectResult().then(result => {
-      const token = result?.credential?.accessToken;
-      if (token) {
-        localStorage.setItem('gAccessToken', token);
-        Toast.success('Google 캘린더가 다시 연결되었습니다');
-        if (document.getElementById('cal-grid') && typeof window.refreshCalendar === 'function') window.refreshCalendar();
-      }
-    }).catch(e => console.warn('redirect result', e));
-
     // 뒤로가기 캐시(bfcache)에서 복원됐는데 로그아웃 상태면 화면을 보여 주지 않고 로그인으로
     window.addEventListener('pageshow', e => {
       if (e.persisted && !FS.getCurrentUser()) {
@@ -630,21 +718,16 @@
       // 새로고침: 기존 기록(n 번호)을 그대로 두고 보던 화면 복원
       const st = history.state;
       if (st && typeof st.n === 'number' && !st.guard) {
-        loadPage(st.page || 'overview', { fromHistory: true });
+        _curState = st;
+        _restoreFilter(st);
+        loadPage(st.page || 'overview', { fromHistory: true, scroll: st.view && st.view.scroll });
         return;
       }
       // 기본 페이지: 개요
       // 기록 구조 [보호용(guard), 개요] — 개요에서 뒤로가기 시 바로 앱이 꺼지지 않도록
-      history.replaceState({ page: 'overview', guard: true, n: 0 }, '');
+      _replaceState({ page: 'overview', guard: true, n: 0 });
       _pushHistory('overview');
       loadPage('overview', { fromHistory: true });
-
-      // 리다이렉트(캘린더 재연결 등)로 앱을 잠시 떠났다 온 경우 보던 화면으로 복귀
-      const returnPage = localStorage.getItem('hw-return-page');
-      if (returnPage) {
-        localStorage.removeItem('hw-return-page');
-        if (PAGE_TITLES[returnPage]) loadPage(returnPage);
-      }
     });
   </script>
 </body>

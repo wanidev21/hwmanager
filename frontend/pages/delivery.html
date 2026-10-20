@@ -66,6 +66,7 @@
 @media (max-width:768px) {
   /* 폰: 목록 행 터치 → 미리보기 (미리보기에서 수정·서명 가능, 목록의 인쇄·수정·삭제 버튼 열은 숨김) */
   .dn-col-opt, .dn-pc-only { display:none !important; }
+  .dn-list-toolbar .form-select { width:auto !important; }
   .dn-list-toolbar { flex-wrap:wrap; gap:8px; margin-bottom:14px; }
   .dn-list-toolbar #delivery-search { max-width:none; flex:1 1 100%; }
   .dn-list-toolbar #status-filter { flex:1; width:auto !important; }
@@ -111,6 +112,18 @@
    인쇄 전용 스타일
 ════════════════════════════════════════════ */
 @media screen { .print-doc { display:none !important; } }
+/* 폰: 품목 확인 */
+.dp-meta { font-size:12px; color:var(--text-sub); margin-bottom:10px; line-height:1.6; }
+.dp-note { font-size:13px; background:var(--surface-2); border-left:3px solid var(--ink); padding:8px 10px; margin-bottom:10px; white-space:pre-wrap; }
+.dp-items { border:2px solid var(--ink); }
+.dp-item { display:flex; gap:10px; padding:10px 12px; border-top:1px solid var(--border); background:var(--surface); }
+.dp-item:first-child { border-top:none; }
+.dp-no { font-family:var(--font-mono); font-size:12px; font-weight:700; color:var(--text-hint); min-width:18px; }
+.dp-main { flex:1; min-width:0; display:flex; flex-direction:column; gap:3px; }
+.dp-desc { font-size:14px; font-weight:800; word-break:break-word; user-select:text; }
+.dp-sub { font-size:12px; color:var(--text-sub); }
+.dp-qty { font-family:var(--font-mono); font-size:14px; font-weight:700; white-space:nowrap; }
+mark.dp-hit { background:var(--signal); color:#111111; }
 
 @media print {
   @page { size:A4 portrait; margin:0; }
@@ -284,15 +297,16 @@
 <div class="view active" id="view-list">
   <div class="dn-list-toolbar">
     <input type="text" class="form-input" id="delivery-search"
-      placeholder="문서번호·고객사·프로젝트 검색..." oninput="renderList()">
+      placeholder="문서번호·고객사·프로젝트·품목 검색" oninput="renderList()">
     <select class="form-select" id="status-filter" onchange="renderList()" style="width:110px;">
       <option value="">전체 상태</option>
       <option value="작성중">작성중</option>
       <option value="완료">완료</option>
     </select>
     <div class="dn-spacer" style="flex:1;"></div>
-    <button class="btn btn-primary" onclick="openEditor()">+ 새 납품확인서</button>
+    <button class="btn btn-primary dn-pc-only" onclick="openEditor()">+ 새 납품확인서</button>
   </div>
+  <div class="text-hint dn-mobile-note" style="font-size:12px;font-weight:600;margin:-4px 0 10px;">폰에서는 품목 확인만 됩니다. 작성·수정·서명·인쇄는 PC에서 하세요.</div>
   <div class="card" style="padding:0;overflow:hidden;">
     <div class="dn-list-scroll">
     <table class="table">
@@ -439,6 +453,17 @@
      인쇄 CSS의 display:block !important가 인쇄 때만 이를 덮어씀 -->
 <div class="print-doc" id="print-doc" style="display:none;"></div>
 
+<!-- 폰: 품목 확인 (A4 미리보기 대신 읽기 쉬운 목록) -->
+<div class="modal-overlay" id="parts-modal" style="display:none;" onclick="if(event.target===this)closeParts()">
+  <div class="modal" style="max-width:520px;">
+    <div class="modal-header">
+      <h3 id="dp-title">납품 품목</h3>
+      <button class="modal-close" onclick="closeParts()">×</button>
+    </div>
+    <div class="modal-body" id="dp-body"></div>
+  </div>
+</div>
+
 <script>
 FS.requireAuth();
 
@@ -446,6 +471,8 @@ const UNIT_OPTIONS = ['EA','대','개','식','set','Box','Roll','m','기타'];
 const MODEL_OPTIONS = ['Server','Storage','GPU','Switch','NIC','HDD','SSD','NVMe','Memory','RAID','PSU','Cable','Rack','Software','Service','Other'];
 
 let deliveryNotes = [], deliveryCusts = [];
+let deliveryItemsByNote = {};   // 품목 검색용 (delivery_id → 품목들)
+const dnIsPhone = () => window.matchMedia('(max-width:768px)').matches;
 let editingNoteId = null, useCustomerText = false, editingStatus = '작성중';
 let dnSaving = false;        // 저장 중복 클릭 방지
 let dnDirty = false;         // 편집 화면에 저장 안 된 변경이 있는지
@@ -481,9 +508,13 @@ function init() {
   window.beforePageLeave = () => dnConfirmLeave();
 
   // 목록·고객사만 실시간 반영 (작성 중인 편집 화면 입력값은 건드리지 않음)
-  FS.watch([['delivery_notes'], ['customers']], ([notes, custs]) => {
+  document.querySelector('.dn-mobile-note').style.display = dnIsPhone() ? '' : 'none';
+  FS.watch([['delivery_notes'], ['customers'], ['delivery_items']], ([notes, custs, items]) => {
     deliveryNotes = notes;
     deliveryCusts = custs;
+    deliveryItemsByNote = {};
+    items.forEach(it => { (deliveryItemsByNote[it.delivery_id] = deliveryItemsByNote[it.delivery_id] || []).push(it); });
+    Object.values(deliveryItemsByNote).forEach(arr => arr.sort((a, b) => (a.seq || 0) - (b.seq || 0)));
     deliveryNotes.sort((a,b)=>(b.created_at?.seconds||0)-(a.created_at?.seconds||0));
     FS.setOptions(document.getElementById('h-customer'),
       deliveryCusts.map(c => ({ value:c.id, label:c.name||c.id })));
@@ -518,7 +549,8 @@ function renderList() {
   const sf = document.getElementById('status-filter')?.value||'';
   const filtered = deliveryNotes.filter(n => {
     const cName = deliveryCusts.find(c=>c.id===n.customer_id)?.name || n.customer_name || '';
-    return (!q || [n.doc_number||'', cName, n.project_name||''].some(s=>s.toLowerCase().includes(q)))
+    const itemText = (deliveryItemsByNote[n.id] || []).map(it => [it.description, it.model, it.note].join(' ')).join(' ');
+    return (!q || [n.doc_number||'', cName, n.project_name||'', itemText].some(s=>s.toLowerCase().includes(q)))
         && (!sf || (n.status||'작성중') === sf);
   });
   document.getElementById('list-empty').style.display = filtered.length ? 'none' : '';
@@ -557,6 +589,7 @@ function showList(force) {
 }
 
 async function openEditor(id) {
+  if (dnIsPhone()) { Toast.info('작성·수정·서명은 PC에서 해 주세요'); return; }
   const myToken = ++dnEditorToken;
   dnDirty = false;
   editingNoteId = id || null;
@@ -898,16 +931,47 @@ function closePreview() {
 async function openPreview(id) {
   const note = deliveryNotes.find(n=>n.id===id);
   if (!note) return;
+  if (dnIsPhone()) { openParts(note); return; }
   const items = await FS.getAll('delivery_items',[['delivery_id','==',id]]);
   items.sort((a,b)=>(a.seq||0)-(b.seq||0));
   const cName = deliveryCusts.find(c=>c.id===note.customer_id)?.name || note.customer_name || '';
   buildPrint(note, items, cName);
-  // 폰에서도 수정(서명) 가능. 인쇄는 PC에서만
+  // 수정·서명·인쇄는 PC에서만 (폰은 위에서 품목 확인 화면으로)
   showPreview(`
     <button class="btn" onclick="closePreview()">닫기</button>
     <button class="btn" onclick="closePreview();openEditor('${id}')">${FS.icon('edit', 16)} 수정·서명</button>
     <button class="btn btn-primary dn-pc-only" onclick="closePreview();printById('${id}')">${FS.icon('printer', 16)} 인쇄</button>`);
 }
+// 폰: 품목(장비 내부 파트) 확인. 검색어가 있으면 해당 품목 강조
+function openParts(note) {
+  const items = deliveryItemsByNote[note.id] || [];
+  const cName = deliveryCusts.find(c => c.id === note.customer_id)?.name || note.customer_name || '';
+  const q = (document.getElementById('delivery-search').value || '').trim();
+  const hl = v => {
+    const s = FS.esc(v || '');
+    if (!q) return s;
+    const i = String(v || '').toLowerCase().indexOf(q.toLowerCase());
+    if (i < 0) return s;
+    const raw = String(v);
+    return FS.esc(raw.slice(0, i)) + '<mark class="dp-hit">' + FS.esc(raw.slice(i, i + q.length)) + '</mark>' + FS.esc(raw.slice(i + q.length));
+  };
+  document.getElementById('dp-title').textContent = note.doc_number || '납품 품목';
+  document.getElementById('dp-body').innerHTML = `
+    <div class="dp-meta">${[cName, note.project_name, note.delivery_date, note.status || '작성중'].filter(Boolean).map(FS.esc).join(' · ')}<br>품목 ${items.length}건</div>
+    ${note.note ? `<div class="dp-note">${FS.esc(note.note)}</div>` : ''}
+    <div class="dp-items">${items.length ? items.map((it, i) => `
+      <div class="dp-item">
+        <span class="dp-no">${i + 1}</span>
+        <div class="dp-main">
+          <span class="dp-desc">${hl(it.description || '-')}</span>
+          <span class="dp-sub">${[it.model ? hl(it.model) : '', it.note ? hl(it.note) : ''].filter(Boolean).join(' · ')}</span>
+        </div>
+        <span class="dp-qty">${FS.esc(it.qty || 1)} ${FS.esc(it.unit || '')}</span>
+      </div>`).join('') : '<div class="dp-item"><span class="dp-sub">품목이 없습니다</span></div>'}</div>`;
+  document.getElementById('parts-modal').style.display = 'flex';
+}
+function closeParts() { document.getElementById('parts-modal').style.display = 'none'; }
+
 function previewFromEditor() {
   buildPrintFromEditor();
   showPreview(`

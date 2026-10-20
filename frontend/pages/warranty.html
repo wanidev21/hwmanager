@@ -142,8 +142,11 @@ function init() {
   wSelectedProjectId = null;
   wCardFilter = '';   // 최상위 let은 화면을 다시 열어도 남으므로 초기화 (개요에서 넘어온 필터만 아래에서 적용)
   // 개요에서 숫자를 눌러 들어온 경우 해당 상태로 필터
+  let pendingProject = null;
   if (window.hwPageFilter && window.hwPageFilter.page === 'warranty') {
     wCardFilter = window.hwPageFilter.status || '';
+    document.getElementById('w-search').value = window.hwPageFilter.q || '';
+    pendingProject = window.hwPageFilter.projectId || null;   // 새로고침·뒤로 가기: 보던 프로젝트 장비
     window.hwPageFilter = null;
   }
   FS.watch([['projects'], ['customers'], ['assets']], ([projects, customers, assets]) => {
@@ -164,6 +167,7 @@ function init() {
     renderStats();
     renderBanner();
     renderTable();
+    if (pendingProject) { const id = pendingProject; pendingProject = null; if (wProjects.some(p => p.id === id)) showProjectAssets(id, false); }
     // 열려 있는 장비 패널도 갱신 (다른 기기에서 수정·삭제된 경우)
     const panel = document.getElementById('proj-asset-panel');
     if (wSelectedProjectId && panel.style.display !== 'none') {
@@ -171,6 +175,11 @@ function init() {
       else { panel.style.display = 'none'; wSelectedProjectId = null; }
     }
   });
+}
+
+function pageViewState() {
+  const open = wSelectedProjectId && document.getElementById('proj-asset-panel').style.display !== 'none';
+  return { filter: { status: wCardFilter, q: document.getElementById('w-search').value, projectId: open ? wSelectedProjectId : null }, label: '워런티 현황' };
 }
 
 function renderStats() {

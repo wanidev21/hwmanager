@@ -832,6 +832,14 @@ html[data-theme="dark"] .idle-warn { border-color: #5A564D; }
 }
 .topbar-menu-btn:hover { background: var(--bg); }
 
+.nav-group-note { font-size:10px; font-weight:800; padding:0 4px; margin-left:4px; border:1px solid currentColor; letter-spacing:0; vertical-align:1px; }
+
+/* 상단 뒤로 가기 (상세를 열었거나 다른 화면에서 넘어온 경우에만) */
+.topbar-back { display:none; align-items:center; gap:2px; height:36px; max-width:46%; padding:0 10px 0 4px; margin-right:12px; border:2px solid var(--ink); background:var(--surface); color:var(--text); font-family:inherit; font-size:13px; font-weight:800; cursor:pointer; flex-shrink:0; -webkit-tap-highlight-color:transparent; }
+.topbar-back.show { display:inline-flex; }
+.topbar-back span { overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.topbar-back:hover, .topbar-back:active { background:var(--signal); color:#111111; }
+
 /* 상단 제목 */
 .topbar-title { display:flex; align-items:baseline; gap:8px; min-width:0; }
 .topbar-group { font-size:12px; font-weight:700; color:var(--text-hint); white-space:nowrap; }
@@ -927,6 +935,7 @@ html[data-theme="dark"] .idle-warn { border-color: #5A564D; }
     padding: 0 12px;
     height: 52px;
   }
+  .topbar-back { height:40px; max-width:58%; margin-right:10px; font-size:14px; }
 
   /* 컨텐츠 패딩 */
   .content {

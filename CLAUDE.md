@@ -22,7 +22,7 @@ FastAPI는 정적 파일 서빙만 담당. 데이터는 모두 Firestore (서버
 
 ## 스택
 - 호스팅: Firebase Hosting (로컬은 FastAPI + uvicorn으로 정적 서빙)
-- 인증: Firebase Auth Google 로그인 단일 (도메인 제한 없음, Firestore `config/access.emails` 허용 목록, Calendar 스코프 포함)
+- 인증: Firebase Auth Google 로그인 단일 (도메인 제한 없음, Firestore `config/access.emails` 허용 목록, 기본 스코프(이메일·프로필)만 — Google 캘린더 연동은 2026-10 제거)
 - Firebase 계정(콘솔·CLI 로그인): karismawan1977@gmail.com
 - DB: Firestore (Firebase 프로젝트 `hwmanager-593ba`)
 - SDK: Firebase compat 10.8.0 (type="module" 방식 사용 안함)
@@ -65,11 +65,11 @@ hwmanager/
     └── pages/
         ├── overview.html      # 개요 (기본)
         ├── customers.html     # 고객사·프로젝트·장비
-        ├── delivery.html
+        ├── delivery.html      # 작성·수정·서명·인쇄는 PC 전용, 폰(768px 이하)은 품목 확인만
         ├── tickets.html
         ├── warranty.html
         ├── jobs.html          # 작업 일정 + 준비 체크리스트 (팀 공용, 하단 탭 '작업')
-        ├── calendar.html      # 개인 일정 + Google 캘린더 + 작업 일정 표시
+        ├── calendar.html      # 내 일정(개인 calendar_events) + 팀 작업 일정 표시
         ├── kb.html
         ├── tech.html
         ├── users.html         # 관리자 전용 메뉴
@@ -103,14 +103,13 @@ customers → projects (customer_id) → assets (customer_id, project_id)
 1. login.html → `FS.loginWithGoogle()`: PC는 팝업, 모바일·PWA는 리다이렉트 (`FS.handleRedirectResult()`로 결과 처리)
    - Hosting 도메인(web.app)에서는 authDomain을 현재 도메인으로 바꿔 iOS Safari 리다이렉트 문제 회피
 2. `FS.completeLogin()`: `FS.checkAccess()`(config/access 읽기 — 규칙상 허용 계정만 가능)로 확인해 목록에 없으면 거부, 신규 사용자 → users/{uid} 문서 생성 (role: 'user')
-3. Google access token은 localStorage `gAccessToken`에 저장 → calendar.html에서 Google Calendar API 호출
-4. index.html: onAuthStateChanged로 확인, 미로그인 → /login
-5. 30분 미사용 시 자동 로그아웃 (localStorage `hw-last-active`)
-6. users.role === 'admin' 이면 사용자 관리 메뉴 표시
+3. index.html: onAuthStateChanged로 확인, 미로그인 → /login
+4. 30분 미사용 시 자동 로그아웃 (localStorage `hw-last-active`)
+5. users.role === 'admin' 이면 사용자 관리 메뉴 표시
 - 개인 데이터(kb_articles, tech_*, releases, calendar_events)는 `user_id == uid`로 필터 (클라이언트 쿼리 기준)
 - Firestore 보안 규칙: `firestore.rules` (배포: `firebase deploy --only firestore:rules`)
-  - 사용자 추가 시 **두 곳**: 허용 목록(회원 관리 화면의 '로그인 허용 계정' 또는 `python scripts/access.py add <email>`) + Google Cloud 콘솔 OAuth 테스트 사용자. 이메일은 코드·저장소에 넣지 않음
-    (OAuth 앱은 테스트 모드. Calendar 스코프가 민감 스코프라 테스트 사용자 외에는 "Google 인증 절차를 완료하지 않았습니다"로 차단됨)
+  - 사용자 추가: 허용 목록(회원 관리 화면의 '로그인 허용 계정' 또는 `python scripts/access.py add <email>`). 이메일은 코드·저장소에 넣지 않음
+    (OAuth 앱이 '테스트' 상태로 남아 있으면 Google Cloud 콘솔 OAuth 테스트 사용자에도 추가해야 함. 기본 스코프만 쓰므로 '프로덕션'으로 게시하면 이 단계 불필요)
   - 개인 데이터는 규칙에서도 `user_id == uid`만 허용, 공용 업무 데이터는 허용 계정 모두 읽기/쓰기, 목록에 없는 컬렉션은 차단
 - 관리자 지정: `python scripts/set_admin.py <email>`
 - 개인 데이터 소유자 이전: `python scripts/reassign_owner.py <from> <to> [--execute]`
@@ -123,7 +122,6 @@ customers → projects (customer_id) → assets (customer_id, project_id)
 - innerHTML 템플릿에 사용자 입력값을 넣을 때는 반드시 `${FS.esc(값)}` (`<bond0>` 같은 표기가 태그로 사라지는 것 방지). 문서 ID·고정 상수는 제외
 - 오프라인 캐시(enablePersistence) 사용, 로그아웃 시 캐시 삭제
 - sw.js는 네트워크 우선 (배포 즉시 반영), `/__/` 경로는 우회
-- Google Calendar 이벤트는 실시간 아님 (5분 폴링)
 
 ## 모바일
 - PWA로 통일 (2026-10 결정). 예전 Capacitor 앱 `C:\waniwani\Claude\HWManagerMobile`(이메일 로그인, 구버전 포크)은 더 이상 개발하지 않음

@@ -107,6 +107,11 @@ function init() {
   const first = (user?.displayName || '').split(' ')[0];
   if (first) document.getElementById('ov-hello').textContent = `${first}님, 오늘의 현장`;
 
+  // 뒤로 가기로 돌아온 경우 검색어 복원
+  if (window.hwPageFilter && window.hwPageFilter.page === 'overview') {
+    document.getElementById('ov-q').value = window.hwPageFilter.q || '';
+    window.hwPageFilter = null;
+  }
   const uid = user.uid;
   FS.watch([
     ['customers'],
@@ -119,6 +124,10 @@ function init() {
     ['calendar_events', [['user_id', '==', uid]]],
     ['jobs'],
   ], data => renderOverview(...data));
+}
+
+function pageViewState() {
+  return { filter: { q: document.getElementById('ov-q').value }, label: '홈' };
 }
 
 // ── 장비 검색: 결과를 누르면 고객사 화면의 해당 장비 상세로 ──

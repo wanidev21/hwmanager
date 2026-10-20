@@ -218,9 +218,13 @@ function init() {
   jbSelectedId = null; jbDetailFor = null; jbTplCur = null;
   let pendingOpen = null, pendingNew = null;
   if (window.hwPageFilter && window.hwPageFilter.page === 'jobs') {
-    pendingOpen = window.hwPageFilter.jobId || null;     // 홈·티켓·캘린더에서 특정 작업
+    pendingOpen = window.hwPageFilter.jobId || null;     // 홈·티켓·캘린더에서 특정 작업, 또는 보던 작업
     pendingNew = window.hwPageFilter.newFor || null;     // 티켓에서 '작업 일정 잡기'
+    jbView = window.hwPageFilter.view || '예정';          // 뒤로 가기로 돌아온 경우
+    document.getElementById('jb-q').value = window.hwPageFilter.q || '';
     window.hwPageFilter = null;
+  } else {
+    jbView = '예정';
   }
   try { jbMineOnly = localStorage.getItem('hw-jobs-mine') === '1'; } catch (e) {}
   jbRenderSeg();
@@ -247,6 +251,17 @@ function init() {
       }
       if (document.getElementById('jb-tpl-modal').style.display === 'flex') jbTplRenderList();
     });
+}
+
+// 화면 상태 (뒤로 가기로 돌아왔을 때 복원 — index.html)
+function pageViewState() {
+  const j = jbSelectedId && document.getElementById('job-detail-col').style.display !== 'none'
+    ? jbJobs.find(x => x.id === jbSelectedId) : null;
+  return {
+    filter: { jobId: j ? j.id : null, view: jbView, q: document.getElementById('jb-q').value },
+    key: j ? 'job:' + j.id : '',
+    label: j ? (j.title || '작업') : '작업 일정',
+  };
 }
 
 // ── 날짜 ──

@@ -240,7 +240,7 @@ html[data-theme="dark"] .cust-item.active .cust-item-name, html[data-theme="dark
 </div>
 
 <!-- 장비 상세 (읽기 전용) -->
-<div class="modal-overlay" id="asset-view-modal" style="display:none;" onclick="if(event.target===this)closeAssetView()">
+<div class="modal-overlay" id="asset-view-modal" data-view-layer style="display:none;" onclick="if(event.target===this)closeAssetView()">
   <div class="modal" style="max-width:560px;">
     <div class="modal-header">
       <h3 id="av-title">장비 정보</h3>
@@ -324,6 +324,7 @@ let allProjects      = [];
 let allAssets        = [];
 let selectedCustomerId = null;
 let selectedProjectId  = null;
+let avAssetId = null;   // 장비 상세 창에 표시 중인 장비
 
 function daysLeft(dateStr) {
   if (!dateStr) return null;
@@ -353,10 +354,13 @@ function init() {
   // 페이지 재진입 시 패널은 초기 상태로 그려지므로 선택도 초기화
   selectedCustomerId = null;
   selectedProjectId  = null;
+  avAssetId = null;
   // 홈 검색에서 장비를 눌러 들어온 경우: 첫 데이터가 오면 해당 장비 상세 열기
-  let pendingAssetId = null;
+  // 뒤로 가기로 돌아온 경우: 보던 고객사·프로젝트·장비·검색어 복원
+  let pending = null;
   if (window.hwPageFilter && window.hwPageFilter.page === 'customers') {
-    pendingAssetId = window.hwPageFilter.assetId || null;
+    pending = { ...window.hwPageFilter };
+    document.getElementById('cust-search').value = pending.q || '';
     window.hwPageFilter = null;
   }
   FS.watch([['customers'], ['projects'], ['assets']], ([custs, projs, assets]) => {
@@ -377,8 +381,29 @@ function init() {
     renderCustomers();
     if (document.getElementById('proj-panel').style.display !== 'none') renderProjects();
     if (document.getElementById('asset-panel').style.display !== 'none') renderAssets();
-    if (pendingAssetId) { const id = pendingAssetId; pendingAssetId = null; jumpToAsset(id); }
+    if (pending) {
+      const p = pending; pending = null;
+      if (p.assetId && allAssets.some(a => a.id === p.assetId)) jumpToAsset(p.assetId);
+      else if (p.projectId && allProjects.some(x => x.id === p.projectId)) {
+        selectedCustomerId = allProjects.find(x => x.id === p.projectId).customer_id;
+        renderCustomers();
+        selectProject(p.projectId);
+      } else if (p.customerId && allCustomers.some(c => c.id === p.customerId)) selectCustomer(p.customerId);
+    }
   });
+}
+
+// 화면 상태 (뒤로 가기로 돌아왔을 때 복원 — index.html)
+function pageViewState() {
+  const avOpen = avAssetId && document.getElementById('asset-view-modal').style.display === 'flex';
+  const a = avOpen ? allAssets.find(x => x.id === avAssetId) : null;
+  const p = allProjects.find(x => x.id === selectedProjectId);
+  const c = allCustomers.find(x => x.id === selectedCustomerId);
+  return {
+    filter: { customerId: selectedCustomerId, projectId: selectedProjectId, assetId: a ? a.id : null, q: document.getElementById('cust-search').value },
+    key: a ? 'asset:' + a.id : '',
+    label: a ? (a.hostname || '장비') : p ? (p.name || '프로젝트') : c ? (c.name || '고객사') : '고객사·자산',
+  };
 }
 
 // ── 고객사 목록 ──────────────────────────────────────────────────────────────
@@ -539,6 +564,7 @@ function viewAsset(id) {
   if (!a) { Toast.error('이미 삭제된 항목입니다'); return; }
   const c = allCustomers.find(x => x.id === a.customer_id);
   const p = allProjects.find(x => x.id === a.project_id);
+  avAssetId = id;
   document.getElementById('av-title').textContent = a.hostname || '장비 정보';
   const fields = [
     ['고객사', c?.name], ['프로젝트', p?.name],
@@ -557,7 +583,6 @@ function viewAsset(id) {
     (a.memo ? `<div class="av-item av-full"><div class="av-label">메모</div><div class="av-val" style="white-space:pre-wrap;">${FS.esc(a.memo)}</div></div>` : '');
   document.getElementById('av-edit').onclick = () => { closeAssetView(); openAssetModal(id); };
   document.getElementById('av-ticket').onclick = () => {
-    closeAssetView();
     window.hwPageFilter = { page: 'tickets', newFor: { customer_id: a.customer_id, asset_id: a.id } };
     loadPage('tickets');
   };
@@ -577,7 +602,7 @@ async function avLoadTickets(assetId) {
       .sort((a, b) => (b.created_at?.seconds || 0) - (a.created_at?.seconds || 0));
     const BADGE = { '접수':'badge-info','진행중':'badge-warning','보류':'badge-gray','완료':'badge-success' };
     box.innerHTML = '<div class="av-label">장애 이력 ' + (list.length ? list.length + '건' : '') + '</div>' + (list.length
-      ? list.map(t => `<div class="av-val" style="display:flex;gap:8px;align-items:center;padding:8px 0;border-top:1px solid var(--border);cursor:pointer;" onclick="closeAssetView();window.hwPageFilter={page:'tickets',ticketId:'${t.id}'};loadPage('tickets')">
+      ? list.map(t => `<div class="av-val" style="display:flex;gap:8px;align-items:center;padding:8px 0;border-top:1px solid var(--border);cursor:pointer;" onclick="window.hwPageFilter={page:'tickets',ticketId:'${t.id}'};loadPage('tickets')">
           <span style="font-family:var(--font-mono);font-size:11px;color:var(--text-hint);">${FS.formatDate(t.created_at) || ''}</span>
           <span style="flex:1;min-width:0;">${FS.esc(t.title || '')}</span>
           <span class="badge ${BADGE[t.status || '접수'] || 'badge-gray'}">${FS.esc(t.status || '접수')}</span></div>`).join('')
@@ -586,7 +611,7 @@ async function avLoadTickets(assetId) {
     box.remove();
   }
 }
-function closeAssetView() { document.getElementById('asset-view-modal').style.display = 'none'; }
+function closeAssetView() { document.getElementById('asset-view-modal').style.display = 'none'; avAssetId = null; }
 
 // 여러 문서를 원자적으로 삭제 (batch 한도 500 → 나눠서)
 async function batchDelete(refs) {

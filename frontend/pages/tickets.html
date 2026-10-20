@@ -179,11 +179,15 @@ function init() {
   tlStop = null; tlTicketId = null; tlLogs = [];   // 페이지 재진입 시 (구독은 loadPage가 해제)
   // 개요에서 '처리중 티켓'을 눌러 들어온 경우
   // 장비 상세에서 '장애 등록'으로 온 경우: 첫 데이터가 오면 장비가 채워진 등록 창 열기
-  let pendingNew = null, pendingOpen = null;
+  let pendingNew = null, pendingOpen = null, pendingCustomer = '';
   if (window.hwPageFilter && window.hwPageFilter.page === 'tickets') {
-    document.getElementById('filter-status').value = window.hwPageFilter.status || '';
-    pendingNew = window.hwPageFilter.newFor || null;
-    pendingOpen = window.hwPageFilter.ticketId || null;   // 홈·장비 이력에서 특정 티켓
+    const f = window.hwPageFilter;
+    document.getElementById('filter-status').value = f.status || '';
+    document.getElementById('filter-priority').value = f.priority || '';   // 뒤로 가기로 돌아온 경우 필터·검색 복원
+    document.getElementById('ticket-search').value = f.q || '';
+    pendingCustomer = f.customer || '';
+    pendingNew = f.newFor || null;
+    pendingOpen = f.ticketId || null;   // 홈·장비 이력에서 특정 티켓, 또는 보던 티켓
     window.hwPageFilter = null;
   }
   // 기록 입력칸이나 등록 창에 쓰던 내용이 있으면 다른 화면으로 가기 전에 확인
@@ -204,6 +208,7 @@ function init() {
     const opts = custList.map(c=>({ value:c.id, label:c.name||c.id }));
     FS.setOptions(document.getElementById('filter-customer'), opts);
     FS.setOptions(document.getElementById('f-customer'), opts);
+    if (pendingCustomer) { document.getElementById('filter-customer').value = pendingCustomer; pendingCustomer = ''; }
 
     renderStats();
     renderTickets();
@@ -217,6 +222,18 @@ function init() {
       else closeTicketDetail();
     }
   });
+}
+
+// 화면 상태 (뒤로 가기로 돌아왔을 때 복원 — index.html)
+function pageViewState() {
+  const t = ticketSelectedId && document.getElementById('detail-col').style.display !== 'none'
+    ? allTickets.find(x => x.id === ticketSelectedId) : null;
+  const v = id => document.getElementById(id).value;
+  return {
+    filter: { status: v('filter-status'), priority: v('filter-priority'), customer: v('filter-customer'), q: v('ticket-search'), ticketId: t ? t.id : null },
+    key: t ? 'ticket:' + t.id : '',
+    label: t ? (t.title || '장애 티켓') : '장애 티켓',
+  };
 }
 
 function renderStats() {

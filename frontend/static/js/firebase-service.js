@@ -65,9 +65,10 @@ _db.enablePersistence({ synchronizeTabs: true }).catch(() => {});
 // 로그인 허용 계정은 Firestore config/access(emails)에서 관리 — 보안 규칙이 이 목록으로 접근을 막음.
 // 앱은 그 문서를 읽어 보고(허용 계정만 읽기 가능) 허용 여부를 판단
 
+// 기본 권한(이메일·프로필)만 요청 — Google 캘린더 연동은 2026-10 제거 (민감 권한 때문에 앱이 테스트 모드에 묶였음)
 const _googleProvider = new firebase.auth.GoogleAuthProvider();
-_googleProvider.addScope('https://www.googleapis.com/auth/calendar');
 _googleProvider.setCustomParameters({ prompt: 'select_account' });
+try { localStorage.removeItem('gAccessToken'); } catch (e) {}   // 예전 캘린더 토큰 정리
 
 // 모바일·홈 화면 앱(PWA)은 팝업이 불안정하므로 리다이렉트 방식 사용
 function _useRedirectLogin() {
@@ -136,21 +137,7 @@ window.FS = {
   async handleRedirectResult() {
     return _auth.getRedirectResult();
   },
-  // Google Calendar 토큰 재발급 (로그인 유지한 채 재인증)
-  // 데스크톱: 팝업 → 토큰 반환 / 모바일: 리다이렉트 → index.html에서 결과 저장
-  async reconnectGoogle() {
-    const user = _auth.currentUser;
-    if (!user) throw new Error('로그인이 필요합니다');
-    if (_useRedirectLogin()) {
-      await user.reauthenticateWithRedirect(_googleProvider);
-      return null;
-    }
-    const result = await user.reauthenticateWithPopup(_googleProvider);
-    const token = result.credential?.accessToken;
-    if (token) localStorage.setItem('gAccessToken', token);
-    return token || null;
-  },
-  // 로그인 결과 후처리: 도메인 검증, Calendar 토큰 저장, 신규 사용자 등록
+  // 로그인 결과 후처리: 허용 계정 확인, 신규 사용자 등록
   async completeLogin(result) {
     const user = result.user;
     if (await FS.checkAccess() === false) {
@@ -158,8 +145,6 @@ window.FS = {
       else await _auth.signOut();
       throw Object.assign(new Error('not allowed'), { code: 'app/email-not-allowed' });
     }
-    const accessToken = result.credential?.accessToken;
-    if (accessToken) localStorage.setItem('gAccessToken', accessToken);
 
     const ref = _db.collection('users').doc(user.uid);
     const snap = await ref.get();

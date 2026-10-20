@@ -1,4 +1,4 @@
-const CACHE = 'hwm-v3';
+const CACHE = 'hwm-v4';
 const SDK = [
   'https://www.gstatic.com/firebasejs/10.8.0/firebase-app-compat.js',
   'https://www.gstatic.com/firebasejs/10.8.0/firebase-auth-compat.js',

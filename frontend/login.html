@@ -8,7 +8,8 @@
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-title" content="HW Manager">
   <link rel="manifest" href="/manifest.json">
-  <link rel="apple-touch-icon" href="/static/icons/icon-192.png">
+  <link rel="icon" href="/static/icons/logo.svg" type="image/svg+xml">
+  <link rel="apple-touch-icon" href="/static/icons/icon-180.png">
   <title>HW Manager - 로그인</title>
   <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-app-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-auth-compat.js"></script>
@@ -54,6 +55,8 @@
       flex-direction: column;
       gap: 8px;
     }
+    .login-brand { display:flex; align-items:center; gap:10px; margin-left:-6px; }
+    .login-brand svg { flex-shrink:0; }
     .login-tag {
       font-family: 'Space Mono', monospace;
       font-size: 11px;
@@ -153,7 +156,7 @@
     <div class="login-stripe" aria-hidden="true"></div>
     <div class="login-head">
       <span class="login-tag">FIELD ENGINEER TOOL</span>
-      <h1 class="login-title">HW MANAGER</h1>
+      <div class="login-brand"><svg width="46" height="46" viewBox="0 0 100 100" aria-hidden="true"><rect x="18" y="24" width="64" height="22" fill="#FF5A1F"/><rect x="24" y="32" width="30" height="6" fill="#111111"/><rect x="68" y="31" width="8" height="8" fill="#FFD23F"/><rect x="18" y="54" width="64" height="22" fill="#FF5A1F"/><rect x="24" y="62" width="30" height="6" fill="#111111"/><rect x="68" y="61" width="8" height="8" fill="#111111"/></svg><h1 class="login-title">HW MANAGER</h1></div>
       <span class="login-subtitle">서버 H/W 엔지니어 업무 관리</span>
     </div>
     <div class="login-body">

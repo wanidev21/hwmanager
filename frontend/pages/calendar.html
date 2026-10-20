@@ -297,6 +297,7 @@ const EV_COLORS = {
 
 let curYear, curMonth;
 let fsEvents       = [];   // Firestore 이벤트 (실시간 구독)
+let jobEvents      = [];   // 팀 작업 일정 (jobs) — 누르면 작업 일정 화면으로
 let rawGcalEvents  = [];   // 이번 달 모든 구글 캘린더 이벤트 (필터 전)
 let gcalEvents     = [];   // 필터 적용 후 이벤트
 let allEvents      = [];   // 렌더링용 병합
@@ -353,8 +354,12 @@ function loadFsEvents() {
     const done = () => { if (first) { first = false; resolve(); } };
     // 구독 오류(권한·네트워크)로 첫 데이터가 오지 않아도 화면은 그리도록
     setTimeout(done, 5000);
-    _fsEventsStop = FS.watch([['calendar_events', [['user_id','==',uid]]]], ([events]) => {
+    _fsEventsStop = FS.watch([['calendar_events', [['user_id','==',uid]]], ['jobs']], ([events, jobs]) => {
       fsEvents = events;
+      jobEvents = jobs.filter(j => j.date && j.status !== '취소').map(j => ({
+        id: 'job:' + j.id, source: 'job', color: 'orange', date: j.date, start_time: j.time || '',
+        title: `${j.status === '완료' ? '[완료] ' : ''}작업 · ${j.title || ''}`,
+      }));
       if (first) { done(); return; }
       applyCalFilter();   // 구글 일정 중복 제거·실데이터 병합도 여기서 다시 계산
       if (document.getElementById('cal-grid')) renderCalendar();
@@ -478,7 +483,7 @@ function applyCalFilter() {
     calFilterState[e.calendarId] !== false
   );
   fsView = showFs ? mergeFsWithLive() : [];
-  allEvents = [...fsView, ...gcalEvents];
+  allEvents = [...fsView, ...gcalEvents, ...jobEvents];
 }
 
 // Firestore 사본에 구글 실데이터를 덮어 표시 (구글에서 바꾼 내용이 사본에 가려지지 않도록)
@@ -640,7 +645,7 @@ function renderCalendar() {
   // 이번 달 Firestore 이벤트(구글 실데이터 반영) + 필터된 Google 이벤트 수집
   applyCalFilter();
   const monthFs  = fsView.filter(e => (e.date||'').startsWith(ym));
-  const visible  = [...monthFs, ...gcalEvents];
+  const visible  = [...monthFs, ...gcalEvents, ...jobEvents.filter(e => e.date.startsWith(ym))];
 
   const byDate = {};
   visible.forEach(e => {
@@ -782,6 +787,11 @@ function closeDayEventsModal() { document.getElementById('day-events-modal').sty
 
 // ── 모달 ─────────────────────────────────────────────────────────────────────
 async function openEventModal(id, dateStr) {
+  if (id && id.startsWith('job:')) {   // 작업 일정은 작업 화면에서 보고 고침
+    window.hwPageFilter = { page: 'jobs', jobId: id.slice(4) };
+    loadPage('jobs');
+    return;
+  }
   editingId = id || null;
 
   ['f-ev-title','f-ev-start','f-ev-end','f-ev-desc'].forEach(i => document.getElementById(i).value = '');

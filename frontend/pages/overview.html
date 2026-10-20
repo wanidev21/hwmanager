@@ -43,6 +43,10 @@
   .ov-tag.t-danger { background:#111111; color:var(--primary); border-color:#111111; }
   .ov-tag.t-warn { background:var(--signal); font-family:var(--font-mono); font-size:14px; font-weight:700; }
   .ov-tag.t-plain { background:var(--surface); color:var(--text); font-family:var(--font-mono); }
+  .ov-item-warn { align-self:flex-start; max-width:100%; font-size:12px; font-weight:800; padding:2px 6px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  .ov-item-warn.w-over { background:var(--primary); color:#111111; }
+  .ov-item-warn.w-today { background:var(--signal); color:#111111; }
+  .ov-tag.t-today { background:var(--primary); font-family:var(--font-mono); font-size:14px; font-weight:700; }
   .ov-allclear { padding:18px; border:2px dashed var(--ink); text-align:center; font-weight:700; color:var(--text-sub); }
 
   /* 전체 현황 */
@@ -83,6 +87,9 @@
 <div class="ov-sec">먼저 확인 <small id="ov-todo-count"></small></div>
 <div class="ov-todo" id="ov-todo"></div>
 
+<div class="ov-sec">다가오는 작업 <small>7일 이내</small></div>
+<div class="ov-todo" id="ov-jobs"></div>
+
 <div class="ov-sec">전체 현황</div>
 <div class="ov-grid" id="ov-grid"></div>
 
@@ -110,6 +117,7 @@ function init() {
     ['delivery_notes'],
     ['tech_notes',      [['user_id', '==', uid]]],
     ['calendar_events', [['user_id', '==', uid]]],
+    ['jobs'],
   ], data => renderOverview(...data));
 }
 
@@ -137,7 +145,7 @@ function openAssetFromHome(id) {
   loadPage('customers');
 }
 
-function renderOverview(customers, projects, assets, tickets, kbArticles, deliveryNotes, techNotes, events) {
+function renderOverview(customers, projects, assets, tickets, kbArticles, deliveryNotes, techNotes, events, jobs) {
   ovData = { customers, projects, assets };
   if (document.getElementById('ov-q').value) renderHits();
 
@@ -156,6 +164,26 @@ function renderOverview(customers, projects, assets, tickets, kbArticles, delive
   const todayEvents = events.filter(e => e.date === todayStr)
     .sort((a, b) => (a.start_time || '').localeCompare(b.start_time || ''));
 
+  // ── 다가오는 작업: 7일 이내 예정 (지난 날짜인데 완료 안 한 것 포함) + 준비 기한 경고 ──
+  const dayDiff = ds => Math.round((new Date(ds + 'T00:00:00') - today) / 86400000);
+  const shiftDate = (ds, n) => { const d = new Date(ds + 'T00:00:00'); d.setDate(d.getDate() + n); return FS.localDate(d); };
+  const W = '일월화수목금토';
+  const fmtDay = ds => { const d = new Date(ds + 'T00:00:00'); return `${String(d.getMonth()+1).padStart(2,'0')}.${String(d.getDate()).padStart(2,'0')} ${W[d.getDay()]}`; };
+  const upcoming = jobs
+    .filter(j => (j.status || '예정') === '예정' && j.date && dayDiff(j.date) <= 7)
+    .sort((a, b) => (a.date + (a.time || '99')).localeCompare(b.date + (b.time || '99')));
+  const jobWarn = j => {
+    const urgent = Object.values(j.items || {})
+      .filter(it => !it.done && it.due_days !== null && it.due_days !== undefined)
+      .map(it => ({ text: it.text, d: dayDiff(shiftDate(j.date, -it.due_days)) }))
+      .filter(x => x.d <= 0).sort((a, b) => a.d - b.d);
+    if (!urgent.length) return null;
+    const x = urgent[0];
+    return { cls: x.d < 0 ? 'w-over' : 'w-today',
+             text: `${x.text} — ${x.d < 0 ? `${-x.d}일 지남` : '오늘까지'}${urgent.length > 1 ? ` 외 ${urgent.length - 1}건` : ''}` };
+  };
+  const jobsWarned = upcoming.filter(j => jobWarn(j)).length;
+
   // ── 신호 3칸 (0이면 색을 빼서 '이상 없음'이 한눈에 보이도록) ──
   const sig = (n, label, cls, onclick) =>
     `<button class="ov-sig ${n ? cls : 'zero'}" onclick="${onclick}">
@@ -164,7 +192,7 @@ function renderOverview(customers, projects, assets, tickets, kbArticles, delive
   document.getElementById('ov-signals').innerHTML =
     sig(openTickets.length, '진행중 장애', 's-danger', "window.hwPageFilter={page:'tickets',status:'처리중'};loadPage('tickets')") +
     sig(expiringSoon.length, '워런티 임박', 's-warn', "window.hwPageFilter={page:'warranty',status:'urgent'};loadPage('warranty')") +
-    sig(todayEvents.length, '오늘 일정', 's-plain', "loadPage('calendar')");
+    sig(upcoming.length, jobsWarned ? `7일 내 작업 · 준비 ${jobsWarned}건 급함` : '7일 내 작업', jobsWarned ? 's-warn' : 's-plain', "loadPage('jobs')");
 
   // ── 먼저 확인: 긴급·높음 장애 → 30일 내 워런티 → 오늘 일정 ──
   const PRI = { '긴급': 0, '높음': 1, '보통': 2, '낮음': 3 };
@@ -210,6 +238,30 @@ function renderOverview(customers, projects, assets, tickets, kbArticles, delive
       </div>
     </div>`).join('')
     : '<div class="ov-allclear">급한 일 없음 — 긴급 장애·30일 내 만료·오늘 일정이 없습니다</div>';
+
+  document.getElementById('ov-jobs').innerHTML = upcoming.length ? upcoming.slice(0, 5).map(j => {
+    const items = Object.values(j.items || {});
+    const done = items.filter(it => it.done).length;
+    const d = dayDiff(j.date);
+    const tag = d === 0 ? '<span class="ov-tag t-today">D-DAY</span>'
+      : d < 0 ? `<span class="ov-tag t-danger">D+${-d}</span>`
+      : `<span class="ov-tag ${d <= 2 ? 't-warn' : 't-plain'}">D-${d}</span>`;
+    const host = (assets.find(a => a.id === j.asset_id) || {}).hostname || j.asset_host || '';
+    const meta = [`${fmtDay(j.date)}${j.time ? ' ' + j.time : ''}`, custMap[j.customer_id], host, j.assignee,
+                  items.length ? `준비 ${done}/${items.length}` : ''].filter(Boolean).join(' · ');
+    const w = jobWarn(j);
+    return `<div class="ov-item" onclick="window.hwPageFilter={page:'jobs',jobId:'${j.id}'};loadPage('jobs')">
+      <div class="ov-item-body">
+        <div class="ov-item-main">
+          <span class="ov-item-title">${FS.esc(j.title || '(제목 없음)')}</span>
+          <span class="ov-item-meta">${FS.esc(meta)}</span>
+          ${w ? `<span class="ov-item-warn ${w.cls}">${FS.esc(w.text)}</span>` : ''}
+        </div>
+        ${tag}
+      </div>
+    </div>`;
+  }).join('') + (upcoming.length > 5 ? `<button class="btn" onclick="loadPage('jobs')">작업 ${upcoming.length - 5}건 더 보기</button>` : '')
+    : `<div class="ov-allclear" style="cursor:pointer;" onclick="loadPage('jobs')">7일 안에 예정된 작업이 없습니다 — 작업 일정 열기</div>`;
 
   // ── 전체 현황 카드 ──
   const byDate = arr => [...arr].sort((a,b) => (b.created_at?.seconds||0) - (a.created_at?.seconds||0));

@@ -68,7 +68,8 @@ hwmanager/
         ├── delivery.html
         ├── tickets.html
         ├── warranty.html
-        ├── calendar.html
+        ├── jobs.html          # 작업 일정 + 준비 체크리스트 (팀 공용, 하단 탭 '작업')
+        ├── calendar.html      # 개인 일정 + Google 캘린더 + 작업 일정 표시
         ├── kb.html
         ├── tech.html
         ├── users.html         # 관리자 전용 메뉴
@@ -86,6 +87,8 @@ hwmanager/
 ## Firestore 컬렉션
 customers, projects, assets, tickets(+ logs 하위: 진행 기록), kb_articles,
 audit_logs(변경 이력, 추가 전용), config/access(허용 계정),
+jobs(작업 일정: date·time·customer/asset/ticket 연결·status 예정/완료/취소, items 맵 {id:{text,due_days,done,order}} — 체크는 `items.<id>.done` 필드 단위 갱신),
+job_templates(준비 템플릿: name, items[{text, due_days}], 비어 있으면 jobs.html의 기본 템플릿 사용·첫 저장 시 함께 저장),
 internal_assets, tech_domains, tech_topics, tech_notes, releases,
 delivery_notes, delivery_items, calendar_events, users
 

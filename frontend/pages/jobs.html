@@ -1,0 +1,776 @@
+<!-- 작업 일정: 예정된 현장 작업과 준비 체크리스트 (팀 공용). 준비 항목 기한 = 작업일 - N일 -->
+<style>
+  .jb-toolbar { gap:8px; }
+  .jb-filters { flex-wrap:wrap; align-items:center; }
+  .jb-seg { display:flex; border:2px solid var(--ink); }
+  .jb-seg button { height:36px; padding:0 14px; border:none; background:var(--surface); color:var(--text); font-family:inherit; font-size:13px; font-weight:800; cursor:pointer; }
+  .jb-seg button + button { border-left:2px solid var(--ink); }
+  .jb-seg button.on { background:var(--ink); color:var(--bg); }
+  html[data-theme="dark"] .jb-seg button.on { background:#ECEAE4; color:#111111; }
+  .jb-mine { height:36px; padding:0 12px; border:2px solid var(--ink); background:var(--surface); color:var(--text); font-family:inherit; font-size:13px; font-weight:800; cursor:pointer; }
+  .jb-mine.on { background:var(--signal); color:#111111; }
+
+  .jb-layout { display:flex; gap:16px; align-items:flex-start; }
+  .jb-list-col { flex:1; min-width:0; }
+  .jb-detail-col { width:440px; flex-shrink:0; }
+
+  .jb-group { font-size:12px; font-weight:900; letter-spacing:.02em; margin:16px 0 6px; display:flex; align-items:center; gap:8px; }
+  .jb-group:first-child { margin-top:0; }
+  .jb-group::after { content:''; flex:1; height:2px; background:var(--ink); }
+  .jb-group.g-past { color:var(--danger); }
+
+  .jb-card { display:flex; align-items:stretch; background:var(--surface); border:2px solid var(--ink); margin-bottom:8px; cursor:pointer; }
+  .jb-card:hover { background:var(--surface-2); }
+  .jb-card.sel { box-shadow:4px 4px 0 var(--ink); transform:translate(-2px,-2px); }
+  .jb-card.closed { opacity:.6; }
+  .jb-date { width:74px; flex-shrink:0; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:3px; padding:8px 4px; border-right:2px solid var(--ink); background:var(--surface-2); }
+  .jb-dday { font-family:var(--font-mono); font-size:13px; font-weight:700; padding:1px 5px; border:1.5px solid var(--ink); background:var(--surface); color:var(--text); white-space:nowrap; }
+  .jb-dday.d-today { background:var(--primary); color:#111111; }
+  .jb-dday.d-soon { background:var(--signal); color:#111111; }
+  .jb-dday.d-past { background:#111111; color:var(--primary); border-color:#111111; }
+  .jb-dow { font-family:var(--font-mono); font-size:12px; font-weight:700; color:var(--text-sub); white-space:nowrap; }
+  .jb-main { flex:1; min-width:0; display:flex; flex-direction:column; gap:3px; padding:10px 12px; }
+  .jb-title { font-size:15px; font-weight:800; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  .jb-meta { font-size:12px; color:var(--text-sub); overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  .jb-meta .mono { font-family:var(--font-mono); }
+  .jb-warn { align-self:flex-start; max-width:100%; font-size:12px; font-weight:800; padding:2px 6px; margin-top:2px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  .jb-warn.w-over { background:var(--primary); color:#111111; }
+  .jb-warn.w-today { background:var(--signal); color:#111111; }
+  .jb-prog { width:64px; flex-shrink:0; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:5px; padding:8px; }
+  .jb-prog b { font-family:var(--font-mono); font-size:14px; }
+  .jb-prog small { font-size:10px; font-weight:800; color:var(--text-hint); }
+  .jb-bar { width:100%; height:6px; border:1.5px solid var(--ink); background:var(--surface); }
+  .jb-bar i { display:block; height:100%; background:var(--ink); }
+  .jb-bar.full i { background:var(--success); }
+
+  /* 상세 */
+  .jb-info-grid { display:grid; grid-template-columns:1fr 1fr; gap:8px; margin-bottom:12px; font-size:12px; }
+  .jb-link { font-weight:700; color:var(--primary-text); cursor:pointer; text-decoration:underline; }
+  .jb-link.mono { font-family:var(--font-mono); }
+  .jb-memo { font-size:13px; line-height:1.6; white-space:pre-wrap; word-break:break-word; background:var(--surface-2); border-left:3px solid var(--ink); padding:8px 10px; margin-bottom:12px; }
+  .jb-check-head { display:flex; justify-content:space-between; align-items:center; margin:16px 0 6px; font-size:14px; font-weight:900; }
+  .jb-items { border:2px solid var(--ink); background:var(--surface); }
+  .jb-item { display:flex; align-items:center; gap:4px; border-top:1px solid var(--border); }
+  .jb-item:first-child { border-top:none; }
+  .jb-item.i-over { background:color-mix(in srgb, var(--primary) 16%, var(--surface)); }
+  .jb-item.i-today { background:color-mix(in srgb, var(--signal) 30%, var(--surface)); }
+  .jb-check { width:46px; height:46px; flex-shrink:0; border:none; background:none; display:flex; align-items:center; justify-content:center; cursor:pointer; color:var(--text); }
+  .jb-box { width:22px; height:22px; border:2.5px solid var(--ink); background:var(--surface); display:flex; align-items:center; justify-content:center; }
+  .jb-item.done .jb-box { background:var(--ink); color:var(--bg); }
+  html[data-theme="dark"] .jb-item.done .jb-box { background:#ECEAE4; color:#111111; }
+  .jb-item-main { flex:1; min-width:0; display:flex; flex-direction:column; gap:2px; padding:8px 0; cursor:pointer; }
+  .jb-item-text { font-size:14px; font-weight:700; word-break:break-word; }
+  .jb-item.done .jb-item-text { text-decoration:line-through; color:var(--text-hint); font-weight:500; }
+  .jb-item-due { font-size:11px; color:var(--text-sub); }
+  .jb-item-due b { font-weight:900; }
+  .jb-item.i-over .jb-item-due b { color:var(--danger); }
+  .jb-item-del { width:40px; height:40px; flex-shrink:0; border:none; background:none; color:var(--text-hint); cursor:pointer; display:flex; align-items:center; justify-content:center; }
+  .jb-item-del:hover { color:var(--text); }
+  .jb-add { display:flex; gap:6px; margin-top:8px; }
+  .jb-add input { flex:1; min-width:0; }
+  .jb-add select { width:auto; flex-shrink:0; }
+  .jb-empty-items { padding:12px; font-size:12px; color:var(--text-hint); }
+
+  /* 준비 템플릿 */
+  .jb-tpl-layout { display:grid; grid-template-columns:180px minmax(0,1fr); gap:14px; }
+  .jb-tpl-list { display:flex; flex-direction:column; gap:4px; }
+  .jb-tpl-list button { text-align:left; padding:8px 10px; border:1.5px solid var(--ink); background:var(--surface); color:var(--text); font-family:inherit; font-size:13px; font-weight:700; cursor:pointer; }
+  .jb-tpl-list button.on { background:var(--ink); color:var(--bg); }
+  html[data-theme="dark"] .jb-tpl-list button.on { background:#ECEAE4; color:#111111; }
+  .jb-tpl-row { display:flex; gap:6px; margin-bottom:6px; }
+  .jb-tpl-row input { flex:1; min-width:0; }
+  .jb-tpl-row select { width:auto; }
+  .jb-tpl-hint { font-size:12px; color:var(--text-hint); margin-top:6px; line-height:1.6; }
+
+  @media (max-width:768px) {
+    .jb-toolbar { flex-direction:column; align-items:stretch; }
+    .jb-filters { display:grid !important; grid-template-columns:1fr auto; }
+    .jb-filters input { grid-column:1 / -1; max-width:none !important; }
+    .jb-seg button { flex:1; height:42px; }
+    .jb-mine { height:46px; }
+    .jb-tpl-btn { display:none; }   /* 템플릿 편집은 PC에서 */
+    .jb-toolbar > div:last-child .btn-primary { flex:1; height:46px; }
+    .jb-toolbar:has(~ .jb-layout.detail-open) { display:none; }   /* 상세를 열면 상세만 */
+    .jb-layout { flex-direction:column; }
+    .jb-list-col, .jb-detail-col { flex:none; width:100%; }
+    .jb-layout.detail-open .jb-list-col { display:none; }
+    .jb-add input, .jb-add select { height:44px; font-size:16px; }
+    .jb-tpl-layout { grid-template-columns:minmax(0,1fr); }
+  }
+</style>
+
+<div class="flex-between mb-3 jb-toolbar">
+  <div class="flex gap-2 jb-filters">
+    <div class="jb-seg" id="jb-seg"></div>
+    <button class="jb-mine" id="jb-mine" onclick="jbToggleMine()">내 담당</button>
+    <input type="search" class="form-input" id="jb-q" placeholder="작업·고객사·장비·준비 항목 검색" oninput="jbRenderList()" style="max-width:260px;">
+  </div>
+  <div class="flex gap-2">
+    <button class="btn jb-tpl-btn" onclick="jbOpenTemplates()">준비 템플릿</button>
+    <button class="btn btn-primary" onclick="jbOpenModal()">+ 작업 등록</button>
+  </div>
+</div>
+
+<div class="jb-layout">
+  <div class="jb-list-col">
+    <div id="jb-list"></div>
+    <div id="jb-empty" class="empty-state" style="display:none;"><div class="empty-icon"></div><div id="jb-empty-text">예정된 작업이 없습니다</div></div>
+  </div>
+  <div class="jb-detail-col" id="job-detail-col" style="display:none;">
+    <div class="card" id="jb-detail"></div>
+  </div>
+</div>
+
+<!-- 작업 등록·수정 -->
+<div class="modal-overlay" id="jb-modal" style="display:none;" onclick="if(event.target===this)jbCloseModal()">
+  <div class="modal" style="max-width:600px;">
+    <div class="modal-header">
+      <h3 id="jb-modal-title">작업 등록</h3>
+      <button class="modal-close" onclick="jbCloseModal()">×</button>
+    </div>
+    <div class="modal-body">
+      <input type="hidden" id="jb-edit-id">
+      <div class="form-row">
+        <div class="form-group"><label class="form-label">날짜 *</label><input type="date" class="form-input" id="f-jb-date"></div>
+        <div class="form-group"><label class="form-label">시간</label><input type="time" class="form-input" id="f-jb-time"></div>
+      </div>
+      <div class="form-group"><label class="form-label">작업 종류</label>
+        <select class="form-select" id="f-jb-type" onchange="jbTypeHint()"></select>
+        <div class="jb-tpl-hint" id="jb-type-hint"></div>
+      </div>
+      <div class="form-row">
+        <div class="form-group"><label class="form-label">고객사</label>
+          <select class="form-select" id="f-jb-customer" onchange="jbFillAssets();jbFillTickets()"><option value="">선택 안 함</option></select>
+        </div>
+        <div class="form-group"><label class="form-label">장비</label>
+          <select class="form-select" id="f-jb-asset" onchange="jbAssetPicked()"><option value="">선택 안 함</option></select>
+        </div>
+      </div>
+      <div class="form-group"><label class="form-label">연결할 장애 티켓</label>
+        <select class="form-select" id="f-jb-ticket" onchange="jbTicketPicked()"><option value="">선택 안 함</option></select>
+      </div>
+      <div class="form-group"><label class="form-label">제목</label>
+        <input type="text" class="form-input" id="f-jb-title" placeholder="비워 두면 '장비 + 작업 종류'로 자동">
+      </div>
+      <div class="form-group"><label class="form-label">담당자</label>
+        <input type="text" class="form-input" id="f-jb-assignee" list="jb-people" placeholder="담당자 이름">
+        <datalist id="jb-people"></datalist>
+      </div>
+      <div class="form-group"><label class="form-label">메모</label>
+        <textarea class="form-textarea" id="f-jb-memo" rows="3" placeholder="예: 고객 담당자 김OO 과장 / 작업 가능 시간 22시 이후"></textarea>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn" onclick="jbCloseModal()">취소</button>
+      <button class="btn btn-primary" onclick="jbSave()">저장</button>
+    </div>
+  </div>
+</div>
+
+<!-- 준비 템플릿 관리 (PC) -->
+<div class="modal-overlay" id="jb-tpl-modal" style="display:none;" onclick="if(event.target===this)jbCloseTemplates()">
+  <div class="modal" style="max-width:760px;">
+    <div class="modal-header">
+      <h3>준비 템플릿</h3>
+      <button class="modal-close" onclick="jbCloseTemplates()">×</button>
+    </div>
+    <div class="modal-body">
+      <div class="jb-tpl-layout">
+        <div>
+          <div class="jb-tpl-list" id="jb-tpl-list"></div>
+          <button class="btn btn-sm mt-2" style="width:100%;" onclick="jbTplNew()"><i data-icon="plus" data-size="14"></i> 새 템플릿</button>
+        </div>
+        <div id="jb-tpl-edit"></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+FS.requireAuth();
+
+let jbJobs = [], jbTemplatesDb = [], jbCusts = [], jbAssets = [], jbTickets = [], jbPeople = [];
+let jbView = '예정';          // '예정' | '완료' | '전체'
+let jbMineOnly = false;
+let jbSelectedId = null;
+let jbDetailFor = null;       // 상세 뼈대를 그린 작업 id
+let jbTplCur = null;          // 편집 중인 템플릿 { id, idx, name, items:[{text, due_days}] }
+let _jbSaving = false;
+
+// 준비 기한: 작업일 기준 며칠 전까지 (null = 기한 없음)
+const JB_DUES = [[null, '기한 없음'], [0, '당일'], [1, '1일 전'], [2, '2일 전'], [3, '3일 전'], [5, '5일 전'], [7, '1주 전'], [14, '2주 전']];
+// 처음 쓸 때의 기본 템플릿 (준비 템플릿에서 고치면 팀 공용으로 저장됨)
+const JB_DEFAULT_TEMPLATES = [
+  { name: '부품 교체', items: [
+    ['출입 신청', 3], ['교체 부품 수령 · P/N 확인', 2], ['작업계획서 · 작업 승인', 2],
+    ['고객 담당자 일정 · 작업 시간 확인', 1], ['공구 · 정전기 방지 밴드', 0] ] },
+  { name: '펌웨어 업데이트', items: [
+    ['대상 버전 · 릴리스 노트 확인', 5], ['출입 신청', 3], ['작업계획서 · 롤백 계획', 2],
+    ['서비스 중단 시간 고객 확인', 2], ['펌웨어 파일 USB 준비', 1] ] },
+  { name: '신규 설치', items: [
+    ['반입 장비 · 수량 확인', 3], ['출입 · 장비 반입 신청', 3], ['랙 위치 · 전원 · 케이블 확인', 2],
+    ['IP · hostname 정보 받기', 2], ['납품확인서 준비', 1] ] },
+  { name: '정기 점검', items: [
+    ['출입 신청', 3], ['이전 점검 이슈 확인', 1], ['점검표 준비', 1] ] },
+].map((t, i) => ({ id: null, idx: i, name: t.name, order: i, items: t.items.map(([text, due_days]) => ({ text, due_days })) }));
+
+function init() {
+  jbSelectedId = null; jbDetailFor = null; jbTplCur = null;
+  let pendingOpen = null, pendingNew = null;
+  if (window.hwPageFilter && window.hwPageFilter.page === 'jobs') {
+    pendingOpen = window.hwPageFilter.jobId || null;     // 홈·티켓·캘린더에서 특정 작업
+    pendingNew = window.hwPageFilter.newFor || null;     // 티켓에서 '작업 일정 잡기'
+    window.hwPageFilter = null;
+  }
+  try { jbMineOnly = localStorage.getItem('hw-jobs-mine') === '1'; } catch (e) {}
+  jbRenderSeg();
+  window.beforePageLeave = async () => {
+    const typing = (document.getElementById('jb-new-text')?.value.trim())
+      || (document.getElementById('jb-modal')?.style.display === 'flex' && (document.getElementById('f-jb-title').value.trim() || document.getElementById('f-jb-memo').value.trim()));
+    return !typing || await Dialog.confirm('작성 중인 내용이 있습니다.\n저장하지 않고 이동하시겠습니까?', true);
+  };
+  FS.watch([['jobs'], ['job_templates'], ['customers'], ['assets'], ['tickets'], ['users']],
+    ([jobs, tpls, custs, assets, tickets, users]) => {
+      jbJobs = jobs; jbTemplatesDb = tpls; jbAssets = assets; jbTickets = tickets;
+      jbCusts = custs.sort((a, b) => (a.name || '').localeCompare(b.name || ''));
+      jbPeople = [...new Set(users.map(u => u.displayName).filter(Boolean))].sort();
+      FS.setOptions(document.getElementById('f-jb-customer'), jbCusts.map(c => ({ value: c.id, label: c.name || c.id })));
+      document.getElementById('jb-people').innerHTML = jbPeople.map(n => `<option value="${FS.esc(n)}">`).join('');
+      jbRenderList();
+      if (pendingNew) { const p = pendingNew; pendingNew = null; jbOpenModal(null, p); }
+      if (pendingOpen) { const id = pendingOpen; pendingOpen = null; if (jbJobs.some(j => j.id === id)) jbShow(id, true); }
+      if (jbSelectedId) {
+        if (jbJobs.some(j => j.id === jbSelectedId)) jbRenderDetail();
+        else closeJobDetail();   // 다른 기기에서 삭제됨
+      }
+      if (document.getElementById('jb-tpl-modal').style.display === 'flex') jbTplRenderList();
+    });
+}
+
+// ── 날짜 ──
+function jbParse(ds) { return new Date(ds + 'T00:00:00'); }
+function jbDays(ds) {   // 오늘부터 며칠 뒤 (지난 날짜는 음수)
+  if (!ds) return null;
+  const t = new Date(); t.setHours(0, 0, 0, 0);
+  return Math.round((jbParse(ds) - t) / 86400000);
+}
+function jbShift(ds, n) { const d = jbParse(ds); d.setDate(d.getDate() + n); return FS.localDate(d); }
+function jbFmt(ds) {
+  if (!ds) return '';
+  const d = jbParse(ds), W = '일월화수목금토';
+  return `${String(d.getMonth() + 1).padStart(2, '0')}.${String(d.getDate()).padStart(2, '0')} ${W[d.getDay()]}`;
+}
+function jbDday(ds) {
+  const d = jbDays(ds);
+  if (d === null) return { text: '-', cls: '' };
+  if (d === 0) return { text: 'D-DAY', cls: 'd-today' };
+  if (d < 0) return { text: `D+${-d}`, cls: 'd-past' };
+  return { text: `D-${d}`, cls: d <= 2 ? 'd-soon' : '' };
+}
+
+// ── 준비 항목 ──
+// items는 맵 { itemId: {text, due_days, done, order, ...} } — 체크 하나만 필드 단위로 바꿔 동시에 체크해도 서로 덮어쓰지 않음
+function jbItems(j) {
+  return Object.entries(j.items || {}).map(([id, it]) => ({ id, ...it }))
+    .sort((a, b) => (a.order ?? 0) - (b.order ?? 0));
+}
+function jbItemDue(j, it) { return (it.due_days === null || it.due_days === undefined || !j.date) ? null : jbShift(j.date, -it.due_days); }
+function jbItemState(j, it) {   // 'over' | 'today' | ''
+  if (it.done || j.status !== '예정') return '';
+  const due = jbItemDue(j, it);
+  if (!due) return '';
+  const d = jbDays(due);
+  return d < 0 ? 'over' : d === 0 ? 'today' : '';
+}
+function jbProgress(j) {
+  const items = jbItems(j);
+  return { done: items.filter(i => i.done).length, total: items.length };
+}
+// 가장 급한 준비 항목 경고 (기한 지남·오늘까지)
+function jbWarning(j) {
+  const urgent = jbItems(j).filter(it => jbItemState(j, it))
+    .sort((a, b) => jbItemDue(j, a).localeCompare(jbItemDue(j, b)));
+  if (!urgent.length) return null;
+  const it = urgent[0], d = jbDays(jbItemDue(j, it));
+  const more = urgent.length > 1 ? ` 외 ${urgent.length - 1}건` : '';
+  return { cls: d < 0 ? 'w-over' : 'w-today', text: `${it.text} — ${d < 0 ? `${-d}일 지남` : '오늘까지'}${more}` };
+}
+function jbNewItemId() { return 'i' + Date.now().toString(36) + Math.random().toString(36).slice(2, 7); }
+function jbItemsFromTemplate(tpl) {
+  const out = {};
+  (tpl?.items || []).forEach((it, i) => {
+    if (!String(it.text || '').trim()) return;
+    out[jbNewItemId() + i] = { text: it.text.trim(), due_days: it.due_days ?? null, done: false, order: i };
+  });
+  return out;
+}
+
+// ── 이름 ──
+function jbCustName(id) { return (jbCusts.find(c => c.id === id) || {}).name || ''; }
+function jbHost(j) { const a = jbAssets.find(x => x.id === j.asset_id); return a ? (a.hostname || a.serial || '') : (j.asset_host || ''); }
+function jbMe() { return FS.getCurrentUser()?.displayName || ''; }
+
+// ── 목록 ──
+function jbRenderSeg() {
+  document.getElementById('jb-seg').innerHTML = ['예정', '완료', '전체'].map(v =>
+    `<button class="${v === jbView ? 'on' : ''}" onclick="jbSetView('${v}')">${v}</button>`).join('');
+  document.getElementById('jb-mine').classList.toggle('on', jbMineOnly);
+}
+function jbSetView(v) { jbView = v; jbRenderSeg(); jbRenderList(); }
+function jbToggleMine() {
+  jbMineOnly = !jbMineOnly;
+  try { localStorage.setItem('hw-jobs-mine', jbMineOnly ? '1' : '0'); } catch (e) {}
+  jbRenderSeg(); jbRenderList();
+}
+
+function jbGroup(j) {
+  if (j.status !== '예정') return j.status === '취소' ? '취소' : '완료';
+  const d = jbDays(j.date);
+  if (d === null) return '날짜 없음';
+  if (d < 0) return '지난 날짜 — 완료 처리 필요';
+  if (d === 0) return '오늘';
+  if (d === 1) return '내일';
+  const toSunday = (7 - new Date().getDay()) % 7;   // 월~일 기준 이번 주
+  if (d <= toSunday) return '이번 주';
+  if (d <= toSunday + 7) return '다음 주';
+  return '이후';
+}
+
+function jbRenderList() {
+  const q = document.getElementById('jb-q').value.trim().toLowerCase();
+  const me = jbMe();
+  const list = jbJobs.filter(j => {
+    const st = j.status || '예정';
+    if (jbView === '예정' && st !== '예정') return false;
+    if (jbView === '완료' && st === '예정') return false;
+    if (jbMineOnly && me && (j.assignee || '') !== me) return false;
+    if (!q) return true;
+    return [j.title, j.type, jbCustName(j.customer_id), jbHost(j), j.assignee, j.memo, j.ticket_title, ...jbItems(j).map(i => i.text)]
+      .some(v => String(v || '').toLowerCase().includes(q));
+  });
+  const key = j => (j.date || '9999') + ' ' + (j.time || '99:99');
+  list.sort((a, b) => jbView === '예정' ? key(a).localeCompare(key(b)) : key(b).localeCompare(key(a)));
+
+  const empty = document.getElementById('jb-empty');
+  empty.style.display = list.length ? 'none' : '';
+  document.getElementById('jb-empty-text').textContent =
+    q || jbMineOnly ? '조건에 맞는 작업이 없습니다' : jbView === '예정' ? '예정된 작업이 없습니다 — + 작업 등록' : '작업이 없습니다';
+
+  let html = '', last = null;
+  list.forEach(j => {
+    const g = jbView === '예정' ? jbGroup(j) : (j.date || '').slice(0, 7).replace('-', '.');
+    if (g !== last) { html += `<div class="jb-group${g.startsWith('지난') ? ' g-past' : ''}">${FS.esc(g)}</div>`; last = g; }
+    const st = j.status || '예정';
+    const dd = st === '예정' ? jbDday(j.date) : { text: st, cls: '' };
+    const { done, total } = jbProgress(j);
+    const warn = jbWarning(j);
+    const host = jbHost(j);
+    const meta = [jbCustName(j.customer_id), host ? `<span class="mono">${FS.esc(host)}</span>` : '', j.assignee]
+      .map((v, i) => i === 1 ? v : FS.esc(v || '')).filter(Boolean).join(' · ');
+    html += `<div class="jb-card${j.id === jbSelectedId ? ' sel' : ''}${st !== '예정' ? ' closed' : ''}" onclick="jbShow('${j.id}', true)">
+      <div class="jb-date">
+        <span class="jb-dday ${dd.cls}">${FS.esc(dd.text)}</span>
+        <span class="jb-dow">${jbFmt(j.date)}</span>
+        ${j.time ? `<span class="jb-dow">${FS.esc(j.time)}</span>` : ''}
+      </div>
+      <div class="jb-main">
+        <span class="jb-title">${FS.esc(j.title || '(제목 없음)')}</span>
+        <span class="jb-meta">${meta || FS.esc(j.type || '')}</span>
+        ${warn ? `<span class="jb-warn ${warn.cls}">${FS.esc(warn.text)}</span>` : ''}
+      </div>
+      ${total ? `<div class="jb-prog"><small>준비</small><b>${done}/${total}</b>
+        <div class="jb-bar${done === total ? ' full' : ''}"><i style="width:${Math.round(done / total * 100)}%"></i></div></div>` : ''}
+    </div>`;
+  });
+  document.getElementById('jb-list').innerHTML = html;
+}
+
+// ── 상세 ──
+function jbShow(id, scroll) {
+  jbSelectedId = id;
+  document.getElementById('job-detail-col').style.display = '';
+  document.querySelector('.jb-layout').classList.add('detail-open');
+  // 다른 작업을 열 때만 뼈대를 새로 (실시간 갱신에 추가 입력칸이 지워지지 않도록)
+  if (jbDetailFor !== id || !document.getElementById('jb-info')) {
+    jbDetailFor = id;
+    document.getElementById('jb-detail').innerHTML = `
+      <div id="jb-info"></div>
+      <div class="jb-check-head"><span id="jb-check-title">준비</span></div>
+      <div class="jb-items" id="jb-items"></div>
+      <div class="jb-add">
+        <input type="text" class="form-input" id="jb-new-text" placeholder="준비 항목 추가 (예: 콘솔 케이블)" autocomplete="off"
+          onkeydown="if(event.key==='Enter'&&!event.isComposing){event.preventDefault();jbAddItem();}">
+        <select class="form-select" id="jb-new-due">${JB_DUES.map(([v, l]) => `<option value="${v ?? ''}">${l}</option>`).join('')}</select>
+        <button class="btn btn-primary" onclick="jbAddItem()" aria-label="준비 항목 추가">${FS.icon('plus', 16)}</button>
+      </div>
+      <div id="jb-foot"></div>`;
+  }
+  jbRenderDetail();
+  jbRenderList();
+  if (scroll && window.innerWidth <= 768) document.getElementById('page-content').scrollTop = 0;
+}
+
+function closeJobDetail() {
+  document.getElementById('job-detail-col').style.display = 'none';
+  document.querySelector('.jb-layout')?.classList.remove('detail-open');
+  jbSelectedId = null; jbDetailFor = null;
+  jbRenderList();
+}
+
+function jbRenderDetail() {
+  const j = jbJobs.find(x => x.id === jbSelectedId);
+  if (!j || !document.getElementById('jb-info')) return;
+  const st = j.status || '예정';
+  const dd = jbDday(j.date);
+  const host = jbHost(j);
+  const assetOk = jbAssets.some(a => a.id === j.asset_id);
+  const ticket = jbTickets.find(t => t.id === j.ticket_id);
+  const STATUS_BADGE = { '예정': 'badge-info', '완료': 'badge-success', '취소': 'badge-gray' };
+  document.getElementById('jb-info').innerHTML = `
+    <div class="flex-between mb-2">
+      <div class="flex gap-2">
+        <span class="badge ${STATUS_BADGE[st] || 'badge-gray'}">${FS.esc(st)}</span>
+        ${st === '예정' ? `<span class="jb-dday ${dd.cls}">${dd.text}</span>` : ''}
+      </div>
+      <div class="flex gap-1">
+        <button class="btn btn-sm" onclick="jbOpenModal('${j.id}')">수정</button>
+        <button class="btn btn-sm btn-danger" onclick="jbDelete('${j.id}')">삭제</button>
+        <button class="btn btn-ghost btn-sm" onclick="closeJobDetail()" aria-label="닫기">${FS.icon('close', 16)}</button>
+      </div>
+    </div>
+    <h3 style="font-size:16px;font-weight:800;margin-bottom:12px;line-height:1.4;">${FS.esc(j.title || '(제목 없음)')}</h3>
+    <div class="jb-info-grid">
+      <div><span class="text-hint">일시</span><br><b>${jbFmt(j.date)}</b>${j.time ? ' ' + FS.esc(j.time) : ''}</div>
+      <div><span class="text-hint">작업 종류</span><br>${FS.esc(j.type || '-')}</div>
+      <div><span class="text-hint">고객사</span><br>${FS.esc(jbCustName(j.customer_id) || '-')}</div>
+      <div><span class="text-hint">장비</span><br>${assetOk ? `<span class="jb-link mono" onclick="jbOpenAsset('${j.asset_id}')">${FS.esc(host)}</span>` : FS.esc(host || '-')}</div>
+      <div><span class="text-hint">담당자</span><br>${FS.esc(j.assignee || '-')}</div>
+      <div><span class="text-hint">장애 티켓</span><br>${ticket ? `<span class="jb-link" onclick="jbOpenTicket('${ticket.id}')">${FS.esc(ticket.title || '열기')}</span>` : FS.esc(j.ticket_title || '-')}</div>
+    </div>
+    ${j.memo ? `<div class="jb-memo">${FS.esc(j.memo)}</div>` : ''}`;
+
+  const items = jbItems(j);
+  const { done, total } = jbProgress(j);
+  document.getElementById('jb-check-title').textContent = total ? `준비 ${done}/${total}` : '준비';
+  document.getElementById('jb-items').innerHTML = items.length ? items.map(it => {
+    const state = jbItemState(j, it);
+    const due = jbItemDue(j, it);
+    let dueText = '';
+    if (it.done) {
+      dueText = `완료${it.done_by_name ? ' · ' + FS.esc(it.done_by_name) : ''}${it.done_at ? ' · ' + jbFmt(FS.localDate(it.done_at.toDate ? it.done_at.toDate() : new Date(it.done_at))) : ''}`;
+    } else if (due) {
+      const label = (JB_DUES.find(([v]) => v === it.due_days) || [, `${it.due_days}일 전`])[1];
+      const d = jbDays(due);
+      const tail = state === 'over' ? ` — <b>${-d}일 지남</b>` : state === 'today' ? ' — <b>오늘까지</b>' : '';
+      dueText = `${label} · ${jbFmt(due)}까지${tail}`;
+    }
+    return `<div class="jb-item${it.done ? ' done' : ''}${state ? ' i-' + state : ''}">
+      <button class="jb-check" onclick="jbToggle('${j.id}','${it.id}')" aria-pressed="${!!it.done}" aria-label="${FS.esc(it.text)} 완료 표시">
+        <span class="jb-box">${it.done ? FS.icon('check', 15) : ''}</span>
+      </button>
+      <div class="jb-item-main" onclick="jbToggle('${j.id}','${it.id}')">
+        <span class="jb-item-text">${FS.esc(it.text)}</span>
+        ${dueText ? `<span class="jb-item-due">${dueText}</span>` : ''}
+      </div>
+      <button class="jb-item-del" onclick="jbDelItem('${j.id}','${it.id}')" aria-label="준비 항목 삭제">${FS.icon('trash', 16)}</button>
+    </div>`;
+  }).join('') : '<div class="jb-empty-items">준비 항목이 없습니다 — 아래에서 추가하세요</div>';
+
+  document.getElementById('jb-foot').innerHTML = `
+    <div class="mt-3">
+      <label class="form-label">상태</label>
+      <div class="flex gap-1" style="flex-wrap:wrap;">
+        ${['예정', '완료', '취소'].map(s => `<button class="btn btn-sm ${st === s ? 'btn-primary' : ''}" onclick="jbSetStatus('${j.id}','${s}')">${s}</button>`).join('')}
+      </div>
+    </div>
+    ${ticket ? `<button class="btn mt-3" style="width:100%;" onclick="jbOpenTicket('${ticket.id}')">${FS.icon('alert', 16)} 장애 티켓에 진행 기록 남기기</button>` : ''}`;
+}
+
+function jbOpenAsset(assetId) { window.hwPageFilter = { page: 'customers', assetId }; loadPage('customers'); }
+function jbOpenTicket(ticketId) { window.hwPageFilter = { page: 'tickets', ticketId }; loadPage('tickets'); }
+
+// ── 준비 항목 체크·추가·삭제 (오프라인이어도 바로 반영) ──
+function jbToggle(jobId, itemId) {
+  const j = jbJobs.find(x => x.id === jobId);
+  const it = j?.items?.[itemId];
+  if (!it) return;
+  const done = !it.done;
+  const patch = { [`items.${itemId}.done`]: done };
+  if (done) {
+    patch[`items.${itemId}.done_by_name`] = jbMe() || FS.getCurrentUser()?.email || '';
+    patch[`items.${itemId}.done_at`] = firebase.firestore.Timestamp.now();
+  }
+  FS.updateNow('jobs', jobId, patch);
+  it.done = done;   // 스냅샷 전 즉시 반영
+  jbRenderDetail(); jbRenderList();
+}
+
+function jbAddItem() {
+  const j = jbJobs.find(x => x.id === jbSelectedId);
+  const el = document.getElementById('jb-new-text');
+  const text = el.value.trim();
+  if (!j) return;
+  if (!text) { el.focus(); return; }
+  const dueVal = document.getElementById('jb-new-due').value;
+  const order = Math.max(-1, ...jbItems(j).map(i => i.order ?? 0)) + 1;
+  const id = jbNewItemId();
+  const item = { text, due_days: dueVal === '' ? null : Number(dueVal), done: false, order };
+  FS.updateNow('jobs', j.id, { [`items.${id}`]: item });
+  j.items = { ...(j.items || {}), [id]: item };
+  el.value = '';
+  el.focus();   // 연달아 추가
+  jbRenderDetail(); jbRenderList();
+}
+
+async function jbDelItem(jobId, itemId) {
+  const j = jbJobs.find(x => x.id === jobId);
+  const it = j?.items?.[itemId];
+  if (!it) return;
+  if (!await Dialog.confirm(`'${it.text}' 항목을 삭제하시겠습니까?`, true)) return;
+  FS.updateNow('jobs', jobId, { [`items.${itemId}`]: firebase.firestore.FieldValue.delete() });
+  delete j.items[itemId];
+  jbRenderDetail(); jbRenderList();
+}
+
+function jbSetStatus(id, status) {
+  const j = jbJobs.find(x => x.id === id);
+  if (!j || (j.status || '예정') === status) return;
+  FS.updateNow('jobs', id, { status, completed_at: status === '완료' ? FS.localDate() : null });
+  j.status = status;
+  if (status !== '예정') Toast.success(`작업을 '${status}'(으)로 표시했습니다`);
+  jbRenderDetail(); jbRenderList();
+}
+
+// ── 등록·수정 ──
+function jbTemplates() {
+  const list = jbTemplatesDb.length ? jbTemplatesDb : JB_DEFAULT_TEMPLATES;
+  return [...list].sort((a, b) => (a.order ?? 0) - (b.order ?? 0) || (a.name || '').localeCompare(b.name || ''));
+}
+
+function jbFillAssets(selected) {
+  const cid = document.getElementById('f-jb-customer').value;
+  const sel = document.getElementById('f-jb-asset');
+  const list = jbAssets.filter(a => !cid || a.customer_id === cid)
+    .sort((a, b) => (a.hostname || '').localeCompare(b.hostname || ''));
+  FS.setOptions(sel, list.map(a => ({
+    value: a.id,
+    label: `${a.hostname || '-'}${a.serial ? ' · ' + a.serial : ''}${cid ? '' : ' (' + (jbCustName(a.customer_id) || '-') + ')'}`,
+  })));
+  if (selected !== undefined) sel.value = selected || '';
+}
+function jbFillTickets(selected) {
+  const cid = document.getElementById('f-jb-customer').value;
+  const aid = document.getElementById('f-jb-asset').value;
+  const sel = document.getElementById('f-jb-ticket');
+  const keep = selected !== undefined ? selected : sel.value;
+  const list = jbTickets.filter(t => t.id === keep ||
+      (t.status !== '완료' && (!cid || t.customer_id === cid) && (!aid || t.asset_id === aid)))
+    .sort((a, b) => (b.created_at?.seconds || 0) - (a.created_at?.seconds || 0));
+  FS.setOptions(sel, list.map(t => ({
+    value: t.id,
+    label: `${t.title || '(제목 없음)'}${t.asset_host ? ' · ' + t.asset_host : ''}${t.status === '완료' ? ' (완료)' : ''}`,
+  })));
+  sel.value = list.some(t => t.id === keep) ? keep : '';
+}
+function jbAssetPicked() {
+  const a = jbAssets.find(x => x.id === document.getElementById('f-jb-asset').value);
+  if (a && a.customer_id && document.getElementById('f-jb-customer').value !== a.customer_id) {
+    document.getElementById('f-jb-customer').value = a.customer_id;
+    jbFillAssets(a.id);
+  }
+  jbFillTickets();
+}
+function jbTicketPicked() {
+  // 티켓을 고르면 고객사·장비를 티켓 것으로
+  const t = jbTickets.find(x => x.id === document.getElementById('f-jb-ticket').value);
+  if (!t) return;
+  if (t.customer_id) document.getElementById('f-jb-customer').value = t.customer_id;
+  jbFillAssets(t.asset_id || '');
+  jbFillTickets(t.id);
+}
+function jbTypeHint() {
+  const hint = document.getElementById('jb-type-hint');
+  if (document.getElementById('jb-edit-id').value) { hint.textContent = '준비 항목은 상세 화면에서 추가·삭제합니다'; return; }
+  const tpl = jbTemplates().find(t => t.name === document.getElementById('f-jb-type').value);
+  const items = (tpl?.items || []).filter(i => i.text);
+  hint.textContent = items.length ? `준비 항목 ${items.length}개가 들어갑니다: ${items.map(i => i.text).join(', ')}` : '준비 항목 없이 시작 (상세 화면에서 추가)';
+}
+
+function jbOpenModal(id, prefill) {
+  const j = id ? jbJobs.find(x => x.id === id) : null;
+  document.getElementById('jb-modal').style.display = 'flex';
+  document.getElementById('jb-modal-title').textContent = j ? '작업 수정' : '작업 등록';
+  document.getElementById('jb-edit-id').value = j ? j.id : '';
+  const typeSel = document.getElementById('f-jb-type');
+  const names = jbTemplates().map(t => t.name);
+  if (j?.type && !names.includes(j.type)) names.push(j.type);
+  typeSel.innerHTML = names.map(n => `<option value="${FS.esc(n)}">${FS.esc(n)}</option>`).join('') + '<option value="">기타 (빈 목록)</option>';
+  const src = j || prefill || {};
+  document.getElementById('f-jb-date').value = j ? (j.date || '') : (prefill?.date || jbShift(FS.localDate(), 1));
+  document.getElementById('f-jb-time').value = src.time || '';
+  typeSel.value = j ? (j.type || '') : (prefill?.type ?? names[0] ?? '');
+  document.getElementById('f-jb-customer').value = src.customer_id || '';
+  jbFillAssets(src.asset_id || '');
+  jbFillTickets(src.ticket_id || '');
+  document.getElementById('f-jb-title').value = j ? (j.title || '') : '';
+  document.getElementById('f-jb-assignee').value = j ? (j.assignee || '') : (prefill?.assignee || jbMe());
+  document.getElementById('f-jb-memo').value = src.memo || '';
+  jbTypeHint();
+}
+function jbCloseModal() { document.getElementById('jb-modal').style.display = 'none'; }
+
+function jbSave() {
+  if (_jbSaving) return;   // 두 번 탭해 중복 등록 방지
+  const date = document.getElementById('f-jb-date').value;
+  if (!date) { Toast.error('날짜를 입력하세요'); return; }
+  const type = document.getElementById('f-jb-type').value;
+  const assetId = document.getElementById('f-jb-asset').value;
+  const a = jbAssets.find(x => x.id === assetId);
+  const ticketId = document.getElementById('f-jb-ticket').value;
+  const t = jbTickets.find(x => x.id === ticketId);
+  let title = document.getElementById('f-jb-title').value.trim();
+  if (!title) title = [a?.hostname, type || (t ? t.title : '')].filter(Boolean).join(' ');
+  if (!title) { Toast.error('제목을 입력하거나 장비·작업 종류를 고르세요'); return; }
+  const data = {
+    title, type, date,
+    time: document.getElementById('f-jb-time').value,
+    customer_id: document.getElementById('f-jb-customer').value,
+    asset_id: assetId, asset_host: a ? (a.hostname || a.serial || '') : '',   // 장비가 삭제돼도 남도록
+    ticket_id: ticketId, ticket_title: t ? (t.title || '') : '',
+    assignee: document.getElementById('f-jb-assignee').value.trim(),
+    memo: document.getElementById('f-jb-memo').value.trim(),
+  };
+  const id = document.getElementById('jb-edit-id').value;
+  if (id) {
+    FS.updateNow('jobs', id, data);
+    FS.audit('수정', '작업', id, title, `${date}${data.asset_host ? ' · ' + data.asset_host : ''}`);
+    const j = jbJobs.find(x => x.id === id);
+    if (j) Object.assign(j, data);
+    Toast.success('작업이 수정되었습니다');
+    jbCloseModal();
+    jbRenderList(); jbRenderDetail();
+    return;
+  }
+  _jbSaving = true;
+  setTimeout(() => { _jbSaving = false; }, 800);
+  const items = jbItemsFromTemplate(jbTemplates().find(x => x.name === type));
+  const newId = FS.addNow('jobs', { ...data, status: '예정', items, ...FS.creator() });
+  FS.audit('등록', '작업', newId, title, `${date}${data.asset_host ? ' · ' + data.asset_host : ''}`);
+  if (!jbJobs.some(x => x.id === newId)) jbJobs.push({ id: newId, ...data, status: '예정', items });
+  jbCloseModal();
+  if (jbView === '완료') jbSetView('예정');
+  Toast.success('작업이 등록되었습니다');
+  jbShow(newId, true);
+}
+
+async function jbDelete(id) {
+  const j = jbJobs.find(x => x.id === id);
+  if (!await Dialog.confirm(`'${j?.title || ''}' 작업을 삭제하시겠습니까?`, true)) return;
+  try { await FS.remove('jobs', id); }
+  catch (e) { Toast.error('삭제 실패: ' + (e.code || e.message)); return; }
+  FS.audit('삭제', '작업', id, j?.title, [j?.date, jbHost(j || {}), j?.status].filter(Boolean).join(' · '));
+  jbJobs = jbJobs.filter(x => x.id !== id);
+  closeJobDetail();
+  Toast.success('작업이 삭제되었습니다');
+}
+
+// ── 준비 템플릿 (팀 공용) ──
+function jbOpenTemplates() {
+  document.getElementById('jb-tpl-modal').style.display = 'flex';
+  const first = jbTemplates()[0];
+  jbTplCur = first ? jbTplCopy(first) : { id: null, idx: null, name: '', items: [{ text: '', due_days: null }] };
+  jbTplRenderList(); jbTplRenderEdit();
+}
+function jbCloseTemplates() { document.getElementById('jb-tpl-modal').style.display = 'none'; jbTplCur = null; }
+function jbTplCopy(t) { return { id: t.id, idx: t.idx ?? null, name: t.name || '', items: (t.items || []).map(i => ({ text: i.text || '', due_days: i.due_days ?? null })) }; }
+function jbTplKey(t) { return t.id || 'd' + t.idx; }
+
+function jbTplRenderList() {
+  const cur = jbTplCur ? jbTplKey(jbTplCur) : '';
+  document.getElementById('jb-tpl-list').innerHTML = jbTemplates().map(t =>
+    `<button class="${jbTplKey(t) === cur ? 'on' : ''}" onclick="jbTplPick('${jbTplKey(t)}')">${FS.esc(t.name || '(이름 없음)')} <span class="text-hint" style="font-weight:400;">${(t.items || []).length}</span></button>`).join('');
+}
+function jbTplPick(key) {
+  const t = jbTemplates().find(x => jbTplKey(x) === key);
+  if (!t) return;
+  jbTplCur = jbTplCopy(t);
+  jbTplRenderList(); jbTplRenderEdit();
+}
+function jbTplNew() {
+  jbTplCur = { id: null, idx: null, name: '', items: [{ text: '', due_days: null }] };
+  jbTplRenderList(); jbTplRenderEdit();
+  document.getElementById('jb-tpl-name').focus();
+}
+function jbTplSync() {   // 입력값 → jbTplCur
+  if (!jbTplCur || !document.getElementById('jb-tpl-name')) return;
+  jbTplCur.name = document.getElementById('jb-tpl-name').value;
+  jbTplCur.items = jbTplCur.items.map((it, i) => ({
+    text: document.getElementById('jb-tpl-t' + i).value,
+    due_days: (v => v === '' ? null : Number(v))(document.getElementById('jb-tpl-d' + i).value),
+  }));
+}
+function jbTplRenderEdit() {
+  const t = jbTplCur;
+  document.getElementById('jb-tpl-edit').innerHTML = `
+    <div class="form-group"><label class="form-label">템플릿 이름 (작업 종류)</label>
+      <input type="text" class="form-input" id="jb-tpl-name" value="${FS.esc(t.name)}" placeholder="예: 메모리 증설"></div>
+    <label class="form-label">준비 항목 · 기한</label>
+    ${t.items.map((it, i) => `<div class="jb-tpl-row">
+      <input type="text" class="form-input" id="jb-tpl-t${i}" value="${FS.esc(it.text)}" placeholder="예: 출입 신청">
+      <select class="form-select" id="jb-tpl-d${i}">${JB_DUES.map(([v, l]) => `<option value="${v ?? ''}"${v === it.due_days ? ' selected' : ''}>${l}</option>`).join('')}</select>
+      <button class="btn btn-ghost btn-sm" onclick="jbTplRemoveRow(${i})" aria-label="항목 삭제">${FS.icon('trash', 15)}</button>
+    </div>`).join('')}
+    <button class="btn btn-sm" onclick="jbTplAddRow()">${FS.icon('plus', 14)} 항목</button>
+    <div class="jb-tpl-hint">기한은 작업일 기준입니다. 작업 날짜를 바꾸면 준비 기한도 함께 바뀝니다.<br>템플릿을 고쳐도 이미 등록된 작업의 준비 항목은 바뀌지 않습니다.</div>
+    <div class="flex gap-1 mt-3" style="justify-content:flex-end;">
+      ${t.id || t.idx !== null ? '<button class="btn btn-danger" onclick="jbTplDelete()">템플릿 삭제</button>' : ''}
+      <span style="flex:1;"></span>
+      <button class="btn btn-primary" onclick="jbTplSave()">저장</button>
+    </div>`;
+}
+function jbTplAddRow() {
+  jbTplSync(); jbTplCur.items.push({ text: '', due_days: null }); jbTplRenderEdit();
+  document.getElementById('jb-tpl-t' + (jbTplCur.items.length - 1)).focus();
+}
+function jbTplRemoveRow(i) { jbTplSync(); jbTplCur.items.splice(i, 1); jbTplRenderEdit(); }
+
+// 아직 저장된 템플릿이 없으면(기본 템플릿 사용 중) 처음 저장할 때 기본 템플릿을 모두 함께 저장
+function jbTplSeedBatch(batch, skipIdx) {
+  if (jbTemplatesDb.length) return;
+  const col = firebase.firestore().collection('job_templates');
+  JB_DEFAULT_TEMPLATES.forEach(t => {
+    if (t.idx === skipIdx) return;
+    batch.set(col.doc(), { name: t.name, order: t.order, items: t.items, ...FS.creator(), created_at: firebase.firestore.FieldValue.serverTimestamp() });
+  });
+}
+function jbTplSave() {
+  jbTplSync();
+  const t = jbTplCur;
+  const name = t.name.trim();
+  if (!name) { Toast.error('템플릿 이름을 입력하세요'); return; }
+  if (jbTemplates().some(x => x.name === name && jbTplKey(x) !== jbTplKey(t))) { Toast.error('같은 이름의 템플릿이 있습니다'); return; }
+  const items = t.items.filter(i => i.text.trim()).map(i => ({ text: i.text.trim(), due_days: i.due_days }));
+  const db = firebase.firestore(), batch = db.batch();
+  jbTplSeedBatch(batch, t.idx);
+  const ref = t.id ? db.collection('job_templates').doc(t.id) : db.collection('job_templates').doc();
+  const order = t.id ? (jbTemplatesDb.find(x => x.id === t.id)?.order ?? 0)
+    : t.idx !== null ? t.idx : Math.max(JB_DEFAULT_TEMPLATES.length - 1, ...jbTemplatesDb.map(x => x.order ?? 0)) + 1;
+  batch.set(ref, { name, items, order, updated_at: firebase.firestore.FieldValue.serverTimestamp(), ...(t.id ? {} : FS.creator()) }, { merge: true });
+  batch.commit().catch(e => Toast.error('템플릿 저장 실패: ' + (e.code || e.message)));
+  jbTplCur = { id: ref.id, idx: null, name, items };
+  Toast.success('템플릿을 저장했습니다');
+  jbTplRenderEdit();
+}
+async function jbTplDelete() {
+  const t = jbTplCur;
+  if (!await Dialog.confirm(`'${t.name}' 템플릿을 삭제하시겠습니까?\n이미 등록된 작업에는 영향이 없습니다.`, true)) return;
+  const db = firebase.firestore(), batch = db.batch();
+  jbTplSeedBatch(batch, t.idx);
+  if (t.id) batch.delete(db.collection('job_templates').doc(t.id));
+  batch.commit().catch(e => Toast.error('템플릿 삭제 실패: ' + (e.code || e.message)));
+  jbTplCur = { id: null, idx: null, name: '', items: [{ text: '', due_days: null }] };
+  jbTplRenderEdit();
+}
+
+init();
+</script>

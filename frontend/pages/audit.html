@@ -74,7 +74,7 @@ function renderAuditFilters() {
   document.getElementById('au-actions').innerHTML =
     ['', '등록', '수정', '삭제'].map(a => chip(a, auAction, 'setAuAction', a || '전체 작업')).join('');
   document.getElementById('au-entities').innerHTML =
-    ['', '티켓', '장비', '고객사', '프로젝트'].map(a => chip(a, auEntity, 'setAuEntity', a || '전체 대상')).join('');
+    ['', '티켓', '작업', '장비', '고객사', '프로젝트'].map(a => chip(a, auEntity, 'setAuEntity', a || '전체 대상')).join('');
 }
 function setAuAction(a) { auAction = a; renderAuditFilters(); renderAudit(); }
 function setAuEntity(a) { auEntity = a; renderAuditFilters(); renderAudit(); }

@@ -52,6 +52,7 @@ const _ICONS = {
   qr:       '<rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/><path d="M14 14h3v3M21 14v7h-4M17 21h.01"/>',
   chevron:  '<path d="M9 6l6 6-6 6"/>',
   back:     '<path d="M15 6l-6 6 6 6"/>',
+  tasks:    '<rect x="4" y="3" width="16" height="18" rx="1"/><path d="M7.5 8.5l1.5 1.5 2.5-2.5M7.5 15l1.5 1.5 2.5-2.5M14 9h3M14 15.5h3"/>',
   copy:     '<rect x="9" y="9" width="11" height="11" rx="1"/><path d="M5 15V5a1 1 0 011-1h10"/>',
 };
 

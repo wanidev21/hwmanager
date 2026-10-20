@@ -167,6 +167,7 @@ FS.requireAuth();
 let allTickets = [];
 let ticketCusts = {};
 let ticketAssets = [];   // 장비 연결용
+let ticketJobs = [];     // 이 티켓으로 잡은 작업 일정
 let ticketSelectedId = null;
 
 const STATUS_BADGE = { '접수':'badge-info','진행중':'badge-warning','보류':'badge-gray','완료':'badge-success' };
@@ -191,9 +192,10 @@ function init() {
       || (document.getElementById('ticket-modal')?.style.display === 'flex' && document.getElementById('f-title').value.trim());
     return !typing || await Dialog.confirm('작성 중인 내용이 있습니다.\n저장하지 않고 이동하시겠습니까?', true);
   };
-  FS.watch([['tickets'], ['customers'], ['assets']], ([tickets, custList, assets]) => {
+  FS.watch([['tickets'], ['customers'], ['assets'], ['jobs']], ([tickets, custList, assets, jobs]) => {
     allTickets = tickets;
     ticketAssets = assets;
+    ticketJobs = jobs;
     allTickets.sort((a,b)=>(b.created_at?.seconds||0)-(a.created_at?.seconds||0));
     ticketCusts = {};
     custList.forEach(c=>ticketCusts[c.id]=c.name||c.id);
@@ -436,7 +438,36 @@ function tlRenderInfo() {
         `).join('')}
       </div>
     </div>
+    ${tkJobsHtml(t)}
     ${tkRelatedHtml(t)}`;
+}
+
+// ── 작업 일정 (부품 교체 방문 등): 이 티켓으로 잡은 작업과 준비 진행 ──
+function tkJobsHtml(t) {
+  const jobs = ticketJobs.filter(j => j.ticket_id === t.id)
+    .sort((a, b) => ((a.status || '예정') !== '예정') - ((b.status || '예정') !== '예정') || (a.date || '').localeCompare(b.date || ''));
+  const today = new Date(); today.setHours(0, 0, 0, 0);
+  const dday = ds => { const d = Math.round((new Date(ds + 'T00:00:00') - today) / 86400000); return d === 0 ? 'D-DAY' : d < 0 ? `D+${-d}` : `D-${d}`; };
+  return `<div class="td-related">
+    <div class="td-related-head">
+      <span>작업 일정 ${jobs.length ? jobs.length + '건' : ''}</span>
+      <button class="btn btn-sm" onclick="tkPlanJob('${t.id}')">${FS.icon('plus', 14)} 작업 일정 잡기</button>
+    </div>
+    ${jobs.map(j => {
+      const items = Object.values(j.items || {});
+      const st = j.status || '예정';
+      return `<div class="td-related-item" onclick="window.hwPageFilter={page:'jobs',jobId:'${j.id}'};loadPage('jobs')">
+        <span>${FS.esc(j.title || '')}<span class="tk-host">${FS.esc(j.date || '')}${j.time ? ' ' + FS.esc(j.time) : ''}${items.length ? ` · 준비 ${items.filter(i => i.done).length}/${items.length}` : ''}</span></span>
+        <span class="badge ${st === '예정' ? 'badge-warning' : 'badge-gray'}">${st === '예정' && j.date ? dday(j.date) : FS.esc(st)}</span>
+      </div>`;
+    }).join('')}
+  </div>`;
+}
+function tkPlanJob(ticketId) {
+  const t = allTickets.find(x => x.id === ticketId);
+  if (!t) return;
+  window.hwPageFilter = { page: 'jobs', newFor: { ticket_id: t.id, customer_id: t.customer_id, asset_id: t.asset_id, assignee: t.assignee } };
+  loadPage('jobs');
 }
 
 // ── 장비 연결 ──

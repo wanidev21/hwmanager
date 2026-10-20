@@ -49,6 +49,9 @@
         </a>
 
         <div class="nav-group-label">일정·기록</div>
+        <a class="nav-item" data-page="jobs" href="#">
+          <span class="nav-icon"><i data-icon="tasks"></i></span> 작업 일정
+        </a>
         <a class="nav-item" data-page="calendar" href="#">
           <span class="nav-icon"><i data-icon="calendar"></i></span> 캘린더
         </a>
@@ -113,7 +116,7 @@
         <a class="tab-item" data-page="overview" href="#"><i data-icon="home" data-size="22"></i>홈</a>
         <a class="tab-item" data-page="customers" href="#"><i data-icon="server" data-size="22"></i>장비</a>
         <a class="tab-item" data-page="tickets" href="#"><i data-icon="alert" data-size="22"></i>장애</a>
-        <a class="tab-item" data-page="calendar" href="#"><i data-icon="calendar" data-size="22"></i>일정</a>
+        <a class="tab-item" data-page="jobs" href="#"><i data-icon="tasks" data-size="22"></i>작업</a>
         <a class="tab-item" id="tab-more" href="#"><i data-icon="more" data-size="22"></i>더보기</a>
       </nav>
     </main>
@@ -163,6 +166,7 @@
       kb:        '지식베이스',
       warranty:  '워런티 현황',
       calendar:  '캘린더',
+      jobs:      '작업 일정',
       tech:      '기술 학습',
       delivery:  '납품확인서',
       users:     '회원 관리',
@@ -175,6 +179,7 @@
       tickets:   '장애·현황',
       warranty:  '장애·현황',
       calendar:  '일정·기록',
+      jobs:      '일정·기록',
       kb:        '지식·기술',
       tech:      '지식·기술',
       users:     '관리',
@@ -365,6 +370,9 @@
         window.closeCustomerPanel(); return true;                     // 고객사: 프로젝트 → 고객사 목록
       }
       // 티켓 상세는 구독 해제·목록 복귀까지 하는 전용 닫기 사용
+      if (_visible(document.querySelector('#page-content #job-detail-col')) && typeof window.closeJobDetail === 'function') {
+        window.closeJobDetail(); return true;                         // 작업 상세 → 목록
+      }
       if (_visible(document.querySelector('#page-content #detail-col')) && currentPage === 'tickets' && typeof window.closeTicketDetail === 'function') {
         window.closeTicketDetail(); return true;
       }

@@ -171,6 +171,9 @@ window.FS = {
         role:        'user',
         created_at:  firebase.firestore.FieldValue.serverTimestamp(),
       });
+    } else if (user.displayName && snap.data().displayName !== user.displayName) {
+      // Google 이름이 처음 로그인 때 비어 있었거나 바뀐 경우 (담당자 목록 등에 사용)
+      await ref.update({ displayName: user.displayName, photoURL: user.photoURL || '' }).catch(() => {});
     }
     localStorage.setItem('hw-last-active', Date.now());
   },

@@ -233,7 +233,9 @@ function init() {
     ([jobs, tpls, custs, assets, tickets, users]) => {
       jbJobs = jobs; jbTemplatesDb = tpls; jbAssets = assets; jbTickets = tickets;
       jbCusts = custs.sort((a, b) => (a.name || '').localeCompare(b.name || ''));
-      jbPeople = [...new Set(users.map(u => u.displayName).filter(Boolean))].sort();
+      // 담당자 추천: 팀원 이름 + 티켓·작업에 이미 쓴 담당자
+      jbPeople = [...new Set([...users.map(u => u.displayName), ...tickets.map(t => t.assignee), ...jobs.map(j => j.assignee)]
+        .map(v => String(v || '').trim()).filter(Boolean))].sort((a, b) => a.localeCompare(b));
       FS.setOptions(document.getElementById('f-jb-customer'), jbCusts.map(c => ({ value: c.id, label: c.name || c.id })));
       document.getElementById('jb-people').innerHTML = jbPeople.map(n => `<option value="${FS.esc(n)}">`).join('');
       jbRenderList();
@@ -628,8 +630,12 @@ function jbSave() {
   const a = jbAssets.find(x => x.id === assetId);
   const ticketId = document.getElementById('f-jb-ticket').value;
   const t = jbTickets.find(x => x.id === ticketId);
+  const autoTitle = (host, ty, tk) => [host, ty || (tk ? tk.title : '')].filter(Boolean).join(' ');
   let title = document.getElementById('f-jb-title').value.trim();
-  if (!title) title = [a?.hostname, type || (t ? t.title : '')].filter(Boolean).join(' ');
+  // 자동으로 붙은 제목을 그대로 둔 채 장비·종류를 바꾸면 제목도 새로
+  const old = jbJobs.find(x => x.id === document.getElementById('jb-edit-id').value);
+  if (old && title === old.title && title === autoTitle(old.asset_host, old.type, jbTickets.find(x => x.id === old.ticket_id))) title = '';
+  if (!title) title = autoTitle(a?.hostname, type, t);
   if (!title) { Toast.error('제목을 입력하거나 장비·작업 종류를 고르세요'); return; }
   const data = {
     title, type, date,

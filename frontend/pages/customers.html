@@ -150,7 +150,7 @@ html[data-theme="dark"] .cust-item.active .cust-item-name, html[data-theme="dark
             <thead>
               <tr>
                 <th>Hostname</th><th>S/N</th><th>IP</th><th>OS</th>
-                <th>상태</th><th>BMC버전</th><th>드라이버버전</th>
+                <th>상태</th><th>BIOS</th><th>BMC</th><th>RAID</th>
                 <th style="width:90px;"></th>
               </tr>
             </thead>
@@ -305,12 +305,16 @@ html[data-theme="dark"] .cust-item.active .cust-item-name, html[data-theme="dark
         <div class="form-group"><label class="form-label">디스크</label><input type="text" class="form-input" id="f-asset-disk" placeholder="NVMe 3.84TB x4"></div>
       </div>
       <div class="form-row">
-        <div class="form-group"><label class="form-label">BMC버전</label><input type="text" class="form-input" id="f-asset-bmc" placeholder="3.00.00"></div>
         <div class="form-group"><label class="form-label">BIOS버전</label><input type="text" class="form-input" id="f-asset-bios" placeholder="1.12.3"></div>
+        <div class="form-group"><label class="form-label">BMC버전</label><input type="text" class="form-input" id="f-asset-bmc" placeholder="3.00.00"></div>
       </div>
       <div class="form-row">
+        <div class="form-group"><label class="form-label">RAID 펌웨어</label><input type="text" class="form-input" id="f-asset-raid" placeholder="52.26.0-5179"></div>
         <div class="form-group"><label class="form-label">드라이버버전</label><input type="text" class="form-input" id="f-asset-driver" placeholder="550.107.02"></div>
+      </div>
+      <div class="form-row">
         <div class="form-group"><label class="form-label">설치일</label><input type="date" class="form-input" id="f-asset-install-date"></div>
+        <div class="form-group"></div>
       </div>
       <div class="form-group">
         <label class="form-label">벤더케이스번호</label>
@@ -558,8 +562,9 @@ function renderAssets() {
       <td class="mono-cell">${escHtml(a.ip_address || '-')}</td>
       <td>${escHtml(a.os || '-')}</td>
       <td><span class="badge ${sc}">${FS.esc(a.status || '-')}</span></td>
+      <td class="mono-cell">${escHtml(a.bios_version || '-')}</td>
       <td class="mono-cell">${escHtml(a.bmc_version || '-')}</td>
-      <td class="mono-cell">${escHtml(a.driver_version || '-')}</td>
+      <td class="mono-cell">${escHtml(a.raid_version || '-')}</td>
       <td onclick="event.stopPropagation()">
         <div class="flex gap-1">
           <button class="btn btn-ghost btn-sm" onclick="openAssetModal('${a.id}')" aria-label="수정">${FS.icon('edit', 16)}</button>
@@ -585,8 +590,9 @@ function viewAsset(id) {
     ['IP', a.ip_address], ['위치', a.location],
     ['OS', a.os], ['CPU', a.cpu],
     ['메모리', a.memory], ['GPU', a.gpu],
-    ['디스크', a.disk], ['BMC', a.bmc_version],
-    ['BIOS', a.bios_version], ['드라이버', a.driver_version],
+    ['디스크', a.disk], ['BIOS', a.bios_version],
+    ['BMC', a.bmc_version], ['RAID', a.raid_version],
+    ['드라이버', a.driver_version],
     ['설치일', a.install_date], ['벤더케이스', a.vendor_case_no],
     ['등록', [a.created_by_name, FS.formatDate(a.created_at)].filter(Boolean).join(' · ')],
   ];
@@ -926,13 +932,14 @@ function openAssetModal(id) {
     document.getElementById('f-asset-bmc').value         = a.bmc_version    || '';
     document.getElementById('f-asset-bios').value        = a.bios_version   || '';
     document.getElementById('f-asset-driver').value      = a.driver_version || '';
+    document.getElementById('f-asset-raid').value        = a.raid_version || '';
     document.getElementById('f-asset-install-date').value= a.install_date   || '';
     document.getElementById('f-asset-vendor-case').value = a.vendor_case_no || '';
     document.getElementById('f-asset-memo').value        = a.memo           || '';
   } else {
     ['f-asset-hostname','f-asset-device-type','f-asset-model','f-asset-serial',
      'f-asset-location','f-asset-ip','f-asset-os','f-asset-cpu','f-asset-memory',
-     'f-asset-gpu','f-asset-disk','f-asset-bmc','f-asset-bios','f-asset-driver',
+     'f-asset-gpu','f-asset-disk','f-asset-bmc','f-asset-bios','f-asset-driver','f-asset-raid',
      'f-asset-install-date','f-asset-vendor-case','f-asset-memo']
       .forEach(i => document.getElementById(i).value = '');
     document.getElementById('f-asset-status').value = '운영중';
@@ -962,6 +969,7 @@ async function saveAsset() {
     bmc_version:    document.getElementById('f-asset-bmc').value.trim(),
     bios_version:   document.getElementById('f-asset-bios').value.trim(),
     driver_version: document.getElementById('f-asset-driver').value.trim(),
+    raid_version:   document.getElementById('f-asset-raid').value.trim(),
     install_date:   document.getElementById('f-asset-install-date').value,
     vendor_case_no: document.getElementById('f-asset-vendor-case').value.trim(),
     memo:           document.getElementById('f-asset-memo').value.trim(),
@@ -1002,12 +1010,12 @@ async function deleteAsset(id) {
 // ── CSV 일괄 가져오기 ─────────────────────────────────────────────────────────
 const CSV_FIELDS = [
   'hostname','device_type','model','serial','location','ip_address','os','status',
-  'cpu','memory','gpu','disk','bmc_version','bios_version','driver_version',
+  'cpu','memory','gpu','disk','bmc_version','bios_version','raid_version','driver_version',
   'install_date','vendor_case_no','memo'
 ];
 const CSV_LABELS = [
   'Hostname(필수)','장비유형','모델명','S/N','위치','IP주소','OS','상태(운영중/장애/점검중/폐기)',
-  'CPU','메모리','GPU','디스크','BMC버전','BIOS버전','드라이버버전',
+  'CPU','메모리','GPU','디스크','BMC버전','BIOS버전','RAID펌웨어','드라이버버전',
   '설치일(YYYY-MM-DD)','벤더케이스번호','메모'
 ];
 
@@ -1015,7 +1023,7 @@ function downloadCsvTemplate() {
   const sample = [
     'server-01','GPU서버','DGX H100','SN123456','Rack-A01','192.168.1.10',
     'Ubuntu 22.04','운영중','Intel Xeon Gold 6338','512GB DDR4','NVIDIA H100 x8',
-    'NVMe 3.84TB x4','3.00.00','1.12.3','550.107.02','2024-01-15','','샘플 장비'
+    'NVMe 3.84TB x4','3.00.00','1.12.3','52.26.0-5179','550.107.02','2024-01-15','','샘플 장비'
   ];
   const rows = [
     CSV_LABELS.map(h => `"${h}"`).join(','),

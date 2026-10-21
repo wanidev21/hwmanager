@@ -316,7 +316,9 @@ function showProjectAssets(projectId, scroll = true) {
       ['메모리',    a.memory],
       ['GPU',       a.gpu],
       ['디스크',    a.disk],
+      ['BIOS',      a.bios_version],
       ['BMC',       a.bmc_version],
+      ['RAID',      a.raid_version],
       ['드라이버',  a.driver_version],
     ].filter(([, v]) => v);
     return `<div class="asset-row">

@@ -47,6 +47,12 @@
   .jb-info-grid { display:grid; grid-template-columns:1fr 1fr; gap:8px; margin-bottom:12px; font-size:12px; }
   .jb-link { font-weight:700; color:var(--primary-text); cursor:pointer; text-decoration:underline; }
   .jb-link.mono { font-family:var(--font-mono); }
+  .jb-fw { font-size:12px; line-height:1.7; border:2px solid var(--ink); padding:8px 10px; margin-top:12px; }
+  .jb-fw b { font-family:var(--font-mono); }
+  .jb-fw-row { display:grid; grid-template-columns:56px 1fr; align-items:center; gap:4px 10px; margin-bottom:12px; }
+  .jb-fw-row label { font-weight:800; }
+  .jb-fw-row input { font-family:var(--font-mono); }
+  .jb-fw-cur { grid-column:2; font-size:11px; color:var(--text-hint); font-family:var(--font-mono); }
   .jb-memo { font-size:13px; line-height:1.6; white-space:pre-wrap; word-break:break-word; background:var(--surface-2); border-left:3px solid var(--ink); padding:8px 10px; margin-bottom:12px; }
   .jb-check-head { display:flex; justify-content:space-between; align-items:center; margin:16px 0 6px; font-size:14px; font-weight:900; }
   .jb-items { border:2px solid var(--ink); background:var(--surface); }
@@ -168,6 +174,24 @@
 </div>
 
 <!-- 준비 템플릿 관리 (PC) -->
+<!-- 작업 완료 → 펌웨어 버전 확인 (바뀐 값만 장비에 반영) -->
+<div class="modal-overlay" id="jb-fw-modal" style="display:none;" onclick="if(event.target===this)jbCloseFw()">
+  <div class="modal" style="max-width:440px;">
+    <div class="modal-header">
+      <h3>펌웨어 버전 확인</h3>
+      <button class="modal-close" onclick="jbCloseFw()">×</button>
+    </div>
+    <div class="modal-body">
+      <div style="font-size:13px;margin-bottom:14px;"><b class="mono" id="jb-fw-host"></b> — 작업 후 버전이 바뀌었으면 고쳐 주세요</div>
+      <div id="jb-fw-fields"></div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn" onclick="jbCloseFw()">변경 없음</button>
+      <button class="btn btn-primary" onclick="jbSaveFw()">장비에 반영</button>
+    </div>
+  </div>
+</div>
+
 <div class="modal-overlay" id="jb-tpl-modal" style="display:none;" onclick="if(event.target===this)jbCloseTemplates()">
   <div class="modal" style="max-width:760px;">
     <div class="modal-header">
@@ -500,6 +524,7 @@ function jbRenderDetail() {
         ${['예정', '완료', '취소'].map(s => `<button class="btn btn-sm ${st === s ? 'btn-primary' : ''}" onclick="jbSetStatus('${j.id}','${s}')">${s}</button>`).join('')}
       </div>
     </div>
+    ${jbFwSummary(j, st, assetOk)}
     ${ticket ? `<button class="btn mt-3" style="width:100%;" onclick="jbOpenTicket('${ticket.id}')">${FS.icon('alert', 16)} 장애 티켓에 진행 기록 남기기</button>` : ''}`;
 }
 
@@ -556,6 +581,57 @@ function jbSetStatus(id, status) {
   j.status = status;
   if (status !== '예정') Toast.success(`작업을 '${status}'(으)로 표시했습니다`);
   jbRenderDetail(); jbRenderList();
+  if (status === '완료' && jbAssets.some(a => a.id === j.asset_id)) jbOpenFw(id);
+}
+
+// ── 작업 완료 후 펌웨어 버전 (BIOS·BMC·RAID) → 장비 정보 갱신 ──
+const JB_FW = [['bios_version', 'BIOS'], ['bmc_version', 'BMC'], ['raid_version', 'RAID']];
+let jbFwJobId = null;
+
+function jbOpenFw(jobId) {
+  const j = jbJobs.find(x => x.id === jobId);
+  const a = j && jbAssets.find(x => x.id === j.asset_id);
+  if (!a) return;
+  jbFwJobId = jobId;
+  document.getElementById('jb-fw-host').textContent = a.hostname || a.serial || '장비';
+  document.getElementById('jb-fw-fields').innerHTML = JB_FW.map(([f, l]) => `
+    <div class="jb-fw-row">
+      <label for="jb-fw-${f}">${l}</label>
+      <input type="text" class="form-input" id="jb-fw-${f}" value="${FS.esc(a[f] || '')}" autocomplete="off" autocapitalize="off" spellcheck="false">
+      <div class="jb-fw-cur">현재 ${FS.esc(a[f] || '없음')}</div>
+    </div>`).join('');
+  document.getElementById('jb-fw-modal').style.display = 'flex';
+}
+function jbCloseFw() { document.getElementById('jb-fw-modal').style.display = 'none'; jbFwJobId = null; }
+
+function jbSaveFw() {
+  const j = jbJobs.find(x => x.id === jbFwJobId);
+  const a = j && jbAssets.find(x => x.id === j.asset_id);
+  if (!a) { jbCloseFw(); return; }
+  // 빈칸은 '모름'으로 보고 기존 값을 지우지 않음
+  const changes = JB_FW.map(([f, l]) => ({ f, l, from: a[f] || '', to: document.getElementById('jb-fw-' + f).value.trim() }))
+    .filter(c => c.to && c.to !== c.from);
+  if (!changes.length) { jbCloseFw(); return; }
+  const rec = changes.map(({ l, from, to }) => ({ label: l, from, to }));
+  FS.updateNow('assets', a.id, Object.fromEntries(changes.map(c => [c.f, c.to])));
+  FS.updateNow('jobs', j.id, { fw_changes: rec });
+  const text = changes.map(c => `${c.l} ${c.from || '-'} → ${c.to}`).join(', ');
+  FS.audit('수정', '장비', a.id, a.hostname, `${text} (작업: ${j.title || ''})`);
+  changes.forEach(c => { a[c.f] = c.to; });   // 스냅샷 전 즉시 반영
+  j.fw_changes = rec;
+  jbCloseFw();
+  Toast.success(`장비 버전 반영: ${text}`);
+  jbRenderDetail();
+}
+
+// 완료된 작업 상세: 기록한 버전 변경 + 다시 기록 버튼
+function jbFwSummary(j, st, assetOk) {
+  if (st !== '완료' || !assetOk) return '';
+  const list = Array.isArray(j.fw_changes) ? j.fw_changes : [];
+  return `<div class="jb-fw">
+    ${list.length ? list.map(c => `${FS.esc(c.label)} <b>${FS.esc(c.from || '-')}</b> → <b>${FS.esc(c.to)}</b>`).join('<br>') : '<span class="text-hint">펌웨어 버전 변경 기록 없음</span>'}
+    <button class="btn btn-sm" style="width:100%;margin-top:8px;" onclick="jbOpenFw('${j.id}')">BIOS·BMC·RAID 버전 기록</button>
+  </div>`;
 }
 
 // ── 등록·수정 ──

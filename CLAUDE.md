@@ -97,7 +97,7 @@ delivery_notes, delivery_items, calendar_events, users
 ## 데이터 계층 구조
 customers → projects (customer_id) → assets (customer_id, project_id)
 - projects: 워런티는 프로젝트 단위로 관리 (warranty_expire)
-- assets: hostname, serial, ip, os, cpu, memory, gpu, disk, bmc_version, bios_version, driver_version 등
+- assets: hostname, serial, ip, os, cpu, memory, gpu, disk, bios_version, bmc_version, raid_version, driver_version 등 (현장에서 관리하는 펌웨어는 BIOS·BMC·RAID — 작업 완료 시 jobs.html에서 갱신, 작업 문서에 fw_changes 기록)
 
 ## 인증 흐름
 1. login.html → `FS.loginWithGoogle()`: PC는 팝업, 모바일·PWA는 리다이렉트 (`FS.handleRedirectResult()`로 결과 처리)

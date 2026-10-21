@@ -18,6 +18,7 @@ FastAPI는 정적 파일 서빙만 담당. 데이터는 모두 Firestore (서버
 - 스모크 테스트: 서버 실행 후 `python scripts/smoke_test.py` → 모든 화면을 PC(1366)·폰(390) 크기로 열어 로드 실패·콘솔 오류·가로 넘침·오류 토스트 확인 + 검색→장비 상세 흐름, 스크린샷은 `smoke-results/`(gitignore). 약 1분, 문제 있으면 종료 코드 1
   - agent-browser(헤드리스 Chrome) 사용, 로그인은 테스트 전용 계정 smoke@hwmanager.test(일반 권한, 비밀번호 없음)에 커스텀 토큰으로. 차단: `--remove`
   - 기능을 고친 뒤 배포 전에 실행할 것. 새 화면을 만들면 스크립트의 PAGES에 추가
+- 보안 규칙 테스트: `cd tests/rules && npm install && npm test` → Firestore 에뮬레이터(포트 8085, 실제 DB와 무관)에서 허용 계정·관리자·개인 데이터·진행 기록·변경 이력 규칙 확인. Java 필요(Microsoft OpenJDK 21, winget 설치). `firestore.rules`를 고치면 배포 전에 실행하고, 새 컬렉션을 만들면 테스트에도 추가
 - 배포: **Firebase Hosting** (`firebase.json`, `.firebaserc`, public = `frontend/`) → https://hwmanager-593ba.web.app
   - CLI: `npm i -g firebase-tools` → `firebase login` → `firebase deploy --only hosting`
   - 폰 테스트는 `firebase hosting:channel:deploy test` 미리보기 채널 사용 (로컬 http/LAN IP로는 Google 로그인 불가)

@@ -71,7 +71,7 @@ def ensure_test_user():
     try:
         auth.get_user(TEST_UID)
     except auth.UserNotFoundError:
-        auth.create_user(uid=TEST_UID, email=TEST_EMAIL, email_verified=True, display_name='스모크 테스트')
+        auth.create_user(uid=TEST_UID, email=TEST_EMAIL, email_verified=True, display_name='데모')
         print(f'테스트 계정 생성: {TEST_EMAIL}')
     ref = firestore.client().collection('config').document('access')
     emails = (ref.get().to_dict() or {}).get('emails', [])

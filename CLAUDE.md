@@ -15,6 +15,9 @@ FastAPI는 정적 파일 서빙만 담당. 데이터는 모두 Firestore (서버
 - 포트: **8471** (8000은 사용 금지)
 - 실행: `python -m uvicorn main:app --host 0.0.0.0 --port 8471 --reload`
 - 확인: http://localhost:8471/api/health → `{"success": true}`
+- 스모크 테스트: 서버 실행 후 `python scripts/smoke_test.py` → 모든 화면을 PC(1366)·폰(390) 크기로 열어 로드 실패·콘솔 오류·가로 넘침·오류 토스트 확인 + 검색→장비 상세 흐름, 스크린샷은 `smoke-results/`(gitignore). 약 1분, 문제 있으면 종료 코드 1
+  - agent-browser(헤드리스 Chrome) 사용, 로그인은 테스트 전용 계정 smoke@hwmanager.test(일반 권한, 비밀번호 없음)에 커스텀 토큰으로. 차단: `--remove`
+  - 기능을 고친 뒤 배포 전에 실행할 것. 새 화면을 만들면 스크립트의 PAGES에 추가
 - 배포: **Firebase Hosting** (`firebase.json`, `.firebaserc`, public = `frontend/`) → https://hwmanager-593ba.web.app
   - CLI: `npm i -g firebase-tools` → `firebase login` → `firebase deploy --only hosting`
   - 폰 테스트는 `firebase hosting:channel:deploy test` 미리보기 채널 사용 (로컬 http/LAN IP로는 Google 로그인 불가)

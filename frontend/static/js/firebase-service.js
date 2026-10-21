@@ -78,6 +78,17 @@ function _useRedirectLogin() {
     (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
 }
 
+// 저장 대기 추적: FS 쓰기 함수가 보낸 쓰기 중 서버 확인을 못 받은 건수 (헤더 배지 — index.html)
+// 오프라인이면 확인이 올 때까지 대기 상태로 남음. 변할 때마다 window에 'hw-sync' 이벤트
+let _pendingWrites = 0;
+function _track(p) {
+  _pendingWrites++;
+  window.dispatchEvent(new Event('hw-sync'));
+  const done = () => { _pendingWrites--; window.dispatchEvent(new Event('hw-sync')); };
+  p.then(done, done);
+  return p;
+}
+
 // 페이지 단위 실시간 구독 목록 (페이지 전환 시 unwatchAll로 해제)
 const _watchers = new Set();
 
@@ -178,11 +189,11 @@ window.FS = {
   },
   async add(collection, data) {
     const now = firebase.firestore.FieldValue.serverTimestamp();
-    const ref = await _db.collection(collection).add({
+    const ref = await _track(_db.collection(collection).add({
       ...data,
       created_at: now,
       updated_at: now,
-    });
+    }));
     return ref.id;
   },
   // 변경 이력 (누가·언제·무엇을). 추가 전용 — 규칙상 수정·삭제 불가. 서버 응답을 기다리지 않음
@@ -190,13 +201,13 @@ window.FS = {
   audit(action, entity, entityId, label, detail = '') {
     const u = _auth.currentUser;
     if (!u) return;
-    _db.collection('audit_logs').add({
+    _track(_db.collection('audit_logs').add({
       action, entity, entity_id: entityId || '', label: String(label || '').slice(0, 200),
       detail: String(detail || '').slice(0, 500),
       by: u.uid, by_name: u.displayName || u.email || '',
       at: firebase.firestore.Timestamp.now(),   // 작업한 순간 (오프라인이어도 정확)
       created_at: firebase.firestore.FieldValue.serverTimestamp(),
-    }).catch(e => console.warn('변경 이력 기록 실패', e));
+    })).catch(e => console.warn('변경 이력 기록 실패', e));
   },
   // 등록자 정보 (문서에 함께 저장)
   creator() {
@@ -209,22 +220,33 @@ window.FS = {
   addNow(collection, data) {
     const now = firebase.firestore.FieldValue.serverTimestamp();
     const ref = _db.collection(collection).doc();
-    ref.set({ ...data, created_at: now, updated_at: now }).catch(_writeFailed);
+    _track(ref.set({ ...data, created_at: now, updated_at: now })).catch(_writeFailed);
     return ref.id;
   },
   updateNow(collection, id, data) {
     const now = firebase.firestore.FieldValue.serverTimestamp();
-    _db.collection(collection).doc(id).update({ ...data, updated_at: now }).catch(_writeFailed);
+    _track(_db.collection(collection).doc(id).update({ ...data, updated_at: now })).catch(_writeFailed);
   },
   async update(collection, id, data) {
     const now = firebase.firestore.FieldValue.serverTimestamp();
-    await _db.collection(collection).doc(id).update({
+    await _track(_db.collection(collection).doc(id).update({
       ...data,
       updated_at: now,
-    });
+    }));
   },
   async remove(collection, id) {
-    await _db.collection(collection).doc(id).delete();
+    await _track(_db.collection(collection).doc(id).delete());
+  },
+
+  // 저장 대기 상태 (헤더 배지용)
+  // pendingCount: 이 화면에서 FS 함수로 보낸 쓰기 중 미확인 건수
+  // hasPendingWrites(): 페이지 코드가 직접 쓴 것·이전 실행에서 남은 것까지 포함해 대기 중인지 (300ms 안에 확인 안 되면 true)
+  get pendingCount() { return _pendingWrites; },
+  hasPendingWrites() {
+    return new Promise(resolve => {
+      const t = setTimeout(() => resolve(true), 300);
+      _db.waitForPendingWrites().then(() => { clearTimeout(t); resolve(false); }, () => { clearTimeout(t); resolve(false); });
+    });
   },
 
   listen(collection, callback, conditions = []) {

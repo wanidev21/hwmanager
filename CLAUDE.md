@@ -122,6 +122,8 @@ customers → projects (customer_id) → assets (customer_id, project_id)
 - innerHTML 템플릿에 사용자 입력값을 넣을 때는 반드시 `${FS.esc(값)}` (`<bond0>` 같은 표기가 태그로 사라지는 것 방지). 문서 ID·고정 상수는 제외
 - 오프라인 캐시(enablePersistence) 사용, 로그아웃 시 캐시 삭제
 - sw.js는 네트워크 우선 (배포 즉시 반영), `/__/` 경로는 우회
+- 전체 검색(index.html): 상단 검색 버튼 / PC Ctrl+K·`/` → 장비·고객사·프로젝트·티켓·작업. 처음 열 때 `FS.listen`으로 구독 시작해 계속 유지(unwatchAll 대상 아님). 결과는 `hwPageFilter` + `loadPage(page, {force:true})`로 열기 (같은 화면이어도 다시 열림)
+- 저장 대기 배지(index.html 상단): FS 쓰기 함수(add/update/remove/addNow/updateNow/audit)는 `_track()`으로 미확인 건수 집계, `FS.hasPendingWrites()`(waitForPendingWrites)로 페이지가 직접 쓴 것까지 확인. 새 쓰기 헬퍼를 만들면 `_track()`으로 감쌀 것
 
 ## 모바일
 - PWA로 통일 (2026-10 결정). 예전 Capacitor 앱 `C:\waniwani\Claude\HWManagerMobile`(이메일 로그인, 구버전 포크)은 더 이상 개발하지 않음

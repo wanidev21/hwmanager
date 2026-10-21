@@ -106,6 +106,13 @@
           <span id="breadcrumb-sep" class="topbar-group" style="display:none;">/</span>
           <span id="page-title" class="topbar-page"></span>
         </div>
+        <div class="topbar-actions">
+          <!-- 저장 대기 배지: 오프라인이거나 서버에 아직 안 올라간 저장이 있을 때만 표시 -->
+          <span class="sync-badge" id="sync-badge" role="status" aria-live="polite"></span>
+          <button class="topbar-search" id="btn-search" title="전체 검색 (Ctrl+K)" aria-label="전체 검색">
+            <i data-icon="search" data-size="20"></i><span class="ts-label">검색</span><kbd>Ctrl K</kbd>
+          </button>
+        </div>
       </div>
       <div class="content" id="page-content">
         <div class="empty-state">
@@ -143,6 +150,18 @@
           <div style="margin-top:10px;font-size:12px;color:var(--text-hint);">설치 후 홈 화면의 HW Manager 아이콘으로 실행하면 됩니다.</div>
         </div>
       </div>
+    </div>
+  </div>
+
+  <!-- 전체 검색 (장비·고객사·프로젝트·티켓·작업) -->
+  <div class="modal-overlay gs-overlay" id="search-modal" style="display:none;">
+    <div class="gs-panel" role="dialog" aria-label="전체 검색">
+      <div class="gs-bar">
+        <i data-icon="search" data-size="20"></i>
+        <input type="search" id="gs-q" placeholder="HOSTNAME / S/N / IP / 고객사 / 티켓" autocomplete="off" enterkeyhint="go" aria-label="검색어">
+        <button class="gs-close" id="gs-close" aria-label="닫기"><i data-icon="close" data-size="20"></i></button>
+      </div>
+      <div class="gs-results" id="gs-results"></div>
     </div>
   </div>
 
@@ -206,8 +225,9 @@
     // opts.fromHistory: 뒤로가기로 온 경우 (기록을 새로 쌓지 않음, opts.leaving = 떠난 기록)
     // opts.nav: 메뉴·탭으로 이동 (뒤로 가기 버튼 없음). 그 외(화면 안의 링크)는 '‹ 원래 화면' 버튼 표시
     // opts.scroll: 복원할 스크롤 위치
+    // opts.force: 같은 화면이어도 다시 열기 (전체 검색에서 지금 화면의 다른 항목을 연 경우)
     async function loadPage(page, opts = {}) {
-      if (currentPage === page) return;
+      if (currentPage === page && !opts.force) return;
 
       // 페이지가 이탈 확인을 요청한 경우 (예: 납품확인서 작성 중 저장 안 한 내용)
       if (typeof window.beforePageLeave === 'function') {
@@ -467,9 +487,11 @@
         return;
       }
       closeSidebar();
-      if (state.page === currentPage) { _updateBack(); return; }
+      // 같은 화면 안의 이동은 그대로 두되, 검색 등으로 같은 화면의 다른 항목을 열었던 경우는 이전 상태로 다시 열기
+      const samePage = state.page === currentPage;
+      if (samePage && !(leaving.link && leaving.page === currentPage)) { _updateBack(); return; }
       _restoreFilter(state);
-      loadPage(state.page || 'overview', { fromHistory: true, leaving, scroll: state.view && state.view.scroll });
+      loadPage(state.page || 'overview', { fromHistory: true, leaving, scroll: state.view && state.view.scroll, force: samePage });
     });
 
     // ── 상단 뒤로 가기 버튼 ── 누르면 폰 뒤로 가기와 똑같이 처리 (위 popstate)
@@ -599,6 +621,183 @@
       document.addEventListener(evt, _resetIdle, { passive: true, capture: true });
     });
 
+    // ── 전체 검색 ── 상단 검색 버튼 / PC Ctrl+K·'/'
+    // 처음 열 때 공용 업무 데이터를 실시간 구독 시작 (화면 전환과 무관하게 유지 → 두 번째부터 즉시, 오프라인 캐시로도 동작)
+    const searchModal = document.getElementById('search-modal');
+    const gsInput = document.getElementById('gs-q');
+    const gsResults = document.getElementById('gs-results');
+    const gsData = { assets: [], customers: [], projects: [], tickets: [], jobs: [] };
+    let gsStarted = false, gsHits = [], gsSel = 0;
+
+    function _gsStart() {
+      if (gsStarted || !FS.getCurrentUser()) return;
+      gsStarted = true;
+      Object.keys(gsData).forEach(col => FS.listen(col, docs => {
+        gsData[col] = docs;
+        if (_visible(searchModal)) _gsRender();
+      }));
+    }
+    function openSearch() {
+      _gsStart();
+      closeSidebar();
+      searchModal.style.display = 'flex';
+      gsInput.focus();   // 클릭 처리 안에서 바로 포커스해야 폰 키보드가 올라옴
+      gsInput.select();
+      _gsRender();
+    }
+    function closeSearch() { searchModal.style.display = 'none'; }
+
+    // 검색어 → 결과 [{group, page, filter, title, meta, score}]. 앞부분 일치일수록 위로
+    function _gsSearch(q) {
+      const lc = v => String(v ?? '').toLowerCase();
+      const score = (...vals) => {
+        let best = 0;
+        vals.forEach(v => { const s = lc(v); if (!s) return; const i = s.indexOf(q);
+          if (i === 0) best = Math.max(best, s.length === q.length ? 3 : 2); else if (i > 0) best = Math.max(best, 1); });
+        return best;
+      };
+      const cust = id => (gsData.customers.find(c => c.id === id) || {}).name || '';
+      const proj = id => (gsData.projects.find(p => p.id === id) || {}).name || '';
+      const join = arr => arr.filter(Boolean).join(' · ');
+      const out = [];
+      const add = (group, list, fn, limit = 5) => {
+        list.map(x => fn(x)).filter(r => r && r.score).sort((a, b) => b.score - a.score).slice(0, limit)
+          .forEach(r => out.push({ group, ...r }));
+      };
+      add('장비', gsData.assets, a => ({
+        score: score(a.hostname, a.serial, a.ip_address, a.model, a.location),
+        page: 'customers', filter: { assetId: a.id }, mono: true,
+        title: a.hostname || a.serial || '(이름 없음)',
+        meta: join([cust(a.customer_id) + (a.project_id ? ' › ' + proj(a.project_id) : ''), a.ip_address, a.serial, a.model]),
+      }), 8);
+      add('고객사', gsData.customers, c => ({
+        score: score(c.name, c.contact),
+        page: 'customers', filter: { customerId: c.id },
+        title: c.name || '(이름 없음)',
+        meta: join([c.contact, `프로젝트 ${gsData.projects.filter(p => p.customer_id === c.id).length}`, `장비 ${gsData.assets.filter(a => a.customer_id === c.id).length}대`]),
+      }));
+      add('프로젝트', gsData.projects, p => ({
+        score: score(p.name),
+        page: 'customers', filter: { projectId: p.id },
+        title: p.name || '(이름 없음)',
+        meta: join([cust(p.customer_id), p.warranty_expire ? '워런티 ' + FS.formatDate(p.warranty_expire) : '']),
+      }));
+      add('장애 티켓', gsData.tickets, t => ({
+        score: score(t.title, t.asset_host, t.asset_serial, t.assignee, t.symptom),
+        page: 'tickets', filter: { ticketId: t.id },
+        title: t.title || '(제목 없음)',
+        meta: join([t.status || '접수', t.priority, cust(t.customer_id), t.asset_host, t.assignee]),
+        done: t.status === '완료',
+      }));
+      add('작업', gsData.jobs, j => ({
+        score: score(j.title, j.asset_host, j.assignee, j.ticket_title, j.memo),
+        page: 'jobs', filter: { jobId: j.id },
+        title: j.title || '(제목 없음)',
+        meta: join([j.date ? FS.formatDate(j.date) + (j.time ? ' ' + j.time : '') : '', j.status || '예정', cust(j.customer_id), j.asset_host, j.assignee]),
+        done: (j.status || '예정') !== '예정',
+      }));
+      return out;
+    }
+
+    function _gsRender() {
+      const q = gsInput.value.trim().toLowerCase();
+      if (!q) {
+        gsHits = [];
+        gsResults.innerHTML = `<div class="gs-hint">장비(HOSTNAME·S/N·IP·모델·위치), 고객사, 프로젝트, 장애 티켓, 작업을 한 번에 찾습니다${
+          matchMedia('(max-width:768px)').matches ? '' : '<br><kbd>↑</kbd><kbd>↓</kbd> 이동 · <kbd>Enter</kbd> 열기 · <kbd>Esc</kbd> 닫기'}</div>`;
+        return;
+      }
+      gsHits = _gsSearch(q);
+      gsSel = Math.min(gsSel, Math.max(0, gsHits.length - 1));
+      if (!gsHits.length) {
+        gsResults.innerHTML = `<div class="gs-hint">'${FS.esc(gsInput.value.trim())}' — 일치하는 항목이 없습니다</div>`;
+        return;
+      }
+      let html = '', group = '';
+      gsHits.forEach((h, i) => {
+        if (h.group !== group) { group = h.group; html += `<div class="gs-group">${FS.esc(group)}</div>`; }
+        html += `<div class="gs-hit${i === gsSel ? ' sel' : ''}${h.done ? ' done' : ''}" data-i="${i}">
+          <span class="gs-title${h.mono ? ' mono' : ''}">${FS.esc(h.title)}</span>
+          ${h.meta ? `<span class="gs-meta">${FS.esc(h.meta)}</span>` : ''}
+        </div>`;
+      });
+      gsResults.innerHTML = html;
+    }
+
+    function _gsOpen(i) {
+      const h = gsHits[i];
+      if (!h) return;
+      closeSearch();
+      window.hwPageFilter = { page: h.page, ...h.filter };
+      loadPage(h.page, { force: true });
+    }
+
+    gsInput.addEventListener('input', () => { gsSel = 0; _gsRender(); });
+    gsInput.addEventListener('keydown', e => {
+      if (e.isComposing) return;   // 한글 조합 중 Enter는 무시
+      if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
+        e.preventDefault();
+        if (!gsHits.length) return;
+        gsSel = (gsSel + (e.key === 'ArrowDown' ? 1 : -1) + gsHits.length) % gsHits.length;
+        _gsRender();
+        const el = gsResults.querySelector('.gs-hit.sel');
+        if (el) el.scrollIntoView({ block: 'nearest' });
+      } else if (e.key === 'Enter') {
+        e.preventDefault();
+        if (gsHits.length) _gsOpen(gsSel);
+        else gsInput.blur();   // 폰: 결과가 없으면 키보드만 내림
+      } else if (e.key === 'Escape') {
+        closeSearch();
+      }
+    });
+    gsResults.addEventListener('click', e => {
+      const el = e.target.closest('.gs-hit');
+      if (el) _gsOpen(+el.dataset.i);
+    });
+    document.getElementById('btn-search').addEventListener('click', openSearch);
+    document.getElementById('gs-close').addEventListener('click', closeSearch);
+    searchModal.addEventListener('click', e => { if (e.target === searchModal) closeSearch(); });
+    document.addEventListener('keydown', e => {
+      if (!FS.getCurrentUser() || _visible(searchModal)) return;
+      const typing = /^(INPUT|TEXTAREA|SELECT)$/.test(document.activeElement?.tagName) || document.activeElement?.isContentEditable;
+      if (((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'k') || (e.key === '/' && !typing)) {
+        e.preventDefault();
+        openSearch();
+      }
+    });
+
+    // ── 저장 대기 배지 ── 오프라인 / 저장 대기 n건 / 다시 연결되면 '동기화 완료' 잠깐
+    const syncBadge = document.getElementById('sync-badge');
+    let _syncPending = false, _syncFlash = 0, _syncPoll = 0;
+    function _renderSync() {
+      const off = !navigator.onLine;
+      const n = FS.pendingCount;
+      let cls = '', text = '';
+      if (_syncPending || (n && off)) { cls = 'pending'; text = n ? `저장 대기 ${n}건` : '저장 대기'; }
+      else if (off) { cls = 'offline'; text = '오프라인'; }
+      else if (_syncFlash) { cls = 'synced'; text = '동기화 완료'; }
+      syncBadge.className = 'sync-badge' + (cls ? ' show ' + cls : '');
+      syncBadge.textContent = text;
+      syncBadge.title = cls === 'pending' ? (off ? '오프라인 — 연결되면 자동으로 서버에 저장됩니다' : '서버에 저장하는 중')
+        : cls === 'offline' ? '오프라인 — 저장한 내용은 이 기기에 보관됐다가 연결되면 올라갑니다' : '';
+    }
+    async function _checkSync() {
+      if (!FS.getCurrentUser() || FS._loggingOut) return;
+      const was = _syncPending;   // 잠깐 대기(정상 저장)는 표시하지 않고, 실제로 대기했던 경우만 '동기화 완료'
+      _syncPending = await FS.hasPendingWrites();
+      if (was && !_syncPending && !FS.pendingCount) {   // 대기하던 저장이 모두 올라감
+        clearTimeout(_syncFlash);
+        _syncFlash = setTimeout(() => { _syncFlash = 0; _renderSync(); }, 2500);
+      }
+      _renderSync();
+      // 오프라인이거나 대기 중이면 주기적으로 다시 확인 (페이지가 직접 쓴 것도 잡기 위해)
+      clearTimeout(_syncPoll);
+      if (_syncPending || !navigator.onLine) _syncPoll = setTimeout(_checkSync, 3000);
+    }
+    window.addEventListener('hw-sync', () => { _renderSync(); _checkSync(); });
+    window.addEventListener('online', _checkSync);
+    window.addEventListener('offline', _checkSync);
+
     // ── 다크 모드 ── (색 값은 app.css의 html[data-theme="dark"]에서 관리)
     function _applyTheme(dark) {
       const root = document.documentElement;
@@ -715,6 +914,7 @@
       // 자동 로그아웃 타이머 시작 (첫 기록은 즉시 반영)
       _lastThrottle = 0;
       _resetIdle();
+      _checkSync();   // 이전 실행에서 못 올린 저장이 남아 있는지
 
       // 새로고침: 기존 기록(n 번호)을 그대로 두고 보던 화면 복원
       const st = history.state;

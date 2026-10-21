@@ -30,3 +30,6 @@ Thumbs.db
 
 # ── 스모크 테스트 결과 ──
 smoke-results/
+
+# ── 데이터 백업 (scripts/backup.py) ──
+backups/

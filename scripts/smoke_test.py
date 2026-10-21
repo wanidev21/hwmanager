@@ -140,7 +140,11 @@ FLOW_SEARCH = r"""
 (async () => {
   openSearch();
   const inp = document.getElementById('gs-q');
-  inp.value = 'dgx'; inp.dispatchEvent(new Event('input'));
+  // 데이터에 있는 장비 이름 앞부분으로 검색 (시연 데이터가 바뀌어도 동작)
+  const t1 = Date.now();
+  while (Date.now() - t1 < 5000 && !gsData.assets.length) await new Promise(r => setTimeout(r, 200));
+  const q = (gsData.assets[0]?.hostname || 'a').slice(0, 4);
+  inp.value = q; inp.dispatchEvent(new Event('input'));
   await new Promise(r => setTimeout(r, 300));
   const hits = document.querySelectorAll('#gs-results .gs-hit').length;
   const first = document.querySelector('#gs-results .gs-hit');
@@ -148,10 +152,10 @@ FLOW_SEARCH = r"""
   const t0 = Date.now();
   while (Date.now() - t0 < 8000) {
     const m = document.getElementById('asset-view-modal');
-    if (m && m.style.display === 'flex') return { hits, opened: true };
+    if (m && m.style.display === 'flex') return { q, hits, opened: true };
     await new Promise(r => setTimeout(r, 200));
   }
-  return { hits, opened: false };
+  return { q, hits, opened: false };
 })()
 """
 
@@ -216,14 +220,14 @@ def main():
                 print(lines[-1 - len(bad)])
                 for b in bad:
                     print(f'      - {b}')
-            # 흐름: 전체 검색 → 장비 상세
+            # 흐름: 전체 검색(장비 이름 앞부분) → 장비 상세
             js('loadPage("overview", { nav: true }), "ok"')
             wait_for('!document.querySelector("#page-content .skeleton-page")', 10)
             s = js(FLOW_SEARCH) or {}
             ab('screenshot', os.path.join(OUT_DIR, f'{vp}-flow-search.png'), check=False)
             errs = collect_errors()
             ok = s.get('hits', 0) > 0 and s.get('opened') and not errs
-            lines.append(f'{"OK " if ok else "NG "}[{vp}] 흐름: 검색 "dgx" → 결과 {s.get("hits", 0)}건 → 장비 상세 {"열림" if s.get("opened") else "안 열림"}')
+            lines.append(f'{"OK " if ok else "NG "}[{vp}] 흐름: 검색 "{s.get("q", "")}" → 결과 {s.get("hits", 0)}건 → 장비 상세 {"열림" if s.get("opened") else "안 열림"}')
             print(lines[-1])
             if not ok:
                 problems.append(f'[{vp}] 검색 흐름: {s} {errs}')

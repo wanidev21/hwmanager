@@ -119,6 +119,8 @@ customers → projects (customer_id) → assets (customer_id, project_id)
     (OAuth 앱이 '테스트' 상태로 남아 있으면 Google Cloud 콘솔 OAuth 테스트 사용자에도 추가해야 함. 기본 스코프만 쓰므로 '프로덕션'으로 게시하면 이 단계 불필요)
   - 개인 데이터는 규칙에서도 `user_id == uid`만 허용, 공용 업무 데이터는 허용 계정 모두 읽기/쓰기, 목록에 없는 컬렉션은 차단
 - 관리자 지정: `python scripts/set_admin.py <email>`
+- 백업: `python scripts/backup.py` → `backups/날짜.json` (gitignore, 무료 — 서비스 계정으로 전체 읽기)
+- 시연 데이터: `python scripts/demo_data.py --owner <로그인 이메일> --yes` → 공용 업무 데이터를 백업 후 비우고 가상 현장 데이터(고객사 5·장비 24·티켓 8·부품·작업·납품)로 채움. 날짜는 실행일 기준이라 시연 전날 실행. 허용 계정·회원·개인 데이터는 유지
 - 개인 데이터 소유자 이전: `python scripts/reassign_owner.py <from> <to> [--execute]`
 
 ## 실시간 동기화

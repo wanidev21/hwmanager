@@ -57,6 +57,18 @@ html[data-theme="dark"] .cust-item.active .cust-item-name, html[data-theme="dark
 .bc-link:hover { text-decoration:underline; }
 .bc-cur { font-weight:600; color:var(--text); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
 .bc-sep { color:var(--text-hint); flex-shrink:0; }
+  /* 장비 이력 타임라인 */
+  .av-tl { display:flex; align-items:center; gap:8px; padding:9px 0; border-top:1px solid var(--border); font-size:13px; }
+  .av-tl.link { cursor:pointer; }
+  .av-tl.link:hover { background:var(--surface-2); }
+  .av-tl.future .av-tl-date { color:var(--primary-text); }
+  .av-tl-date { font-family:var(--font-mono); font-size:11px; color:var(--text-hint); white-space:nowrap; }
+  .av-tl-kind { display:inline-flex; align-items:center; gap:3px; font-size:11px; font-weight:800; color:var(--text-sub); white-space:nowrap; }
+  .av-tl-main { flex:1; min-width:0; display:flex; flex-direction:column; gap:2px; }
+  .av-tl-title { overflow:hidden; text-overflow:ellipsis; white-space:nowrap; font-weight:600; }
+  .av-tl-sub { font-size:11px; color:var(--text-hint); overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  .av-tl-more { margin-top:8px; width:100%; }
+  @media (max-width:768px) { .av-tl { padding:11px 0; } .av-tl-kind span { display:none; } }
 </style>
 
 <div class="flex-between mb-3">
@@ -590,26 +602,60 @@ function viewAsset(id) {
   avLoadTickets(id);
 }
 
-// 이 장비의 장애 이력 (1회 조회)
+// 이 장비의 이력 타임라인: 장애 티켓·작업 일정·변경 이력을 시간순으로 (1회 조회, 최근 것이 위)
+const AV_TL_STEP = 8;
 async function avLoadTickets(assetId) {
   const body = document.getElementById('av-body');
   const box = document.createElement('div');
   box.className = 'av-item av-full';
-  box.innerHTML = '<div class="av-label">장애 이력</div><div class="av-val" style="color:var(--text-hint);">불러오는 중...</div>';
+  box.innerHTML = '<div class="av-label">이력</div><div class="av-val" style="color:var(--text-hint);">불러오는 중...</div>';
   body.appendChild(box);
-  try {
-    const list = (await FS.getAll('tickets', [['asset_id', '==', assetId]]))
-      .sort((a, b) => (b.created_at?.seconds || 0) - (a.created_at?.seconds || 0));
-    const BADGE = { '접수':'badge-info','진행중':'badge-warning','보류':'badge-gray','완료':'badge-success' };
-    box.innerHTML = '<div class="av-label">장애 이력 ' + (list.length ? list.length + '건' : '') + '</div>' + (list.length
-      ? list.map(t => `<div class="av-val" style="display:flex;gap:8px;align-items:center;padding:8px 0;border-top:1px solid var(--border);cursor:pointer;" onclick="window.hwPageFilter={page:'tickets',ticketId:'${t.id}'};loadPage('tickets')">
-          <span style="font-family:var(--font-mono);font-size:11px;color:var(--text-hint);">${FS.formatDate(t.created_at) || ''}</span>
-          <span style="flex:1;min-width:0;">${FS.esc(t.title || '')}</span>
-          <span class="badge ${BADGE[t.status || '접수'] || 'badge-gray'}">${FS.esc(t.status || '접수')}</span></div>`).join('')
-      : '<div class="av-val" style="color:var(--text-hint);">장애 이력 없음</div>');
-  } catch (e) {
-    box.remove();
-  }
+  const [tk, jb, au] = await Promise.allSettled([
+    FS.getAll('tickets', [['asset_id', '==', assetId]]),
+    FS.getAll('jobs', [['asset_id', '==', assetId]]),
+    FS.getAll('audit_logs', [['entity_id', '==', assetId]]),
+  ]);
+  if (avAssetId !== assetId) return;   // 그 사이 다른 장비를 열었음
+  const ms = v => !v ? 0 : typeof v === 'string' ? new Date(v + 'T00:00:00').getTime() : v.toDate ? v.toDate().getTime() : new Date(v).getTime();
+  const TBADGE = { '접수':'badge-info','진행중':'badge-warning','처리중':'badge-warning','보류':'badge-gray','완료':'badge-success' };
+  const JBADGE = { '예정':'badge-info','완료':'badge-success','취소':'badge-gray' };
+  const rows = [];
+  (tk.value || []).forEach(t => rows.push({
+    t: ms(t.created_at), kind: '장애', icon: 'alert',
+    title: t.title || '(제목 없음)', sub: [t.priority, t.assignee].filter(Boolean).join(' · '),
+    badge: `<span class="badge ${TBADGE[t.status || '접수'] || 'badge-gray'}">${FS.esc(t.status || '접수')}</span>`,
+    open: `window.hwPageFilter={page:'tickets',ticketId:'${t.id}'};loadPage('tickets')`,
+  }));
+  (jb.value || []).forEach(j => rows.push({
+    t: ms(j.date) + (j.time ? (parseInt(j.time) || 0) * 3600000 : 0), kind: '작업', icon: 'tasks',
+    title: j.title || '(제목 없음)', sub: [j.time, j.assignee].filter(Boolean).join(' · '),
+    badge: `<span class="badge ${JBADGE[j.status || '예정'] || 'badge-gray'}">${FS.esc(j.status || '예정')}</span>`,
+    open: `window.hwPageFilter={page:'jobs',jobId:'${j.id}'};loadPage('jobs')`,
+  }));
+  (au.value || []).forEach(x => rows.push({
+    t: ms(x.at || x.created_at), kind: '기록', icon: 'edit',
+    title: `장비 정보 ${x.action || ''}`, sub: [x.by_name, x.detail].filter(Boolean).join(' · '),
+    badge: '', open: '',
+  }));
+  rows.sort((a, b) => b.t - a.t);
+  const tCount = (tk.value || []).length, jCount = (jb.value || []).length;
+  const head = `<div class="av-label">이력 <span style="font-weight:600;">${[tCount ? '장애 ' + tCount : '', jCount ? '작업 ' + jCount : ''].filter(Boolean).join(' · ')}</span></div>`;
+  if (!rows.length) { box.innerHTML = head + '<div class="av-val" style="color:var(--text-hint);">이력 없음</div>'; return; }
+  const now = Date.now();
+  const row = r => `<div class="av-tl${r.open ? ' link' : ''}${r.t > now ? ' future' : ''}"${r.open ? ` onclick="${r.open}"` : ''}>
+      <span class="av-tl-date">${r.t ? FS.formatDate(new Date(r.t)) : '-'}</span>
+      <span class="av-tl-kind">${FS.icon(r.icon, 14)}<span>${r.kind}</span></span>
+      <span class="av-tl-main"><span class="av-tl-title">${FS.esc(r.title)}</span>${r.sub ? `<span class="av-tl-sub">${FS.esc(r.sub)}</span>` : ''}</span>
+      ${r.badge}
+    </div>`;
+  let shown = AV_TL_STEP;
+  const draw = () => {
+    box.innerHTML = head + rows.slice(0, shown).map(row).join('') +
+      (rows.length > shown ? `<button class="btn btn-sm av-tl-more">이전 이력 ${rows.length - shown}건 더 보기</button>` : '');
+    const more = box.querySelector('.av-tl-more');
+    if (more) more.onclick = () => { shown += AV_TL_STEP * 2; draw(); };
+  };
+  draw();
 }
 function closeAssetView() { document.getElementById('asset-view-modal').style.display = 'none'; avAssetId = null; }
 

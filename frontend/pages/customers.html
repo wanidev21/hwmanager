@@ -608,7 +608,7 @@ function viewAsset(id) {
   avLoadTickets(id);
 }
 
-// 이 장비의 이력 타임라인: 장애 티켓·작업 일정·변경 이력을 시간순으로 (1회 조회, 최근 것이 위)
+// 이 장비의 이력 타임라인: 장애 티켓·작업 일정·부품 교체·변경 이력을 시간순으로 (1회 조회, 최근 것이 위)
 const AV_TL_STEP = 8;
 async function avLoadTickets(assetId) {
   const body = document.getElementById('av-body');
@@ -616,10 +616,11 @@ async function avLoadTickets(assetId) {
   box.className = 'av-item av-full';
   box.innerHTML = '<div class="av-label">이력</div><div class="av-val" style="color:var(--text-hint);">불러오는 중...</div>';
   body.appendChild(box);
-  const [tk, jb, au] = await Promise.allSettled([
+  const [tk, jb, au, pt] = await Promise.allSettled([
     FS.getAll('tickets', [['asset_id', '==', assetId]]),
     FS.getAll('jobs', [['asset_id', '==', assetId]]),
     FS.getAll('audit_logs', [['entity_id', '==', assetId]]),
+    FS.getAll('parts', [['asset_id', '==', assetId]]),
   ]);
   if (avAssetId !== assetId) return;   // 그 사이 다른 장비를 열었음
   const ms = v => !v ? 0 : typeof v === 'string' ? new Date(v + 'T00:00:00').getTime() : v.toDate ? v.toDate().getTime() : new Date(v).getTime();
@@ -638,14 +639,23 @@ async function avLoadTickets(assetId) {
     badge: `<span class="badge ${JBADGE[j.status || '예정'] || 'badge-gray'}">${FS.esc(j.status || '예정')}</span>`,
     open: `window.hwPageFilter={page:'jobs',jobId:'${j.id}'};loadPage('jobs')`,
   }));
+  (pt.value || []).forEach(p => {
+    const due = Parts.due(p);
+    rows.push({
+      t: ms(p.dates?.['교체'] || p.dates?.['요청'] || p.created_at), kind: '부품', icon: 'box',
+      title: p.name || '(부품)', sub: [p.pn && 'P/N ' + p.pn, p.old_sn && '불량 ' + p.old_sn, p.new_sn && '신규 ' + p.new_sn].filter(Boolean).join(' · '),
+      badge: `<span class="badge ${due?.cls === 'over' ? 'badge-danger' : (p.status || '요청') === '종결' ? 'badge-success' : 'badge-warning'}">${FS.esc(due ? due.text : p.status || '요청')}</span>`,
+      open: `window.hwPageFilter={page:'parts',partId:'${p.id}'};loadPage('parts')`,
+    });
+  });
   (au.value || []).forEach(x => rows.push({
     t: ms(x.at || x.created_at), kind: '기록', icon: 'edit',
     title: `장비 정보 ${x.action || ''}`, sub: [x.by_name, x.detail].filter(Boolean).join(' · '),
     badge: '', open: '',
   }));
   rows.sort((a, b) => b.t - a.t);
-  const tCount = (tk.value || []).length, jCount = (jb.value || []).length;
-  const head = `<div class="av-label">이력 <span style="font-weight:600;">${[tCount ? '장애 ' + tCount : '', jCount ? '작업 ' + jCount : ''].filter(Boolean).join(' · ')}</span></div>`;
+  const tCount = (tk.value || []).length, jCount = (jb.value || []).length, pCount = (pt.value || []).length;
+  const head = `<div class="av-label">이력 <span style="font-weight:600;">${[tCount ? '장애 ' + tCount : '', jCount ? '작업 ' + jCount : '', pCount ? '부품 ' + pCount : ''].filter(Boolean).join(' · ')}</span></div>`;
   if (!rows.length) { box.innerHTML = head + '<div class="av-val" style="color:var(--text-hint);">이력 없음</div>'; return; }
   const now = Date.now();
   const row = r => `<div class="av-tl${r.open ? ' link' : ''}${r.t > now ? ' future' : ''}"${r.open ? ` onclick="${r.open}"` : ''}>

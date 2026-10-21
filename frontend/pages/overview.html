@@ -123,6 +123,7 @@ function init() {
     ['tech_notes',      [['user_id', '==', uid]]],
     ['calendar_events', [['user_id', '==', uid]]],
     ['jobs'],
+    ['parts'],
   ], data => renderOverview(...data));
 }
 
@@ -154,7 +155,7 @@ function openAssetFromHome(id) {
   loadPage('customers');
 }
 
-function renderOverview(customers, projects, assets, tickets, kbArticles, deliveryNotes, techNotes, events, jobs) {
+function renderOverview(customers, projects, assets, tickets, kbArticles, deliveryNotes, techNotes, events, jobs, parts) {
   ovData = { customers, projects, assets };
   if (document.getElementById('ov-q').value) renderHits();
 
@@ -203,7 +204,7 @@ function renderOverview(customers, projects, assets, tickets, kbArticles, delive
     sig(expiringSoon.length, '워런티 임박', 's-warn', "window.hwPageFilter={page:'warranty',status:'urgent'};loadPage('warranty')") +
     sig(upcoming.length, jobsWarned ? `7일 내 작업 · 준비 ${jobsWarned}건 급함` : '7일 내 작업', jobsWarned ? 's-warn' : 's-plain', "loadPage('jobs')");
 
-  // ── 먼저 확인: 긴급·높음 장애 → 30일 내 워런티 → 오늘 일정 ──
+  // ── 먼저 확인: 긴급·높음 장애 → 불량 부품 반납 기한(지남·3일 이내) → 30일 내 워런티 → 오늘 일정 ──
   const PRI = { '긴급': 0, '높음': 1, '보통': 2, '낮음': 3 };
   const todo = [];
   openTickets
@@ -216,6 +217,18 @@ function renderOverview(customers, projects, assets, tickets, kbArticles, delive
       meta: `${custMap[t.customer_id] || '고객사 없음'} · ${t.status || '접수'}${t.assignee ? ' · ' + t.assignee : ''}`,
       tag: `<span class="ov-tag t-danger">${FS.esc(t.priority)}</span>`,
       onclick: `window.hwPageFilter={page:'tickets',ticketId:'${t.id}'};loadPage('tickets')`,   // 해당 티켓 바로 열기
+    }));
+  parts
+    .map(p => ({ p, due: Parts.due(p) }))
+    .filter(x => x.due && x.due.d <= 3)
+    .sort((a, b) => a.due.d - b.due.d)
+    .slice(0, 3)
+    .forEach(({ p, due }) => todo.push({
+      stripe: due.d < 0,
+      title: `${p.name || '부품'} 불량 반납`,
+      meta: [custMap[p.customer_id], p.asset_host, p.case_no ? 'RMA ' + p.case_no : ''].filter(Boolean).join(' · '),
+      tag: `<span class="ov-tag ${due.d < 0 ? 't-danger' : 't-warn'}">${due.d < 0 ? `D+${-due.d}` : `D-${due.d}`}</span>`,
+      onclick: `window.hwPageFilter={page:'parts',partId:'${p.id}'};loadPage('parts')`,
     }));
   expiringSoon
     .filter(p => daysLeft(p.warranty_expire) <= 30)
@@ -246,7 +259,7 @@ function renderOverview(customers, projects, assets, tickets, kbArticles, delive
         ${it.tag}
       </div>
     </div>`).join('')
-    : '<div class="ov-allclear">급한 일 없음 — 긴급 장애·30일 내 만료·오늘 일정이 없습니다</div>';
+    : '<div class="ov-allclear">급한 일 없음 — 긴급 장애·반납 기한·30일 내 만료·오늘 일정이 없습니다</div>';
 
   document.getElementById('ov-jobs').innerHTML = upcoming.length ? upcoming.slice(0, 5).map(j => {
     const items = Object.values(j.items || {});

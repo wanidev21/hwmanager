@@ -71,6 +71,8 @@ service cloud.firestore {
     }
     // 작업 일정·준비 템플릿 (팀 공용)
     match /jobs/{id}            { allow read, write: if allowed(); }
+    // 부품·RMA (팀 공용)
+    match /parts/{id}           { allow read, write: if allowed(); }
     match /job_templates/{id}   { allow read, write: if allowed(); }
     match /internal_assets/{id} { allow read, write: if allowed(); }
     match /delivery_notes/{id}  { allow read, write: if allowed(); }

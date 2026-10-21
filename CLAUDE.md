@@ -61,6 +61,7 @@ hwmanager/
     ├── static/
     │   ├── css/app.css
     │   ├── js/firebase-service.js
+    │   ├── js/parts.js        # window.Parts: 부품 등록 창·단계 진행·반납 기한 계산
     │   └── icons/
     └── pages/
         ├── overview.html      # 개요 (기본)
@@ -68,6 +69,7 @@ hwmanager/
         ├── delivery.html      # 작성·수정·서명·인쇄는 PC 전용, 폰(768px 이하)은 품목 확인만
         ├── tickets.html
         ├── warranty.html
+        ├── parts.html         # 부품·RMA 현황 (반납 기한순). 등록·단계 로직은 static/js/parts.js (티켓 상세와 공용)
         ├── jobs.html          # 작업 일정 + 준비 체크리스트 (팀 공용, 하단 탭 '작업')
         ├── calendar.html      # 내 일정(개인 calendar_events) + 팀 작업 일정 표시
         ├── kb.html
@@ -89,6 +91,7 @@ customers, projects, assets, tickets(+ logs 하위: 진행 기록), kb_articles,
 audit_logs(변경 이력, 추가 전용), config/access(허용 계정),
 jobs(작업 일정: date·time·customer/asset/ticket 연결·status 예정/완료/취소, items 맵 {id:{text,due_days,done,order}} — 체크는 `items.<id>.done` 필드 단위 갱신),
 job_templates(준비 템플릿: name, items[{text, due_days}], 비어 있으면 jobs.html의 기본 템플릿 사용·첫 저장 시 함께 저장),
+parts(부품·RMA: ticket_id·customer_id·asset_id 연결, status 요청/입고/교체/반납/종결, dates{단계:날짜}, 반납 기한=dates.교체+return_days, return_required=false면 교체→종결),
 internal_assets, tech_domains, tech_topics, tech_notes, releases,
 delivery_notes, delivery_items, calendar_events, users
 

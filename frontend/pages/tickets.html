@@ -196,10 +196,11 @@ function init() {
       || (document.getElementById('ticket-modal')?.style.display === 'flex' && document.getElementById('f-title').value.trim());
     return !typing || await Dialog.confirm('작성 중인 내용이 있습니다.\n저장하지 않고 이동하시겠습니까?', true);
   };
-  FS.watch([['tickets'], ['customers'], ['assets'], ['jobs']], ([tickets, custList, assets, jobs]) => {
+  FS.watch([['tickets'], ['customers'], ['assets'], ['jobs'], ['parts']], ([tickets, custList, assets, jobs, parts]) => {
     allTickets = tickets;
     ticketAssets = assets;
     ticketJobs = jobs;
+    ticketParts = parts;
     allTickets.sort((a,b)=>(b.created_at?.seconds||0)-(a.created_at?.seconds||0));
     ticketCusts = {};
     custList.forEach(c=>ticketCusts[c.id]=c.name||c.id);
@@ -455,8 +456,47 @@ function tlRenderInfo() {
         `).join('')}
       </div>
     </div>
+    ${tkPartsHtml(t)}
     ${tkJobsHtml(t)}
     ${tkRelatedHtml(t)}`;
+}
+
+// ── 부품·RMA: 이 티켓의 교체 부품. 카드 아래 버튼 한 번으로 다음 단계 (static/js/parts.js) ──
+let ticketParts = [];
+function tkPartsHtml(t) {
+  const list = ticketParts.filter(p => p.ticket_id === t.id)
+    .sort((a, b) => Parts.isOpen(b) - Parts.isOpen(a) || (a.created_at?.seconds || 0) - (b.created_at?.seconds || 0));
+  return `<div class="td-related">
+    <div class="td-related-head">
+      <span>부품·RMA ${list.length ? list.length + '건' : ''}</span>
+      <button class="btn btn-sm" onclick="tkAddPart('${t.id}')">${FS.icon('plus', 14)} 부품 추가</button>
+    </div>
+    ${list.map(p => {
+      const due = Parts.due(p);
+      const n = Parts.next(p);
+      const meta = [p.pn && 'P/N ' + p.pn, p.case_no && 'RMA ' + p.case_no, p.old_sn && '불량 ' + p.old_sn].filter(Boolean).join(' · ');
+      return `<div class="pt-card${due?.cls === 'over' ? ' over' : ''}">
+        <div class="pt-card-body" onclick="Parts.openModal('${p.id}', null, ticketParts)">
+          <div class="pt-card-main">
+            <span class="pt-card-name">${FS.esc(p.name)}${p.qty > 1 ? ' ×' + p.qty : ''}</span>
+            ${meta ? `<span class="pt-card-meta">${FS.esc(meta)}</span>` : ''}
+          </div>
+          <div class="pt-card-side">
+            <span class="pt-stage">${FS.esc(p.status || '요청')}</span>
+            ${Parts.stepsHtml(p)}
+            ${due ? `<span class="pt-due ${due.cls}">${due.text}</span>` : ''}
+          </div>
+        </div>
+        ${n ? `<button class="pt-next" onclick="Parts.advance('${p.id}', ticketParts)">${FS.icon('check', 16)} ${n} 처리 <span class="text-hint" style="font-weight:600;">— ${Parts.STAGE_HINT[n]}</span></button>` : ''}
+      </div>`;
+    }).join('')}
+  </div>`;
+}
+function tkAddPart(ticketId) {
+  const t = allTickets.find(x => x.id === ticketId);
+  if (!t) return;
+  Parts.openModal(null, { ticket_id: t.id, ticket_title: t.title || '', customer_id: t.customer_id || '',
+                          asset_id: t.asset_id || '', asset_host: tkHost(t.asset_id, t) || '' }, ticketParts);
 }
 
 // ── 작업 일정 (부품 교체 방문 등): 이 티켓으로 잡은 작업과 준비 진행 ──

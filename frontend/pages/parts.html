@@ -1,0 +1,138 @@
+<!-- 부품·RMA: 티켓에서 등록한 교체 부품을 모아 보고, 반납 기한이 급한 것부터 처리 (등록·단계 로직은 static/js/parts.js) -->
+<style>
+  .pp-head { display:flex; justify-content:space-between; align-items:center; gap:10px; flex-wrap:wrap; margin-bottom:12px; }
+  .pp-seg { display:flex; border:2px solid var(--ink); }
+  .pp-seg button { height:36px; padding:0 12px; border:none; background:var(--surface); color:var(--text); font-family:inherit; font-size:13px; font-weight:800; white-space:nowrap; }
+  .pp-seg button + button { border-left:2px solid var(--ink); }
+  .pp-seg button.on { background:var(--ink); color:var(--bg); }
+  .pp-seg button b { font-family:var(--font-mono); margin-left:4px; }
+  .pp-seg button.alert:not(.on) b { background:var(--primary); color:#111111; padding:0 4px; }
+  .pp-search { width:260px; }
+  .pp-grid { display:grid; grid-template-columns:repeat(2, minmax(0,1fr)); gap:0 12px; align-items:start; }
+  .pp-link { font-size:11px; color:var(--text-sub); overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  .pp-link a { color:var(--primary-text); font-weight:700; text-decoration:none; }
+  .pp-empty { padding:24px; border:2px dashed var(--ink); text-align:center; font-weight:700; color:var(--text-sub); margin-top:8px; }
+  @media (max-width:960px) { .pp-grid { grid-template-columns:minmax(0,1fr); } }
+  @media (max-width:768px) {
+    .pp-seg { width:100%; }
+    .pp-seg button { flex:1; height:42px; padding:0 4px; }
+    .pp-search { width:100%; }
+    .pp-head .btn-primary { width:100%; }
+  }
+</style>
+
+<div class="pp-head">
+  <div class="pp-seg" id="pp-seg"></div>
+  <div class="flex gap-2" style="flex-wrap:wrap;flex:1;justify-content:flex-end;">
+    <input type="search" class="form-input pp-search" id="pp-q" placeholder="부품 · P/N · S/N · RMA번호 · 장비" oninput="ppRender()" autocomplete="off">
+    <button class="btn btn-primary" onclick="Parts.openModal(null, {}, ppParts)">+ 부품 추가</button>
+  </div>
+</div>
+<div class="pp-grid" id="pp-list"></div>
+
+<script>
+FS.requireAuth();
+
+let ppParts = [], ppCusts = {}, ppTickets = [];
+let ppView = '진행중';   // '진행중' | '반납 대기' | '종결' | '전체'
+
+function init() {
+  let pendingPart = null;
+  ppView = '진행중';
+  if (window.hwPageFilter && window.hwPageFilter.page === 'parts') {
+    const f = window.hwPageFilter;
+    ppView = f.view || ppView;
+    document.getElementById('pp-q').value = f.q || '';
+    pendingPart = f.partId || null;   // 전체 검색에서 특정 부품
+    window.hwPageFilter = null;
+  }
+  FS.watch([['parts'], ['customers'], ['tickets']], ([parts, custs, tickets]) => {
+    ppParts = parts;
+    ppTickets = tickets;
+    ppCusts = Object.fromEntries(custs.map(c => [c.id, c.name || '']));
+    ppRender();
+    if (pendingPart) {
+      const id = pendingPart; pendingPart = null;
+      const p = ppParts.find(x => x.id === id);
+      if (p) {
+        if (!ppMatchView(p, ppView)) { ppView = '전체'; ppRender(); }
+        Parts.openModal(id, null, ppParts);
+      }
+    }
+  });
+}
+
+function pageViewState() {
+  return { filter: { view: ppView, q: document.getElementById('pp-q').value }, label: '부품·RMA' };
+}
+
+function ppMatchView(p, view) {
+  const st = p.status || '요청';
+  if (view === '진행중') return st !== '종결';
+  if (view === '반납 대기') return !!Parts.due(p);
+  if (view === '종결') return st === '종결';
+  return true;
+}
+function ppSetView(v) { ppView = v; ppRender(); }
+
+// 급한 순: 반납 기한 지남 → 임박 → 반납 대기 → 요청·입고 → 반납 발송 → 종결
+function ppRank(p) {
+  const due = Parts.due(p);
+  if (due) return [due.d < 0 ? 0 : due.d <= 3 ? 1 : 2, due.d];
+  const st = p.status || '요청';
+  return [{ '요청': 3, '입고': 3, '교체': 4, '반납': 5, '종결': 6 }[st] ?? 6, 0];
+}
+
+function ppRender() {
+  const q = document.getElementById('pp-q').value.trim().toLowerCase();
+  const has = v => String(v ?? '').toLowerCase().includes(q);
+  const hit = p => !q || [p.name, p.pn, p.fru, p.case_no, p.new_sn, p.old_sn, p.tracking, p.asset_host, p.ticket_title, ppCusts[p.customer_id]].some(has);
+  const views = ['진행중', '반납 대기', '종결', '전체'];
+  const overdue = ppParts.filter(p => Parts.due(p)?.cls === 'over').length;
+  document.getElementById('pp-seg').innerHTML = views.map(v => {
+    const n = ppParts.filter(p => ppMatchView(p, v) && hit(p)).length;
+    return `<button class="${v === ppView ? 'on' : ''}${v === '반납 대기' && overdue ? ' alert' : ''}" onclick="ppSetView('${v}')">${v}<b>${n}</b></button>`;
+  }).join('');
+
+  const list = ppParts.filter(p => ppMatchView(p, ppView) && hit(p)).sort((a, b) => {
+    const ra = ppRank(a), rb = ppRank(b);
+    return ra[0] - rb[0] || ra[1] - rb[1] || (b.created_at?.seconds || 0) - (a.created_at?.seconds || 0);
+  });
+  const box = document.getElementById('pp-list');
+  if (!list.length) {
+    box.innerHTML = `<div class="pp-empty" style="grid-column:1/-1;">${q ? '검색 결과가 없습니다'
+      : ppView === '반납 대기' ? '반납할 불량 부품이 없습니다' : ppView === '진행중' ? '진행 중인 부품이 없습니다 — 장애 티켓 상세에서 부품을 추가하세요' : '부품 기록이 없습니다'}</div>`;
+    return;
+  }
+  box.innerHTML = list.map(p => {
+    const due = Parts.due(p);
+    const n = Parts.next(p);
+    const st = p.status || '요청';
+    const meta = [p.pn && 'P/N ' + p.pn, p.case_no && 'RMA ' + p.case_no,
+                  p.old_sn && '불량 ' + p.old_sn, st === '반납' && p.tracking ? '운송장 ' + p.tracking : ''].filter(Boolean).join(' · ');
+    const ticketOk = p.ticket_id && ppTickets.some(t => t.id === p.ticket_id);
+    const link = [ppCusts[p.customer_id], p.asset_host].filter(Boolean).map(FS.esc).join(' · ');
+    return `<div class="pt-card${due?.cls === 'over' ? ' over' : ''}">
+      <div class="pt-card-body" onclick="Parts.openModal('${p.id}', null, ppParts)">
+        <div class="pt-card-main">
+          <span class="pt-card-name">${FS.esc(p.name)}${p.qty > 1 ? ' ×' + p.qty : ''}</span>
+          ${meta ? `<span class="pt-card-meta">${FS.esc(meta)}</span>` : ''}
+          <span class="pp-link">${link}${p.ticket_title ? `${link ? ' · ' : ''}${ticketOk
+            ? `<a href="#" onclick="event.stopPropagation();event.preventDefault();ppOpenTicket('${p.ticket_id}')">${FS.esc(p.ticket_title)}</a>`
+            : FS.esc(p.ticket_title)}` : ''}</span>
+        </div>
+        <div class="pt-card-side">
+          <span class="pt-stage">${FS.esc(st)}${p.dates?.[st] ? ` <span class="text-hint pt-mono" style="font-weight:400;font-size:11px;">${FS.formatDate(p.dates[st]).slice(5)}</span>` : ''}</span>
+          ${Parts.stepsHtml(p)}
+          ${due ? `<span class="pt-due ${due.cls}">${due.text}</span>` : ''}
+        </div>
+      </div>
+      ${n ? `<button class="pt-next" onclick="Parts.advance('${p.id}', ppParts)">${FS.icon('check', 16)} ${n} 처리 <span class="text-hint" style="font-weight:600;">— ${Parts.STAGE_HINT[n]}</span></button>` : ''}
+    </div>`;
+  }).join('');
+}
+
+function ppOpenTicket(ticketId) { window.hwPageFilter = { page: 'tickets', ticketId }; loadPage('tickets'); }
+
+init();
+</script>

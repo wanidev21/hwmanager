@@ -17,6 +17,7 @@
   <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore-compat.js"></script>
   <script src="/firebase-config.js"></script>
   <script src="/static/js/firebase-service.js"></script>
+  <script src="/static/js/parts.js"></script>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Black+Han+Sans&family=Space+Mono:wght@400;700&display=swap">
@@ -44,6 +45,9 @@
         <div class="nav-group-label">장애·현황</div>
         <a class="nav-item" data-page="tickets" href="#">
           <span class="nav-icon"><i data-icon="alert"></i></span> 장애 티켓
+        </a>
+        <a class="nav-item" data-page="parts" href="#">
+          <span class="nav-icon"><i data-icon="box"></i></span> 부품·RMA
         </a>
         <a class="nav-item" data-page="warranty" href="#">
           <span class="nav-icon"><i data-icon="shield"></i></span> 워런티 현황
@@ -187,6 +191,7 @@
       tickets:   '장애 티켓',
       kb:        '지식베이스',
       warranty:  '워런티 현황',
+      parts:     '부품·RMA',
       calendar:  '캘린더',
       jobs:      '작업 일정',
       tech:      '기술 학습',
@@ -200,6 +205,7 @@
       delivery:  '고객·업무',
       tickets:   '장애·현황',
       warranty:  '장애·현황',
+      parts:     '장애·현황',
       calendar:  '일정·기록',
       jobs:      '일정·기록',
       kb:        '지식·기술',
@@ -626,7 +632,7 @@
     const searchModal = document.getElementById('search-modal');
     const gsInput = document.getElementById('gs-q');
     const gsResults = document.getElementById('gs-results');
-    const gsData = { assets: [], customers: [], projects: [], tickets: [], jobs: [] };
+    const gsData = { assets: [], customers: [], projects: [], tickets: [], jobs: [], parts: [] };
     let gsStarted = false, gsHits = [], gsSel = 0;
 
     function _gsStart() {
@@ -697,6 +703,13 @@
         meta: join([j.date ? FS.formatDate(j.date) + (j.time ? ' ' + j.time : '') : '', j.status || '예정', cust(j.customer_id), j.asset_host, j.assignee]),
         done: (j.status || '예정') !== '예정',
       }));
+      add('부품·RMA', gsData.parts, p => ({
+        score: score(p.pn, p.fru, p.case_no, p.new_sn, p.old_sn, p.tracking, p.name),
+        page: 'parts', filter: { partId: p.id }, mono: true,
+        title: [p.name, p.pn].filter(Boolean).join(' · ') || '(부품)',
+        meta: join([p.status || '요청', cust(p.customer_id), p.asset_host, p.case_no ? 'RMA ' + p.case_no : '']),
+        done: (p.status || '요청') === '종결',
+      }));
       return out;
     }
 
@@ -704,7 +717,7 @@
       const q = gsInput.value.trim().toLowerCase();
       if (!q) {
         gsHits = [];
-        gsResults.innerHTML = `<div class="gs-hint">장비(HOSTNAME·S/N·IP·모델·위치), 고객사, 프로젝트, 장애 티켓, 작업을 한 번에 찾습니다${
+        gsResults.innerHTML = `<div class="gs-hint">장비(HOSTNAME·S/N·IP·모델·위치), 고객사, 프로젝트, 장애 티켓, 작업, 부품(P/N·FRU·S/N·RMA번호)을 한 번에 찾습니다${
           matchMedia('(max-width:768px)').matches ? '' : '<br><kbd>↑</kbd><kbd>↓</kbd> 이동 · <kbd>Enter</kbd> 열기 · <kbd>Esc</kbd> 닫기'}</div>`;
         return;
       }

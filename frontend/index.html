@@ -875,12 +875,12 @@
 
     // ── Toast ──
     window.Toast = (() => {
-      const ICONS = { success: '✓', error: '✕', warn: '⚠', info: 'ℹ' };
+      const ICONS = { success: 'check', error: 'close', warn: 'alert', info: 'bolt' };   // 기호 문자는 폰에서 컬러 이모지로 바뀌므로 선 아이콘
       function show(msg, type, duration = 3200) {
         const container = document.getElementById('toast-container');
         const el = document.createElement('div');
         el.className = `toast toast-${type}`;
-        el.innerHTML = `<span class="toast-icon">${ICONS[type] || ''}</span><span class="toast-msg"></span>`;
+        el.innerHTML = `<span class="toast-icon">${FS.icon(ICONS[type], 16)}</span><span class="toast-msg"></span>`;
         el.querySelector('.toast-msg').textContent = msg;   // 사용자 입력이 섞여도 태그로 해석되지 않도록
         container.appendChild(el);
         const dismiss = () => {

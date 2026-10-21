@@ -15,6 +15,15 @@
     .ticket-filters { display:grid !important; grid-template-columns:1fr 1fr; }
     .ticket-filters > * { width:100% !important; max-width:none !important; }
   }
+  /* 폰 목록: 우선순위 점 · 제목(장비·고객사) · 상태만 — 가로 스크롤 없이 한눈에 */
+  .tk-cust-m { display:none; }
+  @media (max-width:768px) {
+    #ticket-tbody td:nth-child(n+5), #ticket-tbody td:nth-child(3),
+    .ticket-list-col thead th:nth-child(n+5), .ticket-list-col thead th:nth-child(3) { display:none; }
+    #ticket-tbody td:nth-child(2) { max-width:none !important; width:100%; white-space:normal !important; }
+    #ticket-tbody td { padding-top:11px; padding-bottom:11px; }
+    .tk-cust-m { display:inline; }
+  }
   .priority-dot { width:10px; height:10px; border:1.5px solid var(--ink); display:inline-block; margin-right:6px; }
   @media (max-width:768px) {
     .tl-chip { height:40px; padding:0 14px; }
@@ -289,7 +298,7 @@ function renderTickets() {
   document.getElementById('ticket-tbody').innerHTML = data.map(t=>`
     <tr onclick="showDetail('${t.id}', true)">
       <td><span class="priority-dot" style="background:${PRIORITY_COLOR[t.priority||'보통']||'#9b9b9b'};"></span></td>
-      <td style="font-weight:600;max-width:220px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${FS.esc(t.title||'')}${tkHost(t.asset_id, t) ? `<span class="tk-host">${FS.esc(tkHost(t.asset_id, t))}</span>` : ''}</td>
+      <td style="font-weight:600;max-width:220px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${FS.esc(t.title||'')}<span class="tk-host">${FS.esc(tkHost(t.asset_id, t))}${ticketCusts[t.customer_id] ? `<span class="tk-cust-m">${tkHost(t.asset_id, t) ? ' · ' : ''}${FS.esc(ticketCusts[t.customer_id])}</span>` : ''}</span></td>
       <td style="font-size:12px;">${FS.esc(ticketCusts[t.customer_id]||'-')}</td>
       <td><span class="badge ${STATUS_BADGE[t.status||'접수']||'badge-gray'}">${FS.esc(t.status||'접수')}</span></td>
       <td>${t.priority ? `<span class="badge ${PRIORITY_BADGE[t.priority]||'badge-gray'}">${FS.esc(t.priority)}</span>` : '-'}</td>

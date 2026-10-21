@@ -139,6 +139,9 @@
 .dp-assets { display:flex; flex-wrap:wrap; gap:4px; margin-top:4px; }
 .dp-asset { font-family:var(--font-mono); font-size:12px; font-weight:700; padding:3px 7px; border:1.5px solid var(--ink); background:var(--surface-2); color:var(--text); cursor:pointer; }
 .dp-asset:active { background:var(--signal); color:#111111; }
+.dnb-preview { font-family:var(--font-mono); font-size:12px; background:var(--surface-2); border-left:3px solid var(--ink); padding:8px 10px; line-height:1.7; max-height:160px; overflow-y:auto; white-space:pre; }
+.dnb-warn { font-size:12px; font-weight:700; color:#111111; background:var(--signal); padding:6px 10px; margin-top:8px; }
+.dnb-warn.err { background:var(--primary); }
 .dp-qty { font-family:var(--font-mono); font-size:14px; font-weight:700; white-space:nowrap; }
 mark.dp-hit { background:var(--signal); color:#111111; }
 
@@ -466,8 +469,47 @@ mark.dp-hit { background:var(--signal); color:#111111; }
     </div>
     <div class="modal-footer">
       <span class="dap-count" id="dap-count"></span>
+      <button class="btn" onclick="dnOpenBulk()" title="이 품목으로 장비를 새로 등록하고 바로 연결">+ 새 장비로 등록</button>
       <button class="btn" onclick="dnPickSel.clear();dnRenderPicker()">선택 해제</button>
       <button class="btn btn-primary" onclick="dnApplyAssetPicker()">적용</button>
+    </div>
+  </div>
+</div>
+
+<!-- 납품 품목 → 장비 일괄 등록 (PC 편집) -->
+<div class="modal-overlay" id="dn-bulk-modal" style="display:none;z-index:1100;" onclick="if(event.target===this)dnCloseBulk()">
+  <div class="modal" style="max-width:620px;">
+    <div class="modal-header"><h3>장비 일괄 등록</h3><button class="modal-close" onclick="dnCloseBulk()">×</button></div>
+    <div class="modal-body">
+      <div class="form-row">
+        <div class="form-group"><label class="form-label">고객사 *</label><select class="form-select" id="dnb-cust" onchange="dnBulkFillProjects()"><option value="">선택</option></select></div>
+        <div class="form-group"><label class="form-label">프로젝트 *</label>
+          <select class="form-select" id="dnb-proj" onchange="dnBulkPreview()"></select>
+          <input type="text" class="form-input mt-1" id="dnb-proj-new" placeholder="새 프로젝트 이름" style="display:none;" oninput="dnBulkPreview()">
+        </div>
+      </div>
+      <div class="form-row col-3">
+        <div class="form-group"><label class="form-label">수량 *</label><input type="number" class="form-input" id="dnb-qty" min="1" max="200" oninput="dnBulkPreview()"></div>
+        <div class="form-group"><label class="form-label">장비유형</label><input type="text" class="form-input" id="dnb-type" placeholder="서버, GPU서버..."></div>
+        <div class="form-group"><label class="form-label">설치일</label><input type="date" class="form-input" id="dnb-date"></div>
+      </div>
+      <div class="form-group"><label class="form-label">모델명</label><input type="text" class="form-input" id="dnb-model"></div>
+      <div class="form-row col-3">
+        <div class="form-group"><label class="form-label">Hostname 앞부분 *</label><input type="text" class="form-input" id="dnb-prefix" placeholder="gpu-node-" oninput="dnBulkPreview()" autocomplete="off" spellcheck="false"></div>
+        <div class="form-group"><label class="form-label">시작 번호</label><input type="number" class="form-input" id="dnb-start" min="0" value="1" oninput="dnBulkPreview()"></div>
+        <div class="form-group"><label class="form-label">자릿수</label><select class="form-select" id="dnb-digits" onchange="dnBulkPreview()"><option value="1">1 (1)</option><option value="2" selected>2 (01)</option><option value="3">3 (001)</option></select></div>
+      </div>
+      <div class="form-group">
+        <label class="form-label">S/N (줄마다 하나, 순서대로 — 비워 두면 나중에 입력)</label>
+        <textarea class="form-textarea" id="dnb-serials" rows="4" style="font-family:var(--font-mono);" oninput="dnBulkPreview()" spellcheck="false"></textarea>
+      </div>
+      <label class="form-label">미리보기</label>
+      <div class="dnb-preview" id="dnb-preview"></div>
+      <div id="dnb-warn"></div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn" onclick="dnCloseBulk()">취소</button>
+      <button class="btn btn-primary" id="dnb-save" onclick="dnSaveBulk()">등록하고 연결</button>
     </div>
   </div>
 </div>
@@ -1092,6 +1134,110 @@ function dnPickAll(pid) {
   dnAssets.filter(a => (a.project_id || '') === pid && (!cid || a.customer_id === cid)).forEach(a => dnPickSel.add(a.id));
   dnRenderPicker();
 }
+// ── 납품 품목 → 장비 일괄 등록: 수량만큼 호스트네임 규칙대로 만들고 S/N 붙여넣기, 등록 후 이 품목에 연결 ──
+const DN_TYPE_BY_MODEL = { Server: '서버', Storage: '스토리지', GPU: 'GPU서버', Switch: '스위치' };
+function dnOpenBulk() {
+  const tr = dnPickRow;
+  if (!tr) return;
+  const inputs = tr.querySelectorAll('input');
+  const desc = inputs[0]?.value.trim() || '';
+  const cid = useCustomerText ? '' : document.getElementById('h-customer').value;
+  FS.setOptions(document.getElementById('dnb-cust'), [...deliveryCusts].sort((a, b) => (a.name || '').localeCompare(b.name || ''))
+    .map(c => ({ value: c.id, label: c.name || c.id })));
+  document.getElementById('dnb-cust').value = cid;
+  document.getElementById('dnb-qty').value = Math.min(200, parseInt(inputs[1]?.value) || 1);
+  document.getElementById('dnb-type').value = DN_TYPE_BY_MODEL[tr.querySelector('select')?.value] || '';
+  document.getElementById('dnb-model').value = desc;
+  document.getElementById('dnb-date').value = document.getElementById('h-date').value || FS.localDate();
+  document.getElementById('dnb-prefix').value = '';
+  document.getElementById('dnb-start').value = 1;
+  document.getElementById('dnb-serials').value = '';
+  dnBulkFillProjects();
+  document.getElementById('dn-bulk-modal').style.display = 'flex';
+  document.getElementById(cid ? 'dnb-prefix' : 'dnb-cust').focus();
+}
+function dnCloseBulk() { document.getElementById('dn-bulk-modal').style.display = 'none'; }
+function dnBulkFillProjects() {
+  const cid = document.getElementById('dnb-cust').value;
+  const sel = document.getElementById('dnb-proj');
+  const projName = document.getElementById('h-project').value.trim();
+  const projs = dnProjects.filter(p => p.customer_id === cid).sort((a, b) => (a.name || '').localeCompare(b.name || ''));
+  sel.innerHTML = projs.map(p => `<option value="${p.id}">${FS.esc(p.name || '(이름 없음)')}</option>`).join('') + '<option value="__new">+ 새 프로젝트</option>';
+  // 납품확인서의 프로젝트명과 같은 프로젝트가 있으면 그것, 없으면 새 프로젝트(이름 미리 채움)
+  const same = projs.find(p => (p.name || '').trim() === projName);
+  sel.value = same ? same.id : projs.length && !projName ? projs[0].id : '__new';
+  document.getElementById('dnb-proj-new').value = projName;
+  dnBulkPreview();
+}
+function dnBulkPlan() {
+  const qty = Math.max(0, Math.min(200, parseInt(document.getElementById('dnb-qty').value) || 0));
+  const prefix = document.getElementById('dnb-prefix').value.trim();
+  const start = Math.max(0, parseInt(document.getElementById('dnb-start').value) || 0);
+  const digits = parseInt(document.getElementById('dnb-digits').value) || 1;
+  const serials = document.getElementById('dnb-serials').value.split(/\r?\n/).map(s => s.trim()).filter(Boolean);
+  const rows = Array.from({ length: qty }, (_, i) => ({ hostname: prefix + String(start + i).padStart(digits, '0'), serial: serials[i] || '' }));
+  return { qty, prefix, serials, rows };
+}
+function dnBulkPreview() {
+  const isNew = document.getElementById('dnb-proj').value === '__new';
+  document.getElementById('dnb-proj-new').style.display = isNew ? '' : 'none';
+  const { qty, prefix, serials, rows } = dnBulkPlan();
+  const cid = document.getElementById('dnb-cust').value;
+  const box = document.getElementById('dnb-preview');
+  box.textContent = !prefix || !qty ? 'Hostname 앞부분과 수량을 입력하세요'
+    : rows.map(r => `${r.hostname.padEnd(18)} ${r.serial || '(S/N 없음)'}`).join('\n');
+  const warns = [], errs = [];
+  if (!cid) errs.push('고객사를 선택하세요');
+  if (isNew && !document.getElementById('dnb-proj-new').value.trim()) errs.push('새 프로젝트 이름을 입력하세요');
+  if (serials.length > qty) errs.push(`S/N이 ${serials.length}개로 수량(${qty})보다 많습니다`);
+  else if (serials.length && serials.length < qty) warns.push(`S/N ${serials.length}개 — 나머지 ${qty - serials.length}대는 S/N 없이 등록`);
+  const hostTaken = rows.filter(r => dnAssets.some(a => a.customer_id === cid && (a.hostname || '').toLowerCase() === r.hostname.toLowerCase())).map(r => r.hostname);
+  if (prefix && hostTaken.length) errs.push(`이미 있는 Hostname: ${hostTaken.slice(0, 5).join(', ')}${hostTaken.length > 5 ? ` 외 ${hostTaken.length - 5}` : ''}`);
+  const snTaken = rows.filter(r => r.serial && dnAssets.some(a => (a.serial || '').toLowerCase() === r.serial.toLowerCase())).map(r => r.serial);
+  if (snTaken.length) warns.push(`이미 등록된 S/N: ${snTaken.slice(0, 5).join(', ')}${snTaken.length > 5 ? ` 외 ${snTaken.length - 5}` : ''}`);
+  const dupSn = serials.filter((s, i) => serials.indexOf(s) !== i);
+  if (dupSn.length) errs.push(`S/N 중복 입력: ${[...new Set(dupSn)].join(', ')}`);
+  document.getElementById('dnb-warn').innerHTML = errs.map(e => `<div class="dnb-warn err">${FS.esc(e)}</div>`).join('') + warns.map(w => `<div class="dnb-warn">${FS.esc(w)}</div>`).join('');
+  const ok = !errs.length && prefix && qty;
+  const btn = document.getElementById('dnb-save');
+  btn.disabled = !ok;
+  btn.textContent = ok ? `${qty}대 등록하고 연결` : '등록하고 연결';
+  return ok;
+}
+function dnSaveBulk() {
+  if (!dnBulkPreview() || !dnPickRow) return;
+  const cid = document.getElementById('dnb-cust').value;
+  let pid = document.getElementById('dnb-proj').value;
+  if (pid === '__new') {
+    const name = document.getElementById('dnb-proj-new').value.trim();
+    pid = FS.addNow('projects', { customer_id: cid, name, install_date: document.getElementById('dnb-date').value, ...FS.creator() });
+    FS.audit('등록', '프로젝트', pid, name, '납품확인서에서 장비 일괄 등록');
+    dnProjects.push({ id: pid, customer_id: cid, name });
+  }
+  const base = {
+    customer_id: cid, project_id: pid,
+    device_type: document.getElementById('dnb-type').value.trim(),
+    model: document.getElementById('dnb-model').value.trim(),
+    install_date: document.getElementById('dnb-date').value,
+    status: '운영중',
+    location: '', ip_address: '', os: '', cpu: '', memory: '', gpu: '', disk: '',
+    bmc_version: '', bios_version: '', raid_version: '', driver_version: '', vendor_case_no: '',
+    memo: `납품: ${document.getElementById('h-docno').value.trim() || '납품확인서'}`,
+  };
+  // 서버 응답을 기다리지 않음 (오프라인이어도 바로 반영, 연결되면 동기화)
+  const ids = dnBulkPlan().rows.map(r => {
+    const data = { ...base, hostname: r.hostname, serial: r.serial };
+    const id = FS.addNow('assets', { ...data, ...FS.creator() });
+    dnAssets.push({ id, ...data });
+    return id;
+  });
+  FS.audit('등록', '장비', '', `납품확인서 일괄 ${ids.length}대`, dnBulkPlan().rows.map(r => r.hostname).join(', '));
+  ids.forEach(id => dnPickSel.add(id));
+  dnCloseBulk();
+  dnApplyAssetPicker();
+  Toast.success(`장비 ${ids.length}대 등록·연결 — 납품확인서를 저장하세요`);
+}
+
 function dnCloseAssetPicker() { document.getElementById('dn-asset-modal').style.display = 'none'; dnPickRow = null; }
 function dnApplyAssetPicker() {
   if (dnPickRow) {

@@ -73,7 +73,10 @@ html[data-theme="dark"] .cust-item.active .cust-item-name, html[data-theme="dark
 
 <div class="flex-between mb-3">
   <div style="font-size:16px;font-weight:600;">고객사 관리</div>
-  <button class="btn btn-primary" onclick="openCustModal()">+ 고객사 등록</button>
+  <div class="flex gap-2">
+    <button class="btn pc-only" onclick="exportAssetsXlsx()" title="전체 장비·고객사 목록을 엑셀로 저장">엑셀 내보내기</button>
+    <button class="btn btn-primary" onclick="openCustModal()">+ 고객사 등록</button>
+  </div>
 </div>
 
 <div class="cust-layout">
@@ -1015,6 +1018,29 @@ async function deleteAsset(id) {
   renderAssets();
   renderCustomers();
   Toast.success('삭제되었습니다');
+}
+
+// ── 엑셀 내보내기 (PC): 장비 시트 + 고객사 시트 ──
+function exportAssetsXlsx() {
+  const cust = id => allCustomers.find(c => c.id === id) || {};
+  const proj = id => allProjects.find(p => p.id === id) || {};
+  const ymd = v => FS.formatDate(v) || '';
+  const assets = [...allAssets].sort((a, b) =>
+    (cust(a.customer_id).name || '').localeCompare(cust(b.customer_id).name || '') ||
+    (proj(a.project_id).name || '').localeCompare(proj(b.project_id).name || '') ||
+    (a.hostname || '').localeCompare(b.hostname || '', 'ko', { numeric: true }));
+  const assetRows = [['고객사', '프로젝트', 'Hostname', '장비유형', '모델명', 'S/N', 'IP', '위치', 'OS', '상태',
+                      'CPU', '메모리', 'GPU', '디스크', 'BIOS', 'BMC', 'RAID', '드라이버', '설치일', '워런티 만료', '벤더케이스', '메모'],
+    ...assets.map(a => {
+      const p = proj(a.project_id);
+      return [cust(a.customer_id).name || '', p.name || '', a.hostname, a.device_type, a.model, a.serial, a.ip_address, a.location, a.os, a.status,
+              a.cpu, a.memory, a.gpu, a.disk, a.bios_version, a.bmc_version, a.raid_version, a.driver_version,
+              ymd(a.install_date), ymd(p.warranty_expire), a.vendor_case_no, a.memo].map(v => v ?? '');
+    })];
+  const custRows = [['고객사', '담당자', '연락처', '이메일', '주소', '프로젝트 수', '장비 수', '메모'],
+    ...allCustomers.map(c => [c.name, c.contact, c.phone, c.email, c.address,
+      allProjects.filter(p => p.customer_id === c.id).length, allAssets.filter(a => a.customer_id === c.id).length, c.memo].map(v => v ?? ''))];
+  FS.exportXlsx(`HW장비목록_${FS.localDate()}`, [{ name: '장비', rows: assetRows }, { name: '고객사', rows: custRows }]);
 }
 
 // ── CSV 일괄 가져오기 ─────────────────────────────────────────────────────────

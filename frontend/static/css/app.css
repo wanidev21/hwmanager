@@ -1169,3 +1169,14 @@ html[data-theme="dark"] .gs-hit.sel, html[data-theme="dark"] .gs-hit:hover { bac
 .pt-next { width:100%; border:none; border-top:1px solid var(--border); background:var(--surface-2); color:var(--text); height:40px; font-family:inherit; font-size:13px; font-weight:800; display:flex; align-items:center; justify-content:center; gap:6px; }
 .pt-next:hover, .pt-next:active { background:var(--signal); color:#111111; }
 @media (max-width: 768px) { .pt-next { height:46px; font-size:14px; } }
+
+/* ── 급한 일 배지 (index.html _renderTodayBadges) ── */
+.nav-badge { margin-left:auto; min-width:20px; height:18px; padding:0 5px; display:inline-flex; align-items:center; justify-content:center; background:var(--primary); color:#111111; font-family:var(--font-mono); font-size:11px; font-weight:700; line-height:1; }
+.nav-badge.soft { background:var(--signal); }
+.tab-item { position:relative; }
+.tab-item .nav-badge { position:absolute; top:6px; left:calc(50% + 6px); margin:0; border:2px solid #111111; height:20px; }
+.tab-item .nav-badge.dot { min-width:10px; width:10px; height:10px; padding:0; font-size:0; background:var(--signal); top:10px; }
+.tab-item.active .nav-badge { background:#111111; color:var(--primary); border-color:#111111; }
+
+/* PC 전용 (엑셀 내보내기 등 — 폰에서는 숨김) */
+@media (max-width: 768px) { .pc-only { display:none !important; } }

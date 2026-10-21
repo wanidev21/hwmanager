@@ -103,6 +103,7 @@ window.FS = {
   async logout() {
     FS._loggingOut = true;   // signOut 직후 onAuthChanged(null)이 캐시 삭제 전에 페이지를 떠나지 않도록
     FS.unwatchAll();
+    try { if (navigator.clearAppBadge) navigator.clearAppBadge().catch(() => {}); } catch (e) {}
     await _auth.signOut();
     // 공용 기기 대비: 로그아웃 시 로컬 캐시 삭제
     try { await _db.terminate(); await _db.clearPersistence(); }
@@ -358,6 +359,38 @@ window.FS = {
       if (y > 0) years = ` ${y}년`;
     }
     return (base ? `기본${years}` : '') + (ext ? `${base ? ' + ' : ''}연장 ${ext}회` : '');
+  },
+
+  // 엑셀 내보내기 (PC). sheets: [{ name, rows: [[머리글...], [값...], ...] }]
+  // SheetJS는 누를 때만 불러옴. 못 불러오면(오프라인 등) 첫 시트를 엑셀에서 열리는 CSV(UTF-8 BOM)로 저장
+  async exportXlsx(filename, sheets) {
+    try {
+      if (!window.XLSX) await new Promise((resolve, reject) => {
+        const s = document.createElement('script');
+        s.src = 'https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js';
+        s.onload = resolve; s.onerror = reject;
+        document.head.appendChild(s);
+      });
+      const wb = XLSX.utils.book_new();
+      sheets.forEach(({ name, rows }) => {
+        const ws = XLSX.utils.aoa_to_sheet(rows);
+        // 열 너비: 내용 길이 기준 (한글은 2칸으로 계산)
+        const w = v => [...String(v ?? '')].reduce((n, ch) => n + (ch.charCodeAt(0) > 255 ? 2 : 1), 0);
+        ws['!cols'] = (rows[0] || []).map((_, i) => ({ wch: Math.min(50, Math.max(6, ...rows.slice(0, 300).map(r => w(r[i])))) + 1 }));
+        ws['!autofilter'] = { ref: XLSX.utils.encode_range({ s: { r: 0, c: 0 }, e: { r: Math.max(0, rows.length - 1), c: Math.max(0, (rows[0] || []).length - 1) } }) };
+        XLSX.utils.book_append_sheet(wb, ws, name.slice(0, 31));
+      });
+      XLSX.writeFile(wb, filename + '.xlsx');
+    } catch (e) {
+      console.warn('[FS.exportXlsx] SheetJS 사용 불가 → CSV', e);
+      const csv = sheets[0].rows.map(r => r.map(v => `"${String(v ?? '').replace(/"/g, '""')}"`).join(',')).join('\r\n');
+      const a = document.createElement('a');
+      a.href = URL.createObjectURL(new Blob(['\uFEFF' + csv], { type: 'text/csv;charset=utf-8' }));
+      a.download = filename + '.csv';
+      a.click();
+      setTimeout(() => URL.revokeObjectURL(a.href), 1000);
+      if (window.Toast) Toast.info('엑셀 라이브러리를 불러오지 못해 CSV로 저장했습니다');
+    }
   },
 
   // 로컬(KST) 기준 'YYYY-MM-DD' (toISOString은 UTC라 오전 9시 전에는 하루 전 날짜가 됨)

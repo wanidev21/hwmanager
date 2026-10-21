@@ -56,6 +56,7 @@
   <select class="form-select" id="filter-vendor" style="width:150px;" onchange="renderTable()">
     <option value="">전체 벤더</option>
   </select>
+  <button class="btn pc-only" style="margin-left:auto;" onclick="exportWarrantyXlsx()" title="지금 보이는 목록을 엑셀로 저장">엑셀 내보내기</button>
   <select class="form-select" id="sort-by" style="width:160px;" onchange="renderTable()">
     <option value="expire">만료일순</option>
     <option value="customer">고객사순</option>
@@ -102,6 +103,7 @@ FS.requireAuth();
 let wProjects    = [];
 let wCustomers   = {};
 let wAssets      = [];
+let wShown       = [];  // 지금 표에 보이는 프로젝트 (엑셀 내보내기)
 let wCardFilter  = '';  // stat card 클릭 필터 ('' | 'expired' | 'urgent' | 'ok')
 let wSelectedProjectId = null;  // 장비 패널에 표시 중인 프로젝트
 
@@ -245,6 +247,7 @@ function renderTable() {
     return 0;
   });
 
+  wShown = data;
   document.getElementById('w-empty').style.display = data.length ? 'none' : '';
   document.getElementById('w-tbody').innerHTML = data.map(p => {
     const days = daysLeft(p.warranty_expire);
@@ -338,4 +341,18 @@ function showProjectAssets(projectId, scroll = true) {
 }
 
 init();
+
+// ── 엑셀 내보내기 (PC): 지금 보이는 목록 그대로 ──
+function exportWarrantyXlsx() {
+  const rows = [['만료일', '잔여일', '상태', '고객사', '프로젝트', '벤더', '장비유형', '등록 장비', '워런티 구성', '워런티 시작', '메모'],
+    ...wShown.map(p => {
+      const d = daysLeft(p.warranty_expire);
+      const ps = FS.warrantyPeriods(p);
+      return [FS.formatDate(p.warranty_expire) || '', d ?? '', d === null ? '' : d < 0 ? '만료' : d <= W_URGENT_DAYS ? '임박' : '정상',
+              wCustomers[p.customer_id] || '', p.name || '', p.vendor || '', p.device_type || '',
+              wAssets.filter(a => a.project_id === p.id).length, FS.warrantySummary(ps),
+              FS.formatDate(ps.find(x => x.start)?.start) || '', p.memo || ''];
+    })];
+  FS.exportXlsx(`워런티현황_${FS.localDate()}`, [{ name: '워런티', rows }]);
+}
 </script>

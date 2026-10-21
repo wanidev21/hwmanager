@@ -126,6 +126,8 @@ customers → projects (customer_id) → assets (customer_id, project_id)
 - 오프라인 캐시(enablePersistence) 사용, 로그아웃 시 캐시 삭제
 - sw.js는 네트워크 우선 (배포 즉시 반영), `/__/` 경로는 우회
 - 전체 검색(index.html): 상단 검색 버튼 / PC Ctrl+K·`/` → 장비·고객사·프로젝트·티켓·작업. 처음 열 때 `FS.listen`으로 구독 시작해 계속 유지(unwatchAll 대상 아님). 결과는 `hwPageFilter` + `loadPage(page, {force:true})`로 열기 (같은 화면이어도 다시 열림)
+- 급한 일 배지(index.html `_renderTodayBadges`): 같은 구독 데이터로 메뉴 옆 숫자·하단 탭 '홈'·탭 제목·설치 앱 아이콘(`navigator.setAppBadge`). 합계 = 긴급 미완료 장애 + 오늘/지난 예정 작업·준비 기한 도래 작업 + 반납 기한 3일 이내 부품 (워런티 30일 내는 메뉴에만)
+- 엑셀 내보내기(PC 전용 `.pc-only`): `FS.exportXlsx(파일명, [{name, rows}])` — SheetJS(cdnjs xlsx 0.18.5)를 누를 때만 로드, 실패 시 CSV(UTF-8 BOM). 고객사·자산(장비+고객사 시트), 워런티(보이는 목록)
 - 저장 대기 배지(index.html 상단): FS 쓰기 함수(add/update/remove/addNow/updateNow/audit)는 `_track()`으로 미확인 건수 집계, `FS.hasPendingWrites()`(waitForPendingWrites)로 페이지가 직접 쓴 것까지 확인. 새 쓰기 헬퍼를 만들면 `_track()`으로 감쌀 것
 
 ## 모바일

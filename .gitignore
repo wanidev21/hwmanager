@@ -33,3 +33,6 @@ smoke-results/
 
 # ── 데이터 백업 (scripts/backup.py) ──
 backups/
+
+# ── 면접용 포트폴리오 PDF (스크린샷에 실명 포함) ──
+portfolio/

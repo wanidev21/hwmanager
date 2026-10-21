@@ -661,7 +661,8 @@
       const join = arr => arr.filter(Boolean).join(' · ');
       const out = [];
       const add = (group, list, fn, limit = 5) => {
-        list.map(x => fn(x)).filter(r => r && r.score).sort((a, b) => b.score - a.score).slice(0, limit)
+        list.map(x => fn(x)).filter(r => r && r.score)
+          .sort((a, b) => b.score - a.score || a.title.localeCompare(b.title, 'ko', { numeric: true })).slice(0, limit)
           .forEach(r => out.push({ group, ...r }));
       };
       add('장비', gsData.assets, a => ({

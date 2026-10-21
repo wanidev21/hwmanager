@@ -611,7 +611,7 @@ function viewAsset(id) {
   avLoadTickets(id);
 }
 
-// 이 장비의 이력 타임라인: 장애 티켓·작업 일정·부품 교체·변경 이력을 시간순으로 (1회 조회, 최근 것이 위)
+// 이 장비의 이력 타임라인: 납품·장애 티켓·작업 일정·부품 교체·변경 이력을 시간순으로 (1회 조회, 최근 것이 위)
 const AV_TL_STEP = 8;
 async function avLoadTickets(assetId) {
   const body = document.getElementById('av-body');
@@ -619,11 +619,12 @@ async function avLoadTickets(assetId) {
   box.className = 'av-item av-full';
   box.innerHTML = '<div class="av-label">이력</div><div class="av-val" style="color:var(--text-hint);">불러오는 중...</div>';
   body.appendChild(box);
-  const [tk, jb, au, pt] = await Promise.allSettled([
+  const [tk, jb, au, pt, dn] = await Promise.allSettled([
     FS.getAll('tickets', [['asset_id', '==', assetId]]),
     FS.getAll('jobs', [['asset_id', '==', assetId]]),
     FS.getAll('audit_logs', [['entity_id', '==', assetId]]),
     FS.getAll('parts', [['asset_id', '==', assetId]]),
+    FS.getAll('delivery_notes', [['asset_ids', 'array-contains', assetId]]),
   ]);
   if (avAssetId !== assetId) return;   // 그 사이 다른 장비를 열었음
   const ms = v => !v ? 0 : typeof v === 'string' ? new Date(v + 'T00:00:00').getTime() : v.toDate ? v.toDate().getTime() : new Date(v).getTime();
@@ -642,6 +643,12 @@ async function avLoadTickets(assetId) {
     badge: `<span class="badge ${JBADGE[j.status || '예정'] || 'badge-gray'}">${FS.esc(j.status || '예정')}</span>`,
     open: `window.hwPageFilter={page:'jobs',jobId:'${j.id}'};loadPage('jobs')`,
   }));
+  (dn.value || []).forEach(n => rows.push({
+    t: ms(n.delivery_date || n.created_at), kind: '납품', icon: 'clipboard',
+    title: (n.asset_items && n.asset_items[assetId]) || '납품 품목', sub: [n.doc_number, n.project_name].filter(Boolean).join(' · '),
+    badge: `<span class="badge ${(n.status || '작성중') === '완료' ? 'badge-success' : 'badge-warning'}">${FS.esc(n.status || '작성중')}</span>`,
+    open: `window.hwPageFilter={page:'delivery',noteId:'${n.id}'};loadPage('delivery')`,
+  }));
   (pt.value || []).forEach(p => {
     const due = Parts.due(p);
     rows.push({
@@ -657,8 +664,8 @@ async function avLoadTickets(assetId) {
     badge: '', open: '',
   }));
   rows.sort((a, b) => b.t - a.t);
-  const tCount = (tk.value || []).length, jCount = (jb.value || []).length, pCount = (pt.value || []).length;
-  const head = `<div class="av-label">이력 <span style="font-weight:600;">${[tCount ? '장애 ' + tCount : '', jCount ? '작업 ' + jCount : '', pCount ? '부품 ' + pCount : ''].filter(Boolean).join(' · ')}</span></div>`;
+  const tCount = (tk.value || []).length, jCount = (jb.value || []).length, pCount = (pt.value || []).length, dCount = (dn.value || []).length;
+  const head = `<div class="av-label">이력 <span style="font-weight:600;">${[dCount ? '납품 ' + dCount : '', tCount ? '장애 ' + tCount : '', jCount ? '작업 ' + jCount : '', pCount ? '부품 ' + pCount : ''].filter(Boolean).join(' · ')}</span></div>`;
   if (!rows.length) { box.innerHTML = head + '<div class="av-val" style="color:var(--text-hint);">이력 없음</div>'; return; }
   const now = Date.now();
   const row = r => `<div class="av-tl${r.open ? ' link' : ''}${r.t > now ? ' future' : ''}"${r.open ? ` onclick="${r.open}"` : ''}>

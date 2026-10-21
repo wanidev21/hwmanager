@@ -122,6 +122,23 @@
 .dp-main { flex:1; min-width:0; display:flex; flex-direction:column; gap:3px; }
 .dp-desc { font-size:14px; font-weight:800; word-break:break-word; user-select:text; }
 .dp-sub { font-size:12px; color:var(--text-sub); }
+/* 품목 ↔ 장비 연결 */
+.dn-link-btn { min-width:96px; height:30px; padding:0 8px; border:1.5px dashed var(--ink); background:var(--surface); color:var(--text-sub); font-family:inherit; font-size:12px; font-weight:700; white-space:nowrap; }
+.dn-link-btn.on { border-style:solid; background:var(--ink); color:var(--bg); font-family:var(--font-mono); }
+.dn-link-btn:hover { background:var(--signal); color:#111111; }
+.dap-search { margin-bottom:10px; }
+.dap-group { font-family:var(--font-mono); font-size:11px; font-weight:700; padding:6px 10px; background:#111111; color:#ECEAE4; display:flex; justify-content:space-between; align-items:center; }
+.dap-group button { background:none; border:1px solid #ECEAE4; color:#ECEAE4; font-family:inherit; font-size:11px; padding:1px 6px; }
+.dap-list { border:2px solid var(--ink); max-height:50vh; overflow-y:auto; }
+.dap-row { display:flex; align-items:center; gap:10px; padding:9px 10px; border-top:1px solid var(--border); cursor:pointer; }
+.dap-row:hover { background:var(--surface-2); }
+.dap-row input { width:18px; height:18px; accent-color:var(--primary); flex-shrink:0; }
+.dap-host { font-family:var(--font-mono); font-weight:700; font-size:13px; }
+.dap-meta { font-size:11px; color:var(--text-hint); font-family:var(--font-mono); }
+.dap-count { font-size:12px; font-weight:800; margin-right:auto; }
+.dp-assets { display:flex; flex-wrap:wrap; gap:4px; margin-top:4px; }
+.dp-asset { font-family:var(--font-mono); font-size:12px; font-weight:700; padding:3px 7px; border:1.5px solid var(--ink); background:var(--surface-2); color:var(--text); cursor:pointer; }
+.dp-asset:active { background:var(--signal); color:#111111; }
 .dp-qty { font-family:var(--font-mono); font-size:14px; font-weight:700; white-space:nowrap; }
 mark.dp-hit { background:var(--signal); color:#111111; }
 
@@ -409,6 +426,7 @@ mark.dp-hit { background:var(--signal); color:#111111; }
           <th style="width:70px;text-align:center;">수량</th>
           <th style="width:70px;text-align:center;">단위</th>
           <th style="width:140px;">비고</th>
+          <th style="width:110px;" title="이 품목이 들어간(설치된) 장비">장비</th>
           <th style="width:30px;"></th>
         </tr>
       </thead>
@@ -437,6 +455,23 @@ mark.dp-hit { background:var(--signal); color:#111111; }
 </div>
 
 <!-- ── 인쇄 전용 DOM (화면 숨김) ── -->
+<!-- 품목 → 장비 연결 (PC 편집) -->
+<div class="modal-overlay" id="dn-asset-modal" style="display:none;" onclick="if(event.target===this)dnCloseAssetPicker()">
+  <div class="modal" style="max-width:560px;">
+    <div class="modal-header"><h3 id="dap-title">장비 연결</h3><button class="modal-close" onclick="dnCloseAssetPicker()">×</button></div>
+    <div class="modal-body">
+      <div class="text-hint" id="dap-hint" style="font-size:12px;margin-bottom:8px;"></div>
+      <input type="search" class="form-input dap-search" id="dap-q" placeholder="Hostname · S/N · IP · 모델" oninput="dnRenderPicker()" autocomplete="off">
+      <div class="dap-list" id="dap-list"></div>
+    </div>
+    <div class="modal-footer">
+      <span class="dap-count" id="dap-count"></span>
+      <button class="btn" onclick="dnPickSel.clear();dnRenderPicker()">선택 해제</button>
+      <button class="btn btn-primary" onclick="dnApplyAssetPicker()">적용</button>
+    </div>
+  </div>
+</div>
+
 <div class="modal-overlay" id="preview-modal" style="display:none;" onclick="if(event.target===this)closePreview()">
   <div class="modal dn-preview-modal">
     <div class="modal-header">
@@ -472,6 +507,7 @@ const MODEL_OPTIONS = ['Server','Storage','GPU','Switch','NIC','HDD','SSD','NVMe
 
 let deliveryNotes = [], deliveryCusts = [];
 let deliveryItemsByNote = {};   // 품목 검색용 (delivery_id → 품목들)
+let dnAssets = [], dnProjects = [];   // 품목 ↔ 장비 연결용
 const dnIsPhone = () => window.matchMedia('(max-width:768px)').matches;
 let editingNoteId = null, useCustomerText = false, editingStatus = '작성중';
 let dnSaving = false;        // 저장 중복 클릭 방지
@@ -509,9 +545,17 @@ function init() {
 
   // 목록·고객사만 실시간 반영 (작성 중인 편집 화면 입력값은 건드리지 않음)
   document.querySelector('.dn-mobile-note').style.display = dnIsPhone() ? '' : 'none';
-  FS.watch([['delivery_notes'], ['customers'], ['delivery_items']], ([notes, custs, items]) => {
+  let pendingNote = null;   // 장비 이력 등에서 특정 납품확인서를 열려고 온 경우
+  if (window.hwPageFilter && window.hwPageFilter.page === 'delivery') {
+    pendingNote = window.hwPageFilter.noteId || null;
+    window.hwPageFilter = null;
+  }
+  FS.watch([['delivery_notes'], ['customers'], ['delivery_items'], ['assets'], ['projects']], ([notes, custs, items, assets, projs]) => {
     deliveryNotes = notes;
     deliveryCusts = custs;
+    dnAssets = assets;
+    dnProjects = projs;
+    if (pendingNote) { const id = pendingNote; pendingNote = null; setTimeout(() => openPreview(id), 0); }
     deliveryItemsByNote = {};
     items.forEach(it => { (deliveryItemsByNote[it.delivery_id] = deliveryItemsByNote[it.delivery_id] || []).push(it); });
     Object.values(deliveryItemsByNote).forEach(arr => arr.sort((a, b) => (a.seq || 0) - (b.seq || 0)));
@@ -549,7 +593,7 @@ function renderList() {
   const sf = document.getElementById('status-filter')?.value||'';
   const filtered = deliveryNotes.filter(n => {
     const cName = deliveryCusts.find(c=>c.id===n.customer_id)?.name || n.customer_name || '';
-    const itemText = (deliveryItemsByNote[n.id] || []).map(it => [it.description, it.model, it.note].join(' ')).join(' ');
+    const itemText = (deliveryItemsByNote[n.id] || []).map(it => [it.description, it.model, it.note, ...(it.asset_hosts || [])].join(' ')).join(' ');
     return (!q || [n.doc_number||'', cName, n.project_name||'', itemText].some(s=>s.toLowerCase().includes(q)))
         && (!sf || (n.status||'작성중') === sf);
   });
@@ -664,12 +708,16 @@ function addItemRow(item) {
         oninput="showAC(this)" onblur="setTimeout(()=>hideAC(this),150)" onfocus="showAC(this)">
       <div class="ac-list"></div>
     </div></td>
-    <td><select>${MODEL_OPTIONS.map(m=>`<option ${m===(item?.model||'Server')?'selected':''}>${m}</option>`).join('')}</select></td>
+    <td><select>${[...MODEL_OPTIONS, ...(item?.model && !MODEL_OPTIONS.includes(item.model) ? [item.model] : [])]   // 목록에 없는 기존 값도 유지 (저장 시 바뀌지 않도록)
+      .map(m=>`<option ${m===(item?.model||'Server')?'selected':''}>${FS.esc(m)}</option>`).join('')}</select></td>
     <td><input type="number" min="1" value="${FS.esc(item?.qty||1)}" style="text-align:center;"></td>
     <td><select>${UNIT_OPTIONS.map(u=>`<option ${u===(item?.unit||'EA')?'selected':''}>${u}</option>`).join('')}</select></td>
     <td><input type="text" placeholder="비고" value="${FS.esc(item?.note||'')}"></td>
+    <td><button type="button" class="dn-link-btn" onclick="dnOpenAssetPicker(this.closest('tr'))"></button></td>
     <td><button class="btn btn-ghost btn-sm" onclick="removeRow(this)" style="color:var(--danger);">×</button></td>`;
+  tr.dataset.assets = JSON.stringify(Array.isArray(item?.asset_ids) ? item.asset_ids : []);
   tbody.appendChild(tr);
+  dnRenderLinkBtn(tr);
 }
 
 function removeRow(btn) {
@@ -697,7 +745,9 @@ function getItemRows() {
   return [...document.querySelectorAll('#item-tbody tr')].map(tr=>{
     const inputs = tr.querySelectorAll('input');
     const sels = tr.querySelectorAll('select');
-    return { description:inputs[0]?.value.trim()||'', model:sels[0]?.value||'', qty:parseInt(inputs[1]?.value)||1, unit:sels[1]?.value||'EA', note:inputs[2]?.value.trim()||'' };
+    const asset_ids = dnRowAssets(tr);
+    return { description:inputs[0]?.value.trim()||'', model:sels[0]?.value||'', qty:parseInt(inputs[1]?.value)||1, unit:sels[1]?.value||'EA', note:inputs[2]?.value.trim()||'',
+             asset_ids, asset_hosts: asset_ids.map(id => dnAssetName(id)) };   // 장비가 삭제돼도 이름은 남도록
   })
     // 품목명·비고가 모두 빈 행은 저장하지 않음 (새 문서의 기본 빈 행 등)
     .filter(r => r.description || r.note)
@@ -750,6 +800,7 @@ async function dnSaveNote(status) {
     receiver_sig:  document.getElementById('canvas-receiver').toDataURL(),
     item_count:    items.length,
     status,
+    ...dnAssetIndex(items),
   };
   // 문서 + 품목(기존 삭제·새로 기록)을 batch 하나로 커밋 → 중간 실패로 품목이 사라지거나 중복되지 않음
   // (FS.add/update와 같은 created_at/updated_at 규칙 유지. batch 한도 500건)
@@ -965,12 +1016,93 @@ function openParts(note) {
         <div class="dp-main">
           <span class="dp-desc">${hl(it.description || '-')}</span>
           <span class="dp-sub">${[it.model ? hl(it.model) : '', it.note ? hl(it.note) : ''].filter(Boolean).join(' · ')}</span>
+          ${(it.asset_ids || []).length ? `<span class="dp-assets">${it.asset_ids.map((id, k) => dnAssets.some(a => a.id === id)
+            ? `<button class="dp-asset" onclick="dnGoAsset('${id}')">${hl(dnAssetName(id))}</button>`
+            : `<span class="dp-asset" style="cursor:default;opacity:.6;">${hl((it.asset_hosts || [])[k] || '삭제된 장비')}</span>`).join('')}</span>` : ''}
         </div>
         <span class="dp-qty">${FS.esc(it.qty || 1)} ${FS.esc(it.unit || '')}</span>
       </div>`).join('') : '<div class="dp-item"><span class="dp-sub">품목이 없습니다</span></div>'}</div>`;
   document.getElementById('parts-modal').style.display = 'flex';
 }
 function closeParts() { document.getElementById('parts-modal').style.display = 'none'; }
+
+// ── 품목 ↔ 장비 연결 (PC 편집 화면) ──
+function dnAssetName(id) {
+  const a = dnAssets.find(x => x.id === id);
+  return a ? (a.hostname || a.serial || '(이름 없음)') : '';
+}
+function dnRowAssets(tr) { try { return JSON.parse(tr.dataset.assets || '[]'); } catch { return []; } }
+function dnRenderLinkBtn(tr) {
+  const btn = tr.querySelector('.dn-link-btn');
+  const ids = dnRowAssets(tr);
+  btn.classList.toggle('on', ids.length > 0);
+  btn.textContent = !ids.length ? '+ 장비' : ids.length === 1 ? (dnAssetName(ids[0]) || '1대') : `${ids.length}대`;
+  btn.title = ids.map(dnAssetName).filter(Boolean).join(', ') || '이 품목이 들어간 장비 연결';
+}
+// 문서 단위 색인: asset_ids(장비 이력에서 array-contains 조회) + asset_items(장비별 품목 이름)
+function dnAssetIndex(items) {
+  const map = {};
+  items.forEach(it => (it.asset_ids || []).forEach(id => { (map[id] = map[id] || []).push(it.description || it.model || '품목'); }));
+  return { asset_ids: Object.keys(map), asset_items: Object.fromEntries(Object.entries(map).map(([k, v]) => [k, v.join(', ').slice(0, 300)])) };
+}
+function dnGoAsset(id) { closeParts(); window.hwPageFilter = { page: 'customers', assetId: id }; loadPage('customers'); }
+
+let dnPickRow = null;
+function dnOpenAssetPicker(tr) {
+  dnPickRow = tr;
+  const cid = useCustomerText ? '' : document.getElementById('h-customer').value;
+  const desc = tr.querySelector('input')?.value.trim() || '이 품목';
+  const qty = parseInt(tr.querySelectorAll('input')[1]?.value) || 0;
+  document.getElementById('dap-title').textContent = `${desc} — 들어간 장비`;
+  document.getElementById('dap-hint').textContent = cid
+    ? `${deliveryCusts.find(c => c.id === cid)?.name || ''} 장비${qty > 1 ? ` · 수량 ${qty}` : ''}`
+    : '고객사를 선택하지 않아 전체 장비를 보여 줍니다';
+  document.getElementById('dap-q').value = '';
+  dnPickSel = new Set(dnRowAssets(tr));
+  dnRenderPicker();
+  document.getElementById('dn-asset-modal').style.display = 'flex';
+  document.getElementById('dap-q').focus();
+}
+let dnPickSel = new Set();
+function dnRenderPicker() {
+  const cid = useCustomerText ? '' : document.getElementById('h-customer').value;
+  const q = document.getElementById('dap-q').value.trim().toLowerCase();
+  const has = v => String(v ?? '').toLowerCase().includes(q);
+  const list = dnAssets.filter(a => (!cid || a.customer_id === cid || dnPickSel.has(a.id))
+      && (!q || has(a.hostname) || has(a.serial) || has(a.ip_address) || has(a.model) || has(a.location)))
+    .sort((a, b) => (a.hostname || '').localeCompare(b.hostname || '', 'ko', { numeric: true }));
+  const groups = {};
+  list.forEach(a => { (groups[a.project_id || ''] = groups[a.project_id || ''] || []).push(a); });
+  const pname = id => dnProjects.find(p => p.id === id)?.name || '프로젝트 없음';
+  document.getElementById('dap-list').innerHTML = Object.keys(groups).length ? Object.entries(groups)
+    .sort(([a], [b]) => pname(a).localeCompare(pname(b)))
+    .map(([pid, arr]) => `
+      <div class="dap-group"><span>${FS.esc(pname(pid))} · ${arr.length}대</span><button type="button" onclick="dnPickAll('${pid}')">모두 선택</button></div>
+      ${arr.map(a => `<label class="dap-row">
+        <input type="checkbox" ${dnPickSel.has(a.id) ? 'checked' : ''} onchange="dnPickToggle('${a.id}', this.checked)">
+        <span><span class="dap-host">${FS.esc(a.hostname || '(이름 없음)')}</span><br>
+        <span class="dap-meta">${[a.serial, a.ip_address, a.model].filter(Boolean).map(FS.esc).join(' · ')}</span></span>
+      </label>`).join('')}`).join('')
+    : '<div class="dap-row" style="cursor:default;color:var(--text-hint);">해당하는 장비가 없습니다 — 고객사·자산에서 먼저 장비를 등록하세요</div>';
+  document.getElementById('dap-count').textContent = `${dnPickSel.size}대 선택`;
+}
+function dnPickToggle(id, on) { on ? dnPickSel.add(id) : dnPickSel.delete(id); document.getElementById('dap-count').textContent = `${dnPickSel.size}대 선택`; }
+function dnPickAll(pid) {
+  const cid = useCustomerText ? '' : document.getElementById('h-customer').value;
+  dnAssets.filter(a => (a.project_id || '') === pid && (!cid || a.customer_id === cid)).forEach(a => dnPickSel.add(a.id));
+  dnRenderPicker();
+}
+function dnCloseAssetPicker() { document.getElementById('dn-asset-modal').style.display = 'none'; dnPickRow = null; }
+function dnApplyAssetPicker() {
+  if (dnPickRow) {
+    // 고른 순서 대신 호스트네임 순으로 저장
+    const ids = [...dnPickSel].sort((a, b) => dnAssetName(a).localeCompare(dnAssetName(b), 'ko', { numeric: true }));
+    dnPickRow.dataset.assets = JSON.stringify(ids);
+    dnRenderLinkBtn(dnPickRow);
+    dnDirty = true;
+  }
+  dnCloseAssetPicker();
+}
 
 function previewFromEditor() {
   buildPrintFromEditor();

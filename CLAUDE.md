@@ -97,7 +97,7 @@ jobs(작업 일정: date·time·customer/asset/ticket 연결·status 예정/완�
 job_templates(준비 템플릿: name, items[{text, due_days}], 비어 있으면 jobs.html의 기본 템플릿 사용·첫 저장 시 함께 저장),
 parts(부품·RMA: ticket_id·customer_id·asset_id 연결, status 요청/입고/교체/반납/종결, dates{단계:날짜}, 반납 기한=dates.교체+return_days, return_required=false면 교체→종결),
 internal_assets, tech_domains, tech_topics, tech_notes, releases,
-delivery_notes, delivery_items, calendar_events, users
+delivery_notes(asset_ids·asset_items: 연결 장비 색인 — 장비 이력에서 array-contains 조회), delivery_items(asset_ids·asset_hosts: 품목이 들어간 장비, PC 편집 화면 '장비' 칸에서 연결), calendar_events, users
 
 - kb_articles / tech_* / releases: 문서에 `user_id` (작성자 uid) 기록
 

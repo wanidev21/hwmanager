@@ -372,12 +372,12 @@ window.FS = {
         document.head.appendChild(s);
       });
       const wb = XLSX.utils.book_new();
-      sheets.forEach(({ name, rows }) => {
+      sheets.forEach(({ name, rows, filter = true }) => {
         const ws = XLSX.utils.aoa_to_sheet(rows);
         // 열 너비: 내용 길이 기준 (한글은 2칸으로 계산)
         const w = v => [...String(v ?? '')].reduce((n, ch) => n + (ch.charCodeAt(0) > 255 ? 2 : 1), 0);
         ws['!cols'] = (rows[0] || []).map((_, i) => ({ wch: Math.min(50, Math.max(6, ...rows.slice(0, 300).map(r => w(r[i])))) + 1 }));
-        ws['!autofilter'] = { ref: XLSX.utils.encode_range({ s: { r: 0, c: 0 }, e: { r: Math.max(0, rows.length - 1), c: Math.max(0, (rows[0] || []).length - 1) } }) };
+        if (filter) ws['!autofilter'] = { ref: XLSX.utils.encode_range({ s: { r: 0, c: 0 }, e: { r: Math.max(0, rows.length - 1), c: Math.max(0, (rows[0] || []).length - 1) } }) };
         XLSX.utils.book_append_sheet(wb, ws, name.slice(0, 31));
       });
       XLSX.writeFile(wb, filename + '.xlsx');

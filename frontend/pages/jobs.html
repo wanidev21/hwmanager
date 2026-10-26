@@ -2,60 +2,65 @@
 <style>
   .jb-toolbar { gap:8px; }
   .jb-filters { flex-wrap:wrap; align-items:center; }
-  .jb-seg { display:flex; border:2px solid var(--ink); }
-  .jb-seg button { height:36px; padding:0 14px; border:none; background:var(--surface); color:var(--text); font-family:inherit; font-size:13px; font-weight:800; cursor:pointer; }
-  .jb-seg button + button { border-left:2px solid var(--ink); }
+  .jb-seg { display:flex; border:1px solid var(--ink); }
+  .jb-seg button { height:36px; padding:0 14px; border:none; background:var(--surface); color:var(--text); font-family:inherit; font-size:13px; font-weight:700; cursor:pointer; }
+  .jb-seg button + button { border-left:1px solid var(--ink); }
   .jb-seg button.on { background:var(--ink); color:var(--bg); }
   html[data-theme="dark"] .jb-seg button.on { background:#ECEAE4; color:#111111; }
-  .jb-mine { height:36px; padding:0 12px; border:2px solid var(--ink); background:var(--surface); color:var(--text); font-family:inherit; font-size:13px; font-weight:800; cursor:pointer; }
+  .jb-mine { height:36px; padding:0 12px; border:1px solid var(--ink); background:var(--surface); color:var(--text); font-family:inherit; font-size:13px; font-weight:700; cursor:pointer; }
   .jb-mine.on { background:var(--signal); color:#111111; }
 
   .jb-layout { display:flex; gap:16px; align-items:flex-start; }
   .jb-list-col { flex:1; min-width:0; }
   .jb-detail-col { width:440px; flex-shrink:0; }
 
-  .jb-group { font-size:12px; font-weight:900; letter-spacing:.02em; margin:16px 0 6px; display:flex; align-items:center; gap:8px; }
+  .jb-group { font-size:12px; font-weight:700; letter-spacing:.02em; margin:16px 0 6px; display:flex; align-items:center; gap:8px; }
   .jb-group:first-child { margin-top:0; }
   .jb-group::after { content:''; flex:1; height:2px; background:var(--ink); }
   .jb-group.g-past { color:var(--danger); }
 
-  .jb-card { display:flex; align-items:stretch; background:var(--surface); border:2px solid var(--ink); margin-bottom:8px; cursor:pointer; }
+  .jb-card { display:flex; align-items:stretch; background:var(--surface); border:1px solid var(--ink); margin-bottom:8px; cursor:pointer; }
   .jb-card:hover { background:var(--surface-2); }
   .jb-card.sel { box-shadow:4px 4px 0 var(--ink); transform:translate(-2px,-2px); }
   .jb-card.closed { opacity:.6; }
-  .jb-date { width:74px; flex-shrink:0; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:3px; padding:8px 4px; border-right:2px solid var(--ink); background:var(--surface-2); }
-  .jb-dday { font-family:var(--font-mono); font-size:13px; font-weight:700; padding:1px 5px; border:1.5px solid var(--ink); background:var(--surface); color:var(--text); white-space:nowrap; }
+  .jb-date { width:74px; flex-shrink:0; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:3px; padding:8px 4px; border-right:1px solid var(--ink); background:var(--surface-2); }
+  .jb-dday { font-family:var(--font-mono); font-size:13px; font-weight:600; padding:1px 5px; border:1px solid var(--ink); background:var(--surface); color:var(--text); white-space:nowrap; }
   .jb-dday.d-today { background:var(--primary); color:#111111; }
   .jb-dday.d-soon { background:var(--signal); color:#111111; }
   .jb-dday.d-past { background:#111111; color:var(--primary); border-color:#111111; }
-  .jb-dow { font-family:var(--font-mono); font-size:12px; font-weight:700; color:var(--text-sub); white-space:nowrap; }
+  .jb-dow { font-family:var(--font-mono); font-size:12px; font-weight:600; color:var(--text-sub); white-space:nowrap; }
   .jb-main { flex:1; min-width:0; display:flex; flex-direction:column; gap:3px; padding:10px 12px; }
-  .jb-title { font-size:15px; font-weight:800; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  .jb-title { font-size:15px; font-weight:700; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
   .jb-meta { font-size:12px; color:var(--text-sub); overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
   .jb-meta .mono { font-family:var(--font-mono); }
-  .jb-warn { align-self:flex-start; max-width:100%; font-size:12px; font-weight:800; padding:2px 6px; margin-top:2px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
-  .jb-warn.w-over { background:var(--primary); color:#111111; }
-  .jb-warn.w-today { background:var(--signal); color:#111111; }
+  .jb-warn { align-self:flex-start; max-width:100%; font-size:12px; font-weight:700; padding:2px 6px; margin-top:2px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  /* 준비 경고: 주황 채움 대신 글자색 + 작은 사각 표시 (목록이 온통 주황이 되지 않도록) */
+  .jb-warn { display:inline-flex; align-items:center; gap:6px; padding:0; }
+  .jb-warn::before { content:''; width:8px; height:8px; flex-shrink:0; }
+  .jb-warn.w-over { color:var(--primary-text); }
+  .jb-warn.w-over::before { background:var(--primary); }
+  .jb-warn.w-today { color:var(--text); }
+  .jb-warn.w-today::before { background:var(--signal); outline:1px solid #111111; }
   .jb-prog { width:64px; flex-shrink:0; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:5px; padding:8px; }
   .jb-prog b { font-family:var(--font-mono); font-size:14px; }
-  .jb-prog small { font-size:10px; font-weight:800; color:var(--text-hint); }
-  .jb-bar { width:100%; height:6px; border:1.5px solid var(--ink); background:var(--surface); }
+  .jb-prog small { font-size:10px; font-weight:700; color:var(--text-hint); }
+  .jb-bar { width:100%; height:6px; border:1px solid var(--ink); background:var(--surface); }
   .jb-bar i { display:block; height:100%; background:var(--ink); }
   .jb-bar.full i { background:var(--success); }
 
   /* 상세 */
   .jb-info-grid { display:grid; grid-template-columns:1fr 1fr; gap:8px; margin-bottom:12px; font-size:12px; }
-  .jb-link { font-weight:700; color:var(--primary-text); cursor:pointer; text-decoration:underline; }
+  .jb-link { font-weight:600; color:var(--primary-text); cursor:pointer; text-decoration:underline; }
   .jb-link.mono { font-family:var(--font-mono); }
-  .jb-fw { font-size:12px; line-height:1.7; border:2px solid var(--ink); padding:8px 10px; margin-top:12px; }
+  .jb-fw { font-size:12px; line-height:1.7; border:1px solid var(--ink); padding:8px 10px; margin-top:12px; }
   .jb-fw b { font-family:var(--font-mono); }
   .jb-fw-row { display:grid; grid-template-columns:56px 1fr; align-items:center; gap:4px 10px; margin-bottom:12px; }
-  .jb-fw-row label { font-weight:800; }
+  .jb-fw-row label { font-weight:700; }
   .jb-fw-row input { font-family:var(--font-mono); }
   .jb-fw-cur { grid-column:2; font-size:11px; color:var(--text-hint); font-family:var(--font-mono); }
   .jb-memo { font-size:13px; line-height:1.6; white-space:pre-wrap; word-break:break-word; background:var(--surface-2); border-left:3px solid var(--ink); padding:8px 10px; margin-bottom:12px; }
-  .jb-check-head { display:flex; justify-content:space-between; align-items:center; margin:16px 0 6px; font-size:14px; font-weight:900; }
-  .jb-items { border:2px solid var(--ink); background:var(--surface); }
+  .jb-check-head { display:flex; justify-content:space-between; align-items:center; margin:16px 0 6px; font-size:14px; font-weight:700; }
+  .jb-items { border:1px solid var(--ink); background:var(--surface); }
   .jb-item { display:flex; align-items:center; gap:4px; border-top:1px solid var(--border); }
   .jb-item:first-child { border-top:none; }
   .jb-item.i-over { background:color-mix(in srgb, var(--primary) 16%, var(--surface)); }
@@ -65,10 +70,10 @@
   .jb-item.done .jb-box { background:var(--ink); color:var(--bg); }
   html[data-theme="dark"] .jb-item.done .jb-box { background:#ECEAE4; color:#111111; }
   .jb-item-main { flex:1; min-width:0; display:flex; flex-direction:column; gap:2px; padding:8px 0; cursor:pointer; }
-  .jb-item-text { font-size:14px; font-weight:700; word-break:break-word; }
+  .jb-item-text { font-size:14px; font-weight:600; word-break:break-word; }
   .jb-item.done .jb-item-text { text-decoration:line-through; color:var(--text-hint); font-weight:500; }
   .jb-item-due { font-size:11px; color:var(--text-sub); }
-  .jb-item-due b { font-weight:900; }
+  .jb-item-due b { font-weight:700; }
   .jb-item.i-over .jb-item-due b { color:var(--danger); }
   .jb-item-del { width:40px; height:40px; flex-shrink:0; border:none; background:none; color:var(--text-hint); cursor:pointer; display:flex; align-items:center; justify-content:center; }
   .jb-item-del:hover { color:var(--text); }
@@ -80,7 +85,7 @@
   /* 준비 템플릿 */
   .jb-tpl-layout { display:grid; grid-template-columns:180px minmax(0,1fr); gap:14px; }
   .jb-tpl-list { display:flex; flex-direction:column; gap:4px; }
-  .jb-tpl-list button { text-align:left; padding:8px 10px; border:1.5px solid var(--ink); background:var(--surface); color:var(--text); font-family:inherit; font-size:13px; font-weight:700; cursor:pointer; }
+  .jb-tpl-list button { text-align:left; padding:8px 10px; border:1px solid var(--ink); background:var(--surface); color:var(--text); font-family:inherit; font-size:13px; font-weight:600; cursor:pointer; }
   .jb-tpl-list button.on { background:var(--ink); color:var(--bg); }
   html[data-theme="dark"] .jb-tpl-list button.on { background:#ECEAE4; color:#111111; }
   .jb-tpl-row { display:flex; gap:6px; margin-bottom:6px; }
@@ -112,6 +117,7 @@
     <input type="search" class="form-input" id="jb-q" placeholder="작업·고객사·장비·준비 항목 검색" oninput="jbRenderList()" style="max-width:260px;">
   </div>
   <div class="flex gap-2">
+    <button class="btn" onclick="loadPage('calendar')" title="개인 일정과 팀 작업을 달력으로 보기"><i data-icon="calendar" data-size="16"></i> 캘린더</button>
     <button class="btn jb-tpl-btn" onclick="jbOpenTemplates()">준비 템플릿</button>
     <button class="btn btn-primary" onclick="jbOpenModal()">+ 작업 등록</button>
   </div>
@@ -479,7 +485,7 @@ function jbRenderDetail() {
         <button class="btn btn-ghost btn-sm" onclick="closeJobDetail()" aria-label="닫기">${FS.icon('close', 16)}</button>
       </div>
     </div>
-    <h3 style="font-size:16px;font-weight:800;margin-bottom:12px;line-height:1.4;">${FS.esc(j.title || '(제목 없음)')}</h3>
+    <h3 style="font-size:16px;font-weight:700;margin-bottom:12px;line-height:1.4;">${FS.esc(j.title || '(제목 없음)')}</h3>
     <div class="jb-info-grid">
       <div><span class="text-hint">일시</span><br><b>${jbFmt(j.date)}</b>${j.time ? ' ' + FS.esc(j.time) : ''}</div>
       <div><span class="text-hint">작업 종류</span><br>${FS.esc(j.type || '-')}</div>

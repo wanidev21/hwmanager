@@ -20,7 +20,7 @@
   <script src="/static/js/parts.js"></script>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Black+Han+Sans&family=Space+Mono:wght@400;700&display=swap">
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&display=swap">
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/variable/pretendardvariable-dynamic-subset.min.css">
   <link rel="stylesheet" href="/static/css/app.css">
 </head>
@@ -28,40 +28,36 @@
   <div class="layout">
     <!-- 사이드바 -->
     <aside class="sidebar">
-      <div class="sidebar-logo" id="sidebar-logo" title="개요로 이동">
+      <div class="sidebar-logo" id="sidebar-logo" title="홈으로 이동">
         <div class="logo-icon"><svg width="28" height="28" viewBox="0 0 100 100" aria-hidden="true"><rect x="18" y="24" width="64" height="22" fill="#FF5A1F"/><rect x="24" y="32" width="30" height="6" fill="#111111"/><rect x="68" y="31" width="8" height="8" fill="#FFD23F"/><rect x="18" y="54" width="64" height="22" fill="#FF5A1F"/><rect x="24" y="62" width="30" height="6" fill="#111111"/><rect x="68" y="61" width="8" height="8" fill="#111111"/></svg></div>
         <div class="logo-text">HW Manager</div>
       </div>
 
       <nav class="sidebar-nav">
-        <div class="nav-group-label">고객·업무</div>
+        <a class="nav-item" data-page="overview" href="#">
+          <span class="nav-icon"><i data-icon="home"></i></span> 홈
+        </a>
+        <a class="nav-item" data-page="tickets" href="#">
+          <span class="nav-icon"><i data-icon="alert"></i></span> 장애 티켓
+        </a>
+        <!-- 캘린더는 작업 일정 화면의 '캘린더' 버튼으로 (메뉴 수를 줄여 처음 보는 사람도 덜 복잡하게) -->
+        <a class="nav-item" data-page="jobs" href="#">
+          <span class="nav-icon"><i data-icon="tasks"></i></span> 작업 일정
+        </a>
+        <a class="nav-item" data-page="parts" href="#">
+          <span class="nav-icon"><i data-icon="box"></i></span> 부품·RMA
+        </a>
         <a class="nav-item" data-page="customers" href="#">
-          <span class="nav-icon"><i data-icon="building"></i></span> 고객사·자산
+          <span class="nav-icon"><i data-icon="building"></i></span> 장비·고객사
+        </a>
+        <a class="nav-item" data-page="warranty" href="#">
+          <span class="nav-icon"><i data-icon="shield"></i></span> 워런티 현황
         </a>
         <a class="nav-item" data-page="delivery" href="#">
           <span class="nav-icon"><i data-icon="clipboard"></i></span> 납품확인서
         </a>
 
-        <div class="nav-group-label">장애·현황</div>
-        <a class="nav-item" data-page="tickets" href="#">
-          <span class="nav-icon"><i data-icon="alert"></i></span> 장애 티켓
-        </a>
-        <a class="nav-item" data-page="parts" href="#">
-          <span class="nav-icon"><i data-icon="box"></i></span> 부품·RMA
-        </a>
-        <a class="nav-item" data-page="warranty" href="#">
-          <span class="nav-icon"><i data-icon="shield"></i></span> 워런티 현황
-        </a>
-
-        <div class="nav-group-label">일정·기록</div>
-        <a class="nav-item" data-page="jobs" href="#">
-          <span class="nav-icon"><i data-icon="tasks"></i></span> 작업 일정
-        </a>
-        <a class="nav-item" data-page="calendar" href="#">
-          <span class="nav-icon"><i data-icon="calendar"></i></span> 캘린더
-        </a>
-
-        <div class="nav-group-label">지식·기술 <span class="nav-group-note">개인</span></div>
+        <div class="nav-group-label">개인</div>
         <a class="nav-item" data-page="kb" href="#">
           <span class="nav-icon"><i data-icon="book"></i></span> 지식베이스
         </a>
@@ -186,8 +182,8 @@
     FS.hydrateIcons(document);
 
     const PAGE_TITLES = {
-      overview:  '개요',
-      customers: '고객사·자산',
+      overview:  '홈',
+      customers: '장비·고객사',
       tickets:   '장애 티켓',
       kb:        '지식베이스',
       warranty:  '워런티 현황',
@@ -200,16 +196,11 @@
       audit:     '변경 이력',
     };
 
+    // 상단 제목 앞 경로 (메뉴가 한 줄 목록이라 묶음이 있는 화면만)
     const PAGE_GROUPS = {
-      customers: '고객·업무',
-      delivery:  '고객·업무',
-      tickets:   '장애·현황',
-      warranty:  '장애·현황',
-      parts:     '장애·현황',
-      calendar:  '일정·기록',
-      jobs:      '일정·기록',
-      kb:        '지식·기술',
-      tech:      '지식·기술',
+      calendar:  '작업 일정',
+      kb:        '개인',
+      tech:      '개인',
       users:     '관리',
       audit:     '관리',
     };
@@ -275,7 +266,8 @@
       window.pageViewState = null;   // 이 화면이 정의하지 않으면 이전 화면 것이 남지 않도록 (스냅샷 저장 뒤)
 
       document.querySelectorAll('.nav-item, .tab-item').forEach(el => {
-        el.classList.toggle('active', el.dataset.page === page);
+        // 캘린더는 메뉴에 없으므로 작업 일정을 켜 둠
+        el.classList.toggle('active', el.dataset.page === (page === 'calendar' ? 'jobs' : page));
       });
       const group = PAGE_GROUPS[page] || '';
       document.getElementById('page-group').textContent = group;
@@ -674,7 +666,7 @@
           .forEach(r => out.push({ group, ...r }));
       };
       add('장비', gsData.assets, a => ({
-        score: score(a.hostname, a.serial, a.ip_address, a.model, a.location),
+        score: score(a.hostname, a.serial, a.ip_address, a.bmc_ip, a.model, a.location),
         page: 'customers', filter: { assetId: a.id }, mono: true,
         title: a.hostname || a.serial || '(이름 없음)',
         meta: join([cust(a.customer_id) + (a.project_id ? ' › ' + proj(a.project_id) : ''), a.ip_address, a.serial, a.model]),

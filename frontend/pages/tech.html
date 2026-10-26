@@ -2,21 +2,21 @@
 <style>
   .tech-tabs { display:flex; gap:6px; flex-wrap:wrap; margin-bottom:20px; }
   /* 탭·도메인 칩: 선택 시 주황 배경 + 검정 글자 (흰 글자는 대비 부족) */
-  .tech-tab, .domain-chip { display:inline-flex; align-items:center; height:36px; padding:0 14px; border-radius:0; font-size:13px; font-weight:800; border:1.5px solid var(--ink); background:var(--surface); color:var(--text); cursor:pointer; transition:background 0.1s; user-select:none; }
+  .tech-tab, .domain-chip { display:inline-flex; align-items:center; height:36px; padding:0 14px; border-radius:0; font-size:13px; font-weight:700; border:1px solid var(--ink); background:var(--surface); color:var(--text); cursor:pointer; transition:background 0.1s; user-select:none; }
   .tech-tab:hover:not(.active), .domain-chip:hover:not(.active) { background:var(--surface-2); }
   .tech-tab.active, .domain-chip.active { background:var(--primary); color:#111111; border-color:var(--ink); }
   .tech-panel { display:none; }
   .tech-panel.active { display:block; }
   .domain-list { display:flex; gap:6px; flex-wrap:wrap; margin-bottom:16px; }
-  .keyword-tag { padding:2px 8px; background:var(--primary-light); color:var(--primary-text); border-radius:0; font-size:11px; font-weight:700; }
+  .keyword-tag { padding:2px 8px; background:var(--primary-light); color:var(--primary-text); border-radius:0; font-size:11px; font-weight:600; }
   .topic-item { display:flex; align-items:center; gap:10px; padding:8px 12px; border-radius:0; border:1px solid var(--border); background:var(--surface); margin-bottom:6px; }
-  .topic-status { width:28px; height:28px; border-radius:0; border:2px solid var(--ink); background:var(--surface); color:#111111; cursor:pointer; flex-shrink:0; display:flex; align-items:center; justify-content:center; }
+  .topic-status { width:28px; height:28px; border-radius:0; border:1px solid var(--ink); background:var(--surface); color:#111111; cursor:pointer; flex-shrink:0; display:flex; align-items:center; justify-content:center; }
   .topic-status.in-progress { background:var(--signal); }
   .topic-status.completed { background:#6FD69A; }
   .progress-bar { height:4px; background:var(--border); border-radius:0; overflow:hidden; margin-top:4px; }
   .progress-fill { height:100%; background:var(--primary); transition:width 0.3s; }
   .note-grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(280px,1fr)); gap:12px; }
-  .note-card { background:var(--surface); border:2px solid var(--ink); border-radius:0; padding:16px; cursor:pointer; transition:box-shadow 0.1s, transform 0.1s; }
+  .note-card { background:var(--surface); border:1px solid var(--ink); border-radius:0; padding:16px; cursor:pointer; transition:box-shadow 0.1s, transform 0.1s; }
   .note-card:hover { box-shadow:4px 4px 0 var(--ink); transform:translate(-2px,-2px); }
   .note-preview { font-size:12px; color:var(--text-sub); margin-top:6px; overflow:hidden; display:-webkit-box; -webkit-line-clamp:3; -webkit-box-orient:vertical; }
   .rel-status-select { min-width:110px; }

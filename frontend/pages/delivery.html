@@ -5,8 +5,8 @@
 
 /* ── 목록 액션 버튼 ── */
 .dl-btn {
-  height:28px; padding:0 10px; border-radius:0; border:1.5px solid var(--ink);
-  font-size:11px; font-weight:700; cursor:pointer; display:inline-flex;
+  height:28px; padding:0 10px; border-radius:0; border:1px solid var(--ink);
+  font-size:11px; font-weight:600; cursor:pointer; display:inline-flex;
   align-items:center; gap:4px; background:var(--surface); color:var(--text-sub);
   transition:background 0.1s; font-family:inherit; white-space:nowrap;
 }
@@ -24,12 +24,12 @@
 .edit-toolbar h3 { flex:1; font-size:15px; font-weight:600; }
 
 /* ── 품목 입력 테이블 ── */
-.item-table { width:100%; border-collapse:collapse; border:2px solid var(--ink); }
-/* 머리줄: 검정 띠 (테마 무관) */
+.item-table { width:100%; border-collapse:collapse; border:1px solid var(--ink); }
+/* 머리줄: 표와 같은 옅은 바탕 + 잉크 선 */
 .item-table thead th {
-  font-size:11px; font-weight:800; color:#ECEAE4; letter-spacing:0.04em;
-  padding:8px 10px; background:#111111;
-  border-right:1px solid #3A3833; border-bottom:2px solid var(--ink);
+  font-size:11px; font-weight:600; color:var(--text-sub); letter-spacing:0.04em;
+  padding:8px 10px; background:var(--surface-2);
+  border-right:1px solid var(--border); border-bottom:1px solid var(--ink);
   text-align:left; white-space:nowrap;
 }
 .item-table thead th:last-child { border-right:none; }
@@ -56,7 +56,7 @@
 #list-tbody tr { cursor:pointer; }
 .dn-list-scroll { overflow-x:auto; -webkit-overflow-scrolling:touch; }
 .dn-preview-modal { max-width:860px; width:calc(100vw - 32px); }
-.dn-preview-box { position:relative; overflow:hidden; background:var(--surface-2); border:2px solid var(--ink); border-radius:0; }
+.dn-preview-box { position:relative; overflow:hidden; background:var(--surface-2); border:1px solid var(--ink); border-radius:0; }
 .dn-preview-box iframe {
   position:absolute; top:0; left:0; width:794px; height:1123px;
   border:0; background:#fff; transform-origin:top left;
@@ -90,17 +90,17 @@
 }
 /* 서명 칸: 검정 펜으로 그리므로 다크모드에서도 흰 바탕 */
 .sig-box canvas {
-  border:2px solid var(--ink); border-radius:0;
+  border:1px solid var(--ink); border-radius:0;
   cursor:crosshair; display:block; width:100%; background:#FFFFFF;
   touch-action:none;   /* 서명 중 화면 스크롤 방지 */
 }
-.sig-box label { font-size:12px; font-weight:800; color:var(--text-sub); display:block; margin-bottom:6px; }
+.sig-box label { font-size:12px; font-weight:700; color:var(--text-sub); display:block; margin-bottom:6px; }
 
 /* ── 자동완성 ── */
 .ac-wrap { position:relative; }
 .ac-list {
   position:absolute; top:100%; left:0; right:0; background:var(--surface);
-  border:2px solid var(--ink); border-radius:0; z-index:200;
+  border:1px solid var(--ink); border-radius:0; z-index:200;
   max-height:150px; overflow-y:auto; display:none;
   box-shadow:4px 4px 0 rgba(17,17,17,0.25);
 }
@@ -115,34 +115,34 @@
 /* 폰: 품목 확인 */
 .dp-meta { font-size:12px; color:var(--text-sub); margin-bottom:10px; line-height:1.6; }
 .dp-note { font-size:13px; background:var(--surface-2); border-left:3px solid var(--ink); padding:8px 10px; margin-bottom:10px; white-space:pre-wrap; }
-.dp-items { border:2px solid var(--ink); }
+.dp-items { border:1px solid var(--ink); }
 .dp-item { display:flex; gap:10px; padding:10px 12px; border-top:1px solid var(--border); background:var(--surface); }
 .dp-item:first-child { border-top:none; }
-.dp-no { font-family:var(--font-mono); font-size:12px; font-weight:700; color:var(--text-hint); min-width:18px; }
+.dp-no { font-family:var(--font-mono); font-size:12px; font-weight:600; color:var(--text-hint); min-width:18px; }
 .dp-main { flex:1; min-width:0; display:flex; flex-direction:column; gap:3px; }
-.dp-desc { font-size:14px; font-weight:800; word-break:break-word; user-select:text; }
+.dp-desc { font-size:14px; font-weight:700; word-break:break-word; user-select:text; }
 .dp-sub { font-size:12px; color:var(--text-sub); }
 /* 품목 ↔ 장비 연결 */
-.dn-link-btn { min-width:96px; height:30px; padding:0 8px; border:1.5px dashed var(--ink); background:var(--surface); color:var(--text-sub); font-family:inherit; font-size:12px; font-weight:700; white-space:nowrap; }
+.dn-link-btn { min-width:96px; height:30px; padding:0 8px; border:1.5px dashed var(--ink); background:var(--surface); color:var(--text-sub); font-family:inherit; font-size:12px; font-weight:600; white-space:nowrap; }
 .dn-link-btn.on { border-style:solid; background:var(--ink); color:var(--bg); font-family:var(--font-mono); }
 .dn-link-btn:hover { background:var(--signal); color:#111111; }
 .dap-search { margin-bottom:10px; }
-.dap-group { font-family:var(--font-mono); font-size:11px; font-weight:700; padding:6px 10px; background:#111111; color:#ECEAE4; display:flex; justify-content:space-between; align-items:center; }
+.dap-group { font-family:var(--font-mono); font-size:11px; font-weight:600; padding:6px 10px; background:#111111; color:#ECEAE4; display:flex; justify-content:space-between; align-items:center; }
 .dap-group button { background:none; border:1px solid #ECEAE4; color:#ECEAE4; font-family:inherit; font-size:11px; padding:1px 6px; }
-.dap-list { border:2px solid var(--ink); max-height:50vh; overflow-y:auto; }
+.dap-list { border:1px solid var(--ink); max-height:50vh; overflow-y:auto; }
 .dap-row { display:flex; align-items:center; gap:10px; padding:9px 10px; border-top:1px solid var(--border); cursor:pointer; }
 .dap-row:hover { background:var(--surface-2); }
 .dap-row input { width:18px; height:18px; accent-color:var(--primary); flex-shrink:0; }
-.dap-host { font-family:var(--font-mono); font-weight:700; font-size:13px; }
+.dap-host { font-family:var(--font-mono); font-weight:600; font-size:13px; }
 .dap-meta { font-size:11px; color:var(--text-hint); font-family:var(--font-mono); }
-.dap-count { font-size:12px; font-weight:800; margin-right:auto; }
+.dap-count { font-size:12px; font-weight:700; margin-right:auto; }
 .dp-assets { display:flex; flex-wrap:wrap; gap:4px; margin-top:4px; }
-.dp-asset { font-family:var(--font-mono); font-size:12px; font-weight:700; padding:3px 7px; border:1.5px solid var(--ink); background:var(--surface-2); color:var(--text); cursor:pointer; }
+.dp-asset { font-family:var(--font-mono); font-size:12px; font-weight:600; padding:3px 7px; border:1px solid var(--ink); background:var(--surface-2); color:var(--text); cursor:pointer; }
 .dp-asset:active { background:var(--signal); color:#111111; }
 .dnb-preview { font-family:var(--font-mono); font-size:12px; background:var(--surface-2); border-left:3px solid var(--ink); padding:8px 10px; line-height:1.7; max-height:160px; overflow-y:auto; white-space:pre; }
-.dnb-warn { font-size:12px; font-weight:700; color:#111111; background:var(--signal); padding:6px 10px; margin-top:8px; }
+.dnb-warn { font-size:12px; font-weight:600; color:#111111; background:var(--signal); padding:6px 10px; margin-top:8px; }
 .dnb-warn.err { background:var(--primary); }
-.dp-qty { font-family:var(--font-mono); font-size:14px; font-weight:700; white-space:nowrap; }
+.dp-qty { font-family:var(--font-mono); font-size:14px; font-weight:600; white-space:nowrap; }
 mark.dp-hit { background:var(--signal); color:#111111; }
 
 @media print {
@@ -195,13 +195,13 @@ mark.dp-hit { background:var(--signal); color:#111111; }
   }
   .pd-brand { line-height:1.2; }
   .pd-brand-name {
-    font-size:18pt; font-weight:900; color:#e8540a;
+    font-size:18pt; font-weight:700; color:#e8540a;
     letter-spacing:-0.02em;
   }
   .pd-brand-contact { font-size:6.8pt; color:#888; margin-top:1.5mm; white-space:nowrap; letter-spacing:0.01em; }
   .pd-doc-title {
     text-align:center;
-    font-size:21pt; font-weight:900; color:#1a1a1a;
+    font-size:21pt; font-weight:700; color:#1a1a1a;
     letter-spacing:0.45em;
     text-indent:0.45em; /* 마지막 글자 좌우 대칭 */
   }
@@ -221,8 +221,8 @@ mark.dp-hit { background:var(--signal); color:#111111; }
     background:#fdf4f0; border-left:4px solid #e8540a;
     padding:3mm 4mm;
   }
-  .pd-recipient-label { font-size:7.5pt; color:#e8540a; font-weight:700; margin-bottom:1mm; }
-  .pd-recipient-name { font-size:12pt; font-weight:800; color:#1a1a1a; }
+  .pd-recipient-label { font-size:7.5pt; color:#e8540a; font-weight:600; margin-bottom:1mm; }
+  .pd-recipient-name { font-size:12pt; font-weight:700; color:#1a1a1a; }
   .pd-recipient-suffix { font-size:9pt; color:#555; margin-left:2mm; }
   .pd-project-block {
     display:flex; flex-direction:column; justify-content:center;
@@ -242,7 +242,7 @@ mark.dp-hit { background:var(--signal); color:#111111; }
   .pd-table { width:100%; border-collapse:collapse; margin-bottom:5mm; flex:1; }
   .pd-table thead tr { background:#1a1a1a; }
   .pd-table thead th {
-    padding:2.5mm 3mm; color:#fff; font-size:8.5pt; font-weight:700;
+    padding:2.5mm 3mm; color:#fff; font-size:8.5pt; font-weight:600;
     text-align:center; letter-spacing:0.04em; border:1px solid #1a1a1a;
   }
   .pd-table thead th:nth-child(2) { text-align:left; }
@@ -274,7 +274,7 @@ mark.dp-hit { background:var(--signal); color:#111111; }
   }
   .pd-sig-head {
     background:#1a1a1a; color:#fff;
-    text-align:center; font-size:9pt; font-weight:700;
+    text-align:center; font-size:9pt; font-weight:600;
     padding:2mm; letter-spacing:0.1em;
   }
   .pd-sig-name {
@@ -1111,7 +1111,7 @@ function dnRenderPicker() {
   const q = document.getElementById('dap-q').value.trim().toLowerCase();
   const has = v => String(v ?? '').toLowerCase().includes(q);
   const list = dnAssets.filter(a => (!cid || a.customer_id === cid || dnPickSel.has(a.id))
-      && (!q || has(a.hostname) || has(a.serial) || has(a.ip_address) || has(a.model) || has(a.location)))
+      && (!q || has(a.hostname) || has(a.serial) || has(a.ip_address) || has(a.bmc_ip) || has(a.model) || has(a.location)))
     .sort((a, b) => (a.hostname || '').localeCompare(b.hostname || '', 'ko', { numeric: true }));
   const groups = {};
   list.forEach(a => { (groups[a.project_id || ''] = groups[a.project_id || ''] || []).push(a); });
@@ -1219,8 +1219,7 @@ function dnSaveBulk() {
     device_type: document.getElementById('dnb-type').value.trim(),
     model: document.getElementById('dnb-model').value.trim(),
     install_date: document.getElementById('dnb-date').value,
-    status: '운영중',
-    location: '', ip_address: '', os: '', cpu: '', memory: '', gpu: '', disk: '',
+    location: '', ip_address: '', bmc_ip: '', os: '', cpu: '', memory: '', gpu: '', disk: '',
     bmc_version: '', bios_version: '', raid_version: '', driver_version: '', vendor_case_no: '',
     memo: `납품: ${document.getElementById('h-docno').value.trim() || '납품확인서'}`,
   };

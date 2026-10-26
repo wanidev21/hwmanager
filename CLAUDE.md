@@ -68,14 +68,14 @@ hwmanager/
     │   ├── js/parts.js        # window.Parts: 부품 등록 창·단계 진행·반납 기한 계산
     │   └── icons/
     └── pages/
-        ├── overview.html      # 개요 (기본)
+        ├── overview.html      # 홈 (기본): 'OOO님, 오늘의 이슈 N건'(하단 탭 홈 배지와 같은 기준) · 신호 3칸 · 먼저 확인/다가오는 작업 (PC 2단)
         ├── customers.html     # 고객사·프로젝트·장비
         ├── delivery.html      # 작성·수정·서명·인쇄는 PC 전용, 폰(768px 이하)은 품목 확인만
         ├── tickets.html
         ├── warranty.html
         ├── parts.html         # 부품·RMA 현황 (반납 기한순). 등록·단계 로직은 static/js/parts.js (티켓 상세와 공용)
         ├── jobs.html          # 작업 일정 + 준비 체크리스트 (팀 공용, 하단 탭 '작업')
-        ├── calendar.html      # 내 일정(개인 calendar_events) + 팀 작업 일정 표시
+        ├── calendar.html      # 내 일정(개인 calendar_events) + 팀 작업 일정 표시. 사이드바 메뉴 없음 — 작업 일정 화면의 '캘린더' 버튼으로
         ├── kb.html
         ├── tech.html
         ├── users.html         # 관리자 전용 메뉴
@@ -104,7 +104,7 @@ delivery_notes(asset_ids·asset_items: 연결 장비 색인 — 장비 이력에
 ## 데이터 계층 구조
 customers → projects (customer_id) → assets (customer_id, project_id)
 - projects: 워런티는 프로젝트 단위로 관리 (warranty_expire)
-- assets: hostname, serial, ip, os, cpu, memory, gpu, disk, bios_version, bmc_version, raid_version, driver_version 등 (현장에서 관리하는 펌웨어는 BIOS·BMC·RAID — 작업 완료 시 jobs.html에서 갱신, 작업 문서에 fw_changes 기록)
+- assets: hostname, serial, ip_address, bmc_ip(BMC 관리 IP — 예전 status 필드는 화면에서 제거), os, cpu, memory, gpu, disk, bios_version, bmc_version, raid_version, driver_version 등 (현장에서 관리하는 펌웨어는 BIOS·BMC·RAID — 작업 완료 시 jobs.html에서 갱신, 작업 문서에 fw_changes 기록)
 
 ## 인증 흐름
 1. login.html → `FS.loginWithGoogle()`: PC는 팝업, 모바일·PWA는 리다이렉트 (`FS.handleRedirectResult()`로 결과 처리)
@@ -133,7 +133,7 @@ customers → projects (customer_id) → assets (customer_id, project_id)
 - sw.js는 네트워크 우선 (배포 즉시 반영), `/__/` 경로는 우회
 - 전체 검색(index.html): 상단 검색 버튼 / PC Ctrl+K·`/` → 장비·고객사·프로젝트·티켓·작업. 처음 열 때 `FS.listen`으로 구독 시작해 계속 유지(unwatchAll 대상 아님). 결과는 `hwPageFilter` + `loadPage(page, {force:true})`로 열기 (같은 화면이어도 다시 열림)
 - 급한 일 배지(index.html `_renderTodayBadges`): 같은 구독 데이터로 메뉴 옆 숫자·하단 탭 '홈'·탭 제목·설치 앱 아이콘(`navigator.setAppBadge`). 합계 = 긴급 미완료 장애 + 오늘/지난 예정 작업·준비 기한 도래 작업 + 반납 기한 3일 이내 부품 (워런티 30일 내는 메뉴에만)
-- 엑셀 내보내기(PC 전용 `.pc-only`): `FS.exportXlsx(파일명, [{name, rows}])` — SheetJS(cdnjs xlsx 0.18.5)를 누를 때만 로드, 실패 시 CSV(UTF-8 BOM). 고객사·자산(장비+고객사 시트), 워런티(보이는 목록)
+- 엑셀 내보내기(PC 전용 `.pc-only`): `FS.exportXlsx(파일명, [{name, rows}])` — SheetJS(cdnjs xlsx 0.18.5)를 누를 때만 로드, 실패 시 CSV(UTF-8 BOM). 고객사·자산(장비+고객사 시트), 워런티(보이는 목록), 장애 티켓(보이는 목록 — 고객사·기간(연도) 필터 → 장애 목록·진행 기록·요약 시트, 진행 기록은 누를 때 1회 조회). 시트에 `filter:false`면 자동 필터 생략
 - 저장 대기 배지(index.html 상단): FS 쓰기 함수(add/update/remove/addNow/updateNow/audit)는 `_track()`으로 미확인 건수 집계, `FS.hasPendingWrites()`(waitForPendingWrites)로 페이지가 직접 쓴 것까지 확인. 새 쓰기 헬퍼를 만들면 `_track()`으로 감쌀 것
 
 ## 모바일
@@ -143,7 +143,10 @@ customers → projects (customer_id) → assets (customer_id, project_id)
 - PC 사이드바 "📱 모바일 설치" → `static/icons/install-qr.svg` (배포 주소 QR, segno로 생성). 주소가 바뀌면 QR 재생성
 - 폰(768px 이하)·설치된 앱(standalone)에서는 이 메뉴 숨김
 
-## 디자인
-- Linear/Notion 스타일 (심플, 여백 충분, 테두리 얇게)
-- Primary #e8540a, 배경 #f7f7f5, 카드 #ffffff
-- PC 우선, 사이드바 240px 고정 (768px 이하 모바일 대응 CSS 있음)
+## 디자인 (시그널 절제판, 2026-10-26)
+- 현장 장비 라벨 느낌: 콘크리트 바탕 #ECEAE4, 잉크 #111111, 안전 주황 #FF5A1F, 신호 노랑 #FFD23F, 각진 모서리 (토큰은 app.css :root)
+- **강조는 급한 것에만**: 주황 채움 = 긴급·D-DAY, 검정+주황 글자 = 기한 지남, 노랑 = 임박. 나머지 배지·태그는 옅은 바탕/테두리만. 경고 줄무늬는 기한 지난 부품 카드 등 일부만
+- 테두리 1px (굵은 2px 선은 상단 바 아래만). 표·캘린더 머리줄은 옅은 바탕(검정 띠 사용 안 함)
+- 글꼴: Pretendard(본문·제목), Space Mono(호스트명·날짜·큰 숫자 — 보통 굵기). **굵기 최대 700** (굵으면 뭉개져 보임). 한글이 들어가는 태그에는 고정폭 글꼴 쓰지 않기
+- 메뉴(사이드바): 홈 · 장애 티켓 · 작업 일정 · 부품·RMA · 장비·고객사 · 워런티 현황 · 납품확인서 / 개인: 지식베이스 · 기술 학습. 숫자는 사각 배지 대신 숫자만(급한 것 주황)
+- PC 우선, 사이드바 220px 고정 (768px 이하는 하단 탭 바 + 더보기)

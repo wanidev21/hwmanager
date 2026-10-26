@@ -1,19 +1,19 @@
 <!-- 변경 이력: 티켓·장비·고객사·프로젝트의 등록·수정·삭제 (누가·언제·무엇을). 추가 전용 기록 -->
 <style>
   .au-toolbar { display:flex; flex-wrap:wrap; gap:8px; margin-bottom:12px; align-items:center; }
-  .au-chip { height:36px; padding:0 12px; border:1.5px solid var(--ink); background:var(--surface); color:var(--text); font-family:inherit; font-size:12px; font-weight:800; cursor:pointer; }
+  .au-chip { height:36px; padding:0 12px; border:1px solid var(--ink); background:var(--surface); color:var(--text); font-family:inherit; font-size:12px; font-weight:700; cursor:pointer; }
   .au-chip.on { background:var(--ink); color:var(--bg); }
   html[data-theme="dark"] .au-chip.on { background:#ECEAE4; color:#111111; }
-  .au-list { border:2px solid var(--ink); background:var(--surface); }
+  .au-list { border:1px solid var(--ink); background:var(--surface); }
   .au-row { display:grid; grid-template-columns:120px 64px 70px minmax(0,1fr) 110px; gap:10px; align-items:center; padding:9px 12px; border-top:1px solid var(--border); font-size:13px; }
   .au-row:first-child { border-top:none; }
-  .au-time { font-family:var(--font-mono); font-size:12px; font-weight:700; color:var(--text-sub); }
-  .au-act { font-size:11px; font-weight:900; padding:2px 6px; border:1.5px solid var(--ink); text-align:center; }
+  .au-time { font-family:var(--font-mono); font-size:12px; font-weight:600; color:var(--text-sub); }
+  .au-act { font-size:11px; font-weight:700; padding:2px 6px; border:1px solid var(--ink); text-align:center; }
   .au-act.a-등록 { background:var(--success-bg); color:var(--success); border-color:var(--success); }
   .au-act.a-수정 { background:var(--surface-2); color:var(--text-sub); border-color:var(--border); }
   .au-act.a-삭제 { background:var(--primary); color:#111111; }
-  .au-entity { font-size:12px; font-weight:800; color:var(--text-sub); }
-  .au-label { font-weight:700; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  .au-entity { font-size:12px; font-weight:700; color:var(--text-sub); }
+  .au-label { font-weight:600; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
   .au-detail { display:block; font-size:12px; font-weight:400; color:var(--text-hint); overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
   .au-by { font-size:12px; color:var(--text-sub); text-align:right; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
   .au-more { display:block; width:100%; margin-top:10px; }

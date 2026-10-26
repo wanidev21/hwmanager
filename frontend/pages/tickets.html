@@ -14,6 +14,7 @@
     .ticket-toolbar { flex-direction:column; align-items:stretch; gap:8px; }
     .ticket-filters { display:grid !important; grid-template-columns:1fr 1fr; }
     .ticket-filters > * { width:100% !important; max-width:none !important; }
+    .ticket-filters > input { grid-column:1 / -1; }
   }
   /* 폰 목록: 우선순위 점 · 제목(장비·고객사) · 상태만 — 가로 스크롤 없이 한눈에 */
   .tk-cust-m { display:none; }
@@ -24,7 +25,11 @@
     #ticket-tbody td { padding-top:11px; padding-bottom:11px; }
     .tk-cust-m { display:inline; }
   }
-  .priority-dot { width:10px; height:10px; border:1.5px solid var(--ink); display:inline-block; margin-right:6px; }
+  /* PC는 우선순위 칸이 있으므로 점은 폰에서만 (같은 정보를 두 번 보여 주지 않도록) */
+  @media (min-width:769px) {
+    #ticket-tbody td:first-child, .ticket-list-col thead th:first-child { display:none; }
+  }
+  .priority-dot { width:10px; height:10px; border:1px solid var(--ink); display:inline-block; margin-right:6px; }
   @media (max-width:768px) {
     .tl-chip { height:40px; padding:0 14px; }
     .tl-actions button { width:40px; height:40px; }
@@ -32,26 +37,26 @@
   }
 
   /* ── 진행 기록 (타임라인) ── */
-  .td-elapsed { font-family:var(--font-mono); font-size:12px; font-weight:700; background:var(--ink); color:var(--bg); padding:3px 7px; white-space:nowrap; }
+  .td-elapsed { font-family:var(--font-mono); font-size:12px; font-weight:600; background:var(--ink); color:var(--bg); padding:3px 7px; white-space:nowrap; }
   html[data-theme="dark"] .td-elapsed { background:#ECEAE4; color:#111111; }
-  .tl-compose { border:2px solid var(--ink); background:var(--surface-2); padding:10px; margin-top:16px; display:flex; flex-direction:column; gap:8px; }
+  .tl-compose { border:1px solid var(--ink); background:var(--surface-2); padding:10px; margin-top:16px; display:flex; flex-direction:column; gap:8px; }
   .tl-types { display:flex; flex-wrap:wrap; gap:6px; }
-  .tl-chip { height:32px; padding:0 11px; border:1.5px solid var(--ink); background:var(--surface); color:var(--text); font-family:inherit; font-size:12px; font-weight:800; cursor:pointer; }
+  .tl-chip { height:32px; padding:0 11px; border:1px solid var(--ink); background:var(--surface); color:var(--text); font-family:inherit; font-size:12px; font-weight:700; cursor:pointer; }
   .tl-chip.on { background:var(--ink); color:var(--bg); }
   html[data-theme="dark"] .tl-chip.on { background:#ECEAE4; color:#111111; }
   .tl-compose textarea { min-height:60px; }
   .tl-compose-foot { display:flex; align-items:center; gap:8px; flex-wrap:wrap; }
-  .tl-when-btn { background:none; border:none; padding:0; font-family:inherit; font-size:12px; font-weight:700; color:var(--text-sub); text-decoration:underline; cursor:pointer; }
+  .tl-when-btn { background:none; border:none; padding:0; font-family:inherit; font-size:12px; font-weight:600; color:var(--text-sub); text-decoration:underline; cursor:pointer; }
   .tl-when { height:32px !important; width:auto !important; font-size:13px !important; }
-  .tl-head { display:flex; justify-content:space-between; align-items:center; margin:18px 0 6px; font-size:14px; font-weight:900; }
+  .tl-head { display:flex; justify-content:space-between; align-items:center; margin:18px 0 6px; font-size:14px; font-weight:700; }
   .tl-list { border-left:3px solid var(--ink); margin-left:6px; }
   .tl-item { position:relative; padding:8px 0 10px 16px; }
   .tl-item::before { content:''; position:absolute; left:-8px; top:13px; width:11px; height:11px; background:var(--surface); border:2.5px solid var(--ink); }
   .tl-item.auto::before { background:var(--ink); }
   .tl-item.t-부품::before, .tl-item.t-조치::before { background:var(--primary); }
   .tl-meta { display:flex; align-items:center; gap:6px; flex-wrap:wrap; font-size:11px; color:var(--text-hint); }
-  .tl-time { font-family:var(--font-mono); font-weight:700; color:var(--text-sub); }
-  .tl-type { font-size:11px; font-weight:800; padding:1px 6px; border:1.5px solid var(--ink); color:var(--text); background:var(--surface); }
+  .tl-time { font-family:var(--font-mono); font-weight:600; color:var(--text-sub); }
+  .tl-type { font-size:11px; font-weight:700; padding:1px 6px; border:1px solid var(--ink); color:var(--text); background:var(--surface); }
   .tl-item.auto .tl-type { background:var(--surface-2); color:var(--text-sub); border-color:var(--border); }
   .tl-text { margin-top:4px; font-size:13px; line-height:1.55; white-space:pre-wrap; word-break:break-word; }
   .tl-item.auto .tl-text { color:var(--text-sub); }
@@ -63,16 +68,16 @@
   /* 부품: P/N · FRU */
   .tl-parts { display:grid; grid-template-columns:repeat(2, minmax(0,1fr)); gap:6px; }
   .tl-parts input { font-family:var(--font-mono); }
-  .tl-pn { display:inline-flex; gap:4px; align-items:center; font-family:var(--font-mono); font-size:12px; font-weight:700; padding:2px 6px; background:var(--signal); color:#111111; border:1.5px solid var(--ink); margin:4px 4px 0 0; user-select:all; }
-  .tl-pn b { font-family:var(--font-body); font-size:10px; font-weight:900; }
+  .tl-pn { display:inline-flex; gap:4px; align-items:center; font-family:var(--font-mono); font-size:12px; font-weight:600; padding:2px 6px; background:var(--signal); color:#111111; border:1px solid var(--ink); margin:4px 4px 0 0; user-select:all; }
+  .tl-pn b { font-family:var(--font-body); font-size:10px; font-weight:700; }
   /* 장비 · 관련 티켓 */
-  .td-asset { font-family:var(--font-mono); font-weight:700; color:var(--primary-text); cursor:pointer; text-decoration:underline; }
-  .td-related { border:2px solid var(--ink); margin-top:14px; }
-  .td-related-head { display:flex; justify-content:space-between; align-items:center; padding:7px 10px; background:var(--ink); color:var(--bg); font-size:12px; font-weight:800; }
+  .td-asset { font-family:var(--font-mono); font-weight:600; color:var(--primary-text); cursor:pointer; text-decoration:underline; }
+  .td-related { border:1px solid var(--ink); margin-top:14px; }
+  .td-related-head { display:flex; justify-content:space-between; align-items:center; padding:7px 10px; background:var(--ink); color:var(--bg); font-size:12px; font-weight:700; }
   html[data-theme="dark"] .td-related-head { background:#0C0C0B; color:#ECEAE4; }
   .td-related-item { display:flex; align-items:center; gap:8px; padding:8px 10px; border-top:1px solid var(--border); font-size:12px; cursor:pointer; background:var(--surface); }
   .td-related-item:hover { background:var(--surface-2); }
-  .td-related-item span:first-of-type { flex:1; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; font-weight:700; }
+  .td-related-item span:first-of-type { flex:1; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; font-weight:600; }
   .tk-host { display:block; font-family:var(--font-mono); font-size:11px; color:var(--text-hint); font-weight:400; }
 </style>
 
@@ -93,8 +98,14 @@
     <select class="form-select" id="filter-customer" style="width:160px;" onchange="renderTickets()">
       <option value="">전체 고객사</option>
     </select>
+    <select class="form-select" id="filter-year" style="width:120px;" onchange="renderTickets()" title="등록일 기준">
+      <option value="">전체 기간</option>
+    </select>
   </div>
-  <button class="btn btn-primary" onclick="openModal()">+ 티켓 등록</button>
+  <div class="flex gap-2">
+    <button class="btn pc-only" onclick="exportTicketsXlsx(this)" title="지금 보이는 목록(고객사·기간 필터 적용)을 진행 기록·부품까지 엑셀로 저장">엑셀 내보내기</button>
+    <button class="btn btn-primary" onclick="openModal()">+ 티켓 등록</button>
+  </div>
 </div>
 
 <div class="ticket-layout">
@@ -188,13 +199,14 @@ function init() {
   tlStop = null; tlTicketId = null; tlLogs = [];   // 페이지 재진입 시 (구독은 loadPage가 해제)
   // 개요에서 '처리중 티켓'을 눌러 들어온 경우
   // 장비 상세에서 '장애 등록'으로 온 경우: 첫 데이터가 오면 장비가 채워진 등록 창 열기
-  let pendingNew = null, pendingOpen = null, pendingCustomer = '';
+  let pendingNew = null, pendingOpen = null, pendingCustomer = '', pendingYear = '';
   if (window.hwPageFilter && window.hwPageFilter.page === 'tickets') {
     const f = window.hwPageFilter;
     document.getElementById('filter-status').value = f.status || '';
     document.getElementById('filter-priority').value = f.priority || '';   // 뒤로 가기로 돌아온 경우 필터·검색 복원
     document.getElementById('ticket-search').value = f.q || '';
     pendingCustomer = f.customer || '';
+    pendingYear = f.year || '';
     pendingNew = f.newFor || null;
     pendingOpen = f.ticketId || null;   // 홈·장비 이력에서 특정 티켓, 또는 보던 티켓
     window.hwPageFilter = null;
@@ -219,6 +231,10 @@ function init() {
     FS.setOptions(document.getElementById('filter-customer'), opts);
     FS.setOptions(document.getElementById('f-customer'), opts);
     if (pendingCustomer) { document.getElementById('filter-customer').value = pendingCustomer; pendingCustomer = ''; }
+    // 기간: 티켓이 있는 연도 (최신 연도 먼저)
+    const years = [...new Set(allTickets.map(tkYear).filter(Boolean))].sort((a, b) => b - a);
+    FS.setOptions(document.getElementById('filter-year'), years.map(y => ({ value: String(y), label: `${y}년` })));
+    if (pendingYear) { document.getElementById('filter-year').value = pendingYear; pendingYear = ''; }
 
     renderStats();
     renderTickets();
@@ -240,7 +256,7 @@ function pageViewState() {
     ? allTickets.find(x => x.id === ticketSelectedId) : null;
   const v = id => document.getElementById(id).value;
   return {
-    filter: { status: v('filter-status'), priority: v('filter-priority'), customer: v('filter-customer'), q: v('ticket-search'), ticketId: t ? t.id : null },
+    filter: { status: v('filter-status'), priority: v('filter-priority'), customer: v('filter-customer'), year: v('filter-year'), q: v('ticket-search'), ticketId: t ? t.id : null },
     key: t ? 'ticket:' + t.id : '',
     label: t ? (t.title || '장애 티켓') : '장애 티켓',
   };
@@ -280,19 +296,27 @@ function setStatusFilter(status) {
   renderTickets();
 }
 
-function renderTickets() {
+function tkYear(t) { return tlDate(t.created_at)?.getFullYear() || null; }
+
+// 지금 필터·검색에 맞는 티켓 (목록·엑셀 내보내기 공용)
+function tkFiltered() {
   const q = document.getElementById('ticket-search').value.toLowerCase();
   const sf = document.getElementById('filter-status').value;
   const pf = document.getElementById('filter-priority').value;
   const cf = document.getElementById('filter-customer').value;
-
-  const data = allTickets.filter(t =>
+  const yf = document.getElementById('filter-year').value;
+  return allTickets.filter(t =>
     (!q || [t.title, ticketCusts[t.customer_id], t.assignee, t.symptom, t.action, tkHost(t.asset_id, t), (t.log_keys || []).join(' ')]
       .some(v => String(v ?? '').toLowerCase().includes(q))) &&
     (!sf || (sf === '처리중' ? t.status !== '완료' : t.status===sf)) &&
     (!pf || t.priority===pf) &&
-    (!cf || t.customer_id===cf)
+    (!cf || t.customer_id===cf) &&
+    (!yf || String(tkYear(t))===yf)
   );
+}
+
+function renderTickets() {
+  const data = tkFiltered();
 
   document.getElementById('ticket-empty').style.display = data.length?'none':'';
   document.getElementById('ticket-tbody').innerHTML = data.map(t=>`
@@ -446,17 +470,17 @@ function tlRenderInfo() {
         <button class="btn btn-ghost btn-sm" onclick="closeTicketDetail()" aria-label="닫기">${FS.icon('close', 16)}</button>
       </div>
     </div>
-    <h3 style="font-size:16px;font-weight:800;margin-bottom:12px;line-height:1.4;">${FS.esc(t.title||'')}</h3>
+    <h3 style="font-size:16px;font-weight:700;margin-bottom:12px;line-height:1.4;">${FS.esc(t.title||'')}</h3>
     <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:12px;font-size:12px;">
       <div><span class="text-hint">고객사</span><br>${FS.esc(ticketCusts[t.customer_id]||'-')}</div>
       <div><span class="text-hint">장비</span><br>${ticketAssets.some(a => a.id === t.asset_id) ? `<span class="td-asset" onclick="tkOpenAsset('${t.asset_id}')">${FS.esc(tkHost(t.asset_id, t))}</span>` : FS.esc(tkHost(t.asset_id, t) || '-')}</div>
       <div><span class="text-hint">담당자</span><br>${FS.esc(t.assignee||'-')}</div>
       <div><span class="text-hint">우선순위</span><br>${t.priority ? `<span class="badge ${PRIORITY_BADGE[t.priority]||'badge-gray'}">${FS.esc(t.priority)}</span>` : '-'}</div>
       <div><span class="text-hint">등록일</span><br>${FS.formatDate(t.created_at)||'-'}</div>
-      ${t.completed_at?`<div><span class="text-hint">완료일</span><br><span style="color:var(--success);font-weight:700;">${FS.formatDate(t.completed_at)||'-'}</span></div>`:''}
+      ${t.completed_at?`<div><span class="text-hint">완료일</span><br><span style="color:var(--success);font-weight:600;">${FS.formatDate(t.completed_at)||'-'}</span></div>`:''}
     </div>
-    ${t.symptom?`<div class="mb-2"><div class="text-hint" style="font-size:11px;font-weight:800;margin-bottom:4px;">증상</div><p style="font-size:13px;white-space:pre-wrap;line-height:1.6;">${FS.esc(t.symptom)}</p></div>`:''}
-    ${t.action?`<div class="mb-2"><div class="text-hint" style="font-size:11px;font-weight:800;margin-bottom:4px;">조치내용 (최종)</div><p style="font-size:13px;white-space:pre-wrap;line-height:1.6;">${FS.esc(t.action)}</p></div>`:''}
+    ${t.symptom?`<div class="mb-2"><div class="text-hint" style="font-size:11px;font-weight:700;margin-bottom:4px;">증상</div><p style="font-size:13px;white-space:pre-wrap;line-height:1.6;">${FS.esc(t.symptom)}</p></div>`:''}
+    ${t.action?`<div class="mb-2"><div class="text-hint" style="font-size:11px;font-weight:700;margin-bottom:4px;">조치내용 (최종)</div><p style="font-size:13px;white-space:pre-wrap;line-height:1.6;">${FS.esc(t.action)}</p></div>`:''}
     <div class="mt-3">
       <label class="form-label">상태 변경</label>
       <div class="flex gap-1" style="flex-wrap:wrap;">
@@ -927,6 +951,77 @@ async function deleteTicket(id) {
   renderStats();
   renderTickets();
   Toast.success('티켓이 삭제되었습니다');
+}
+
+// ── 엑셀 내보내기 (PC): 지금 보이는 목록 → 장애 목록 · 진행 기록 · 요약 시트 ──
+// 고객사가 연말에 '올해 장애 이력'을 요청할 때: 고객사·기간 필터를 고르고 내보내기
+async function exportTicketsXlsx(btn) {
+  const list = tkFiltered().sort((a, b) => (tlDate(a.created_at) || 0) - (tlDate(b.created_at) || 0));   // 오래된 것 먼저
+  if (!list.length) { Toast.error('내보낼 티켓이 없습니다'); return; }
+  btn.disabled = true;
+  try {
+    // 진행 기록은 화면에 구독해 두지 않으므로 내보낼 때 한 번 읽기
+    const logsBy = {};
+    await Promise.all(list.map(async t => {
+      const snap = await tlLogsRef(t.id).get();
+      logsBy[t.id] = snap.docs.map(d => ({ id: d.id, ...d.data() }))
+        .sort((a, b) => (tlDate(a.at) || 0) - (tlDate(b.at) || 0));
+    }));
+    const p = n => String(n).padStart(2, '0');
+    const dt = d => d ? `${d.getFullYear()}.${p(d.getMonth()+1)}.${p(d.getDate())} ${p(d.getHours())}:${p(d.getMinutes())}` : '';
+    const day0 = d => { const x = new Date(d); x.setHours(0, 0, 0, 0); return x; };
+    const doneDate = t => { const v = toDateInputVal(t.completed_at); return v ? new Date(v + 'T00:00:00') : null; };
+    const days = t => {
+      const s = tlDate(t.created_at), e = t.status === '완료' ? doneDate(t) : null;
+      return s && e ? Math.max(0, Math.round((e - day0(s)) / 86400000)) : '';
+    };
+    const texts = (t, type, legacy) => [legacy, ...logsBy[t.id].filter(l => l.type === type).map(l => l.text)]
+      .map(v => String(v || '').trim()).filter(Boolean).join(' / ');
+    const partsOf = t => ticketParts.filter(x => x.ticket_id === t.id)
+      .map(x => `${x.name || ''}${x.qty > 1 ? ' ×' + x.qty : ''}${x.pn ? ' (P/N ' + x.pn + ')' : ''} [${x.status || '요청'}]`).join(' / ');
+
+    const listRows = [['No', '등록일', '완료일', '처리일수', '고객사', '장비', 'S/N', '모델', '제목', '우선순위', '상태', '담당자', '증상', '조치 내용', '교체 부품']];
+    const logRows = [['No', '제목', '장비', '일시', '종류', '내용', 'P/N', 'FRU', '작성자']];
+    list.forEach((t, i) => {
+      const a = ticketAssets.find(x => x.id === t.asset_id);
+      const host = tkHost(t.asset_id, t);
+      listRows.push([i + 1, FS.formatDate(t.created_at), t.completed_at ? FS.formatDate(t.completed_at) : '', days(t),
+        ticketCusts[t.customer_id] || '', host, a?.serial || t.asset_serial || '', a?.model || t.asset_model || '',
+        t.title || '', t.priority || '', t.status || '접수', t.assignee || '',
+        texts(t, '증상', t.symptom), texts(t, '조치', t.action), partsOf(t)]);
+      logRows.push([i + 1, t.title || '', host, dt(tlDate(t.created_at)), '등록', '티켓 등록', '', '', t.created_by_name || '']);
+      logsBy[t.id].forEach(l => logRows.push([i + 1, t.title || '', host, dt(tlDate(l.at)), l.type || '', l.text || '', l.pn || '', l.fru || '', l.by_name || '']));
+    });
+
+    // 요약: 건수 · 월별 · 우선순위별 · 장비별
+    const cf = document.getElementById('filter-customer').value;
+    const yf = document.getElementById('filter-year').value;
+    const count = keyFn => list.reduce((m, t) => { const k = keyFn(t); m[k] = (m[k] || 0) + 1; return m; }, {});
+    const done = list.filter(t => t.status === '완료');
+    const doneDays = done.map(days).filter(v => v !== '');
+    const byMonth = count(t => { const d = tlDate(t.created_at); return d ? `${d.getFullYear()}-${p(d.getMonth()+1)}` : '-'; });
+    const months = yf ? Array.from({ length: 12 }, (_, m) => `${yf}-${p(m + 1)}`) : Object.keys(byMonth).sort();
+    const byPri = count(t => t.priority || '보통');
+    const byAsset = Object.entries(count(t => tkHost(t.asset_id, t) || '(장비 미지정)')).sort((a, b) => b[1] - a[1]);
+    const sumRows = [
+      ['장애 이력 요약'], [],
+      ['고객사', cf ? (ticketCusts[cf] || '') : '전체'],
+      ['기간', yf ? `${yf}년 (등록일 기준)` : `${FS.formatDate(list[0].created_at)} ~ ${FS.formatDate(list[list.length - 1].created_at)}`],
+      ['총 장애', list.length], ['완료', done.length], ['처리중', list.length - done.length],
+      ['평균 처리일 (완료 건)', doneDays.length ? Math.round(doneDays.reduce((s, v) => s + v, 0) / doneDays.length * 10) / 10 : ''],
+      [], ['월별 발생', '건수'], ...months.map(m => [m.replace('-', '.'), byMonth[m] || 0]),
+      [], ['우선순위', '건수'], ...['긴급', '높음', '보통', '낮음'].filter(k => byPri[k]).map(k => [k, byPri[k]]),
+      [], ['장비', '건수'], ...byAsset,
+      [], ['내보낸 날짜', FS.formatDate(FS.localDate())],
+    ];
+
+    const name = [ '장애이력', cf && ticketCusts[cf], yf && yf + '년', FS.localDate() ].filter(Boolean).join('_').replace(/[\\/:*?"<>|]/g, '');
+    await FS.exportXlsx(name, [{ name: '장애 목록', rows: listRows }, { name: '진행 기록', rows: logRows }, { name: '요약', rows: sumRows, filter: false }]);
+  } catch (e) {
+    Toast.error('내보내기 실패: ' + (e.code || e.message));
+  } finally {
+    btn.disabled = false;
+  }
 }
 
 init();

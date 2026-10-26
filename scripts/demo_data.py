@@ -140,14 +140,21 @@ def seed_inventory():
             'install_date': d(inst), 'memo': '', 'warranty_periods': wp,
             'warranty_expire': max(p['end'] for p in wp), 'warranty_start': wp[0]['start'],
         }, inst), cust[ck])
-    for (pk, host, model, sn, ip, loc, os_, cpu, mem, gpu, disk, bios, bmc, raid, status) in ASSETS:
+    # BMC IP: 관리망 대역 (서비스 IP 세 번째 자리 + 100)
+    def bmc_ip_of(ip):
+        if not ip:
+            return ''
+        a, b, c, e = ip.split('.')
+        return f'{a}.{b}.{int(c) + 100}.{e}'
+
+    for (pk, host, model, sn, ip, loc, os_, cpu, mem, gpu, disk, bios, bmc, raid, _status) in ASSETS:
         pid, cid = proj[pk]
         inst = next(p[6] for p in PROJECTS if p[0] == pk)
         asset[host] = put('assets', {
-            'customer_id': cid, 'project_id': pid, 'hostname': host, 'model': model, 'serial': sn, 'ip_address': ip,
+            'customer_id': cid, 'project_id': pid, 'hostname': host, 'model': model, 'serial': sn, 'ip_address': ip, 'bmc_ip': bmc_ip_of(ip),
             'location': loc, 'os': os_, 'cpu': cpu, 'memory': mem, 'gpu': gpu, 'disk': disk,
             'bios_version': bios, 'bmc_version': bmc, 'raid_version': raid, 'driver_version': '',
-            'device_type': next(p[4] for p in PROJECTS if p[0] == pk), 'status': status,
+            'device_type': next(p[4] for p in PROJECTS if p[0] == pk),
             'install_date': d(inst), 'vendor_case_no': '', 'memo': '',
         }, inst)
     return cust, proj, asset

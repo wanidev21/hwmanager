@@ -26,7 +26,7 @@
 /* 워런티 기간 편집 */
 .wp-row { display:grid; grid-template-columns:96px minmax(0,1fr) minmax(0,1fr) 36px; gap:6px; align-items:center; margin-bottom:6px; }
 .wp-row .wp-memo { grid-column:2 / 4; }
-.wp-del { width:36px; height:36px; border:1.5px solid var(--ink); background:var(--surface); color:var(--text-sub); display:flex; align-items:center; justify-content:center; cursor:pointer; }
+.wp-del { width:36px; height:36px; border:1px solid var(--ink); background:var(--surface); color:var(--text-sub); display:flex; align-items:center; justify-content:center; cursor:pointer; }
 @media (max-width:768px) { .wp-row { grid-template-columns:84px minmax(0,1fr) 36px; } .wp-row .wp-end { grid-column:2 / 3; } .wp-row .wp-memo { grid-column:2 / 3; } }
 .wp-sub { font-size:11px; color:var(--text-hint); font-weight:600; }
 .cust-item {
@@ -63,7 +63,7 @@ html[data-theme="dark"] .cust-item.active .cust-item-name, html[data-theme="dark
   .av-tl.link:hover { background:var(--surface-2); }
   .av-tl.future .av-tl-date { color:var(--primary-text); }
   .av-tl-date { font-family:var(--font-mono); font-size:11px; color:var(--text-hint); white-space:nowrap; }
-  .av-tl-kind { display:inline-flex; align-items:center; gap:3px; font-size:11px; font-weight:800; color:var(--text-sub); white-space:nowrap; }
+  .av-tl-kind { display:inline-flex; align-items:center; gap:3px; font-size:11px; font-weight:700; color:var(--text-sub); white-space:nowrap; }
   .av-tl-main { flex:1; min-width:0; display:flex; flex-direction:column; gap:2px; }
   .av-tl-title { overflow:hidden; text-overflow:ellipsis; white-space:nowrap; font-weight:600; }
   .av-tl-sub { font-size:11px; color:var(--text-hint); overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
@@ -152,8 +152,8 @@ html[data-theme="dark"] .cust-item.active .cust-item-name, html[data-theme="dark
           <table class="table table-clickable">
             <thead>
               <tr>
-                <th>Hostname</th><th>S/N</th><th>IP</th><th>OS</th>
-                <th>상태</th><th>BIOS</th><th>BMC</th><th>RAID</th>
+                <th>Hostname</th><th>S/N</th><th>IP</th><th>BMC IP</th>
+                <th>OS</th><th>BIOS</th><th>BMC</th><th>RAID</th>
                 <th style="width:90px;"></th>
               </tr>
             </thead>
@@ -288,16 +288,12 @@ html[data-theme="dark"] .cust-item.active .cust-item-name, html[data-theme="dark
         <div class="form-group"><label class="form-label">S/N</label><input type="text" class="form-input" id="f-asset-serial" placeholder="시리얼번호"></div>
       </div>
       <div class="form-row">
-        <div class="form-group"><label class="form-label">위치</label><input type="text" class="form-input" id="f-asset-location" placeholder="서버실 Rack-A01"></div>
-        <div class="form-group"><label class="form-label">IP 주소</label><input type="text" class="form-input" id="f-asset-ip" placeholder="192.168.1.10"></div>
+        <div class="form-group"><label class="form-label">IP 주소</label><input type="text" class="form-input" id="f-asset-ip" placeholder="192.168.1.10" inputmode="decimal"></div>
+        <div class="form-group"><label class="form-label">BMC IP</label><input type="text" class="form-input" id="f-asset-bmc-ip" placeholder="10.0.0.10 (iDRAC·iLO·XCC)" inputmode="decimal"></div>
       </div>
       <div class="form-row">
+        <div class="form-group"><label class="form-label">위치</label><input type="text" class="form-input" id="f-asset-location" placeholder="서버실 Rack-A01"></div>
         <div class="form-group"><label class="form-label">OS</label><input type="text" class="form-input" id="f-asset-os" placeholder="Ubuntu 22.04"></div>
-        <div class="form-group"><label class="form-label">상태</label>
-          <select class="form-select" id="f-asset-status">
-            <option>운영중</option><option>장애</option><option>점검중</option><option>폐기</option>
-          </select>
-        </div>
       </div>
       <div class="form-row">
         <div class="form-group"><label class="form-label">CPU</label><input type="text" class="form-input" id="f-asset-cpu" placeholder="Intel Xeon Gold 6338"></div>
@@ -435,7 +431,7 @@ function renderCustomers() {
   );
   // 현장 조회용: Hostname · S/N · IP · 모델 · 위치로 장비 바로 찾기
   const hits = q ? allAssets.filter(a =>
-    has(a.hostname) || has(a.serial) || has(a.ip_address) || has(a.model) || has(a.location)
+    has(a.hostname) || has(a.serial) || has(a.ip_address) || has(a.bmc_ip) || has(a.model) || has(a.location)
   ).slice(0, 30) : [];
   const custName = id => (allCustomers.find(c => c.id === id) || {}).name || '-';
   const projName = id => (allProjects.find(p => p.id === id) || {}).name || '-';
@@ -558,13 +554,12 @@ function renderAssets() {
   const assets = allAssets.filter(a => a.project_id === selectedProjectId);
   document.getElementById('asset-empty').style.display = assets.length ? 'none' : '';
   document.getElementById('asset-tbody').innerHTML = assets.map(a => {
-    const sc = a.status === '운영중' ? 'badge-success' : a.status === '장애' ? 'badge-danger' : 'badge-warning';
     return `<tr onclick="viewAsset('${a.id}')">
-      <td class="mono-cell" style="font-weight:700;">${escHtml(a.hostname || '-')}</td>
+      <td class="mono-cell" style="font-weight:600;">${escHtml(a.hostname || '-')}</td>
       <td class="mono-cell">${escHtml(a.serial || '-')}</td>
       <td class="mono-cell">${escHtml(a.ip_address || '-')}</td>
+      <td class="mono-cell">${escHtml(a.bmc_ip || '-')}</td>
       <td>${escHtml(a.os || '-')}</td>
-      <td><span class="badge ${sc}">${FS.esc(a.status || '-')}</span></td>
       <td class="mono-cell">${escHtml(a.bios_version || '-')}</td>
       <td class="mono-cell">${escHtml(a.bmc_version || '-')}</td>
       <td class="mono-cell">${escHtml(a.raid_version || '-')}</td>
@@ -588,9 +583,9 @@ function viewAsset(id) {
   document.getElementById('av-title').textContent = a.hostname || '장비 정보';
   const fields = [
     ['고객사', c?.name], ['프로젝트', p?.name],
-    ['상태', a.status], ['장비유형', a.device_type],
-    ['모델명', a.model], ['S/N', a.serial],
-    ['IP', a.ip_address], ['위치', a.location],
+    ['장비유형', a.device_type], ['모델명', a.model],
+    ['S/N', a.serial], ['위치', a.location],
+    ['IP', a.ip_address], ['BMC IP', a.bmc_ip],
     ['OS', a.os], ['CPU', a.cpu],
     ['메모리', a.memory], ['GPU', a.gpu],
     ['디스크', a.disk], ['BIOS', a.bios_version],
@@ -944,7 +939,7 @@ function openAssetModal(id) {
     document.getElementById('f-asset-location').value    = a.location       || '';
     document.getElementById('f-asset-ip').value          = a.ip_address     || '';
     document.getElementById('f-asset-os').value          = a.os             || '';
-    document.getElementById('f-asset-status').value      = a.status         || '운영중';
+    document.getElementById('f-asset-bmc-ip').value      = a.bmc_ip         || '';
     document.getElementById('f-asset-cpu').value         = a.cpu            || '';
     document.getElementById('f-asset-memory').value      = a.memory         || '';
     document.getElementById('f-asset-gpu').value         = a.gpu            || '';
@@ -958,11 +953,10 @@ function openAssetModal(id) {
     document.getElementById('f-asset-memo').value        = a.memo           || '';
   } else {
     ['f-asset-hostname','f-asset-device-type','f-asset-model','f-asset-serial',
-     'f-asset-location','f-asset-ip','f-asset-os','f-asset-cpu','f-asset-memory',
+     'f-asset-location','f-asset-ip','f-asset-bmc-ip','f-asset-os','f-asset-cpu','f-asset-memory',
      'f-asset-gpu','f-asset-disk','f-asset-bmc','f-asset-bios','f-asset-driver','f-asset-raid',
      'f-asset-install-date','f-asset-vendor-case','f-asset-memo']
       .forEach(i => document.getElementById(i).value = '');
-    document.getElementById('f-asset-status').value = '운영중';
   }
   document.getElementById('asset-modal').style.display = 'flex';
 }
@@ -981,7 +975,7 @@ async function saveAsset() {
     location:       document.getElementById('f-asset-location').value.trim(),
     ip_address:     document.getElementById('f-asset-ip').value.trim(),
     os:             document.getElementById('f-asset-os').value.trim(),
-    status:         document.getElementById('f-asset-status').value,
+    bmc_ip:         document.getElementById('f-asset-bmc-ip').value.trim(),
     cpu:            document.getElementById('f-asset-cpu').value.trim(),
     memory:         document.getElementById('f-asset-memory').value.trim(),
     gpu:            document.getElementById('f-asset-gpu').value.trim(),
@@ -1036,11 +1030,11 @@ function exportAssetsXlsx() {
     (cust(a.customer_id).name || '').localeCompare(cust(b.customer_id).name || '') ||
     (proj(a.project_id).name || '').localeCompare(proj(b.project_id).name || '') ||
     (a.hostname || '').localeCompare(b.hostname || '', 'ko', { numeric: true }));
-  const assetRows = [['고객사', '프로젝트', 'Hostname', '장비유형', '모델명', 'S/N', 'IP', '위치', 'OS', '상태',
+  const assetRows = [['고객사', '프로젝트', 'Hostname', '장비유형', '모델명', 'S/N', 'IP', 'BMC IP', '위치', 'OS',
                       'CPU', '메모리', 'GPU', '디스크', 'BIOS', 'BMC', 'RAID', '드라이버', '설치일', '워런티 만료', '벤더케이스', '메모'],
     ...assets.map(a => {
       const p = proj(a.project_id);
-      return [cust(a.customer_id).name || '', p.name || '', a.hostname, a.device_type, a.model, a.serial, a.ip_address, a.location, a.os, a.status,
+      return [cust(a.customer_id).name || '', p.name || '', a.hostname, a.device_type, a.model, a.serial, a.ip_address, a.bmc_ip, a.location, a.os,
               a.cpu, a.memory, a.gpu, a.disk, a.bios_version, a.bmc_version, a.raid_version, a.driver_version,
               ymd(a.install_date), ymd(p.warranty_expire), a.vendor_case_no, a.memo].map(v => v ?? '');
     })];
@@ -1052,12 +1046,12 @@ function exportAssetsXlsx() {
 
 // ── CSV 일괄 가져오기 ─────────────────────────────────────────────────────────
 const CSV_FIELDS = [
-  'hostname','device_type','model','serial','location','ip_address','os','status',
+  'hostname','device_type','model','serial','location','ip_address','bmc_ip','os',
   'cpu','memory','gpu','disk','bmc_version','bios_version','raid_version','driver_version',
   'install_date','vendor_case_no','memo'
 ];
 const CSV_LABELS = [
-  'Hostname(필수)','장비유형','모델명','S/N','위치','IP주소','OS','상태(운영중/장애/점검중/폐기)',
+  'Hostname(필수)','장비유형','모델명','S/N','위치','IP주소','BMC IP','OS',
   'CPU','메모리','GPU','디스크','BMC버전','BIOS버전','RAID펌웨어','드라이버버전',
   '설치일(YYYY-MM-DD)','벤더케이스번호','메모'
 ];
@@ -1065,7 +1059,7 @@ const CSV_LABELS = [
 function downloadCsvTemplate() {
   const sample = [
     'server-01','GPU서버','DGX H100','SN123456','Rack-A01','192.168.1.10',
-    'Ubuntu 22.04','운영중','Intel Xeon Gold 6338','512GB DDR4','NVIDIA H100 x8',
+    '10.0.0.10','Ubuntu 22.04','Intel Xeon Gold 6338','512GB DDR4','NVIDIA H100 x8',
     'NVMe 3.84TB x4','3.00.00','1.12.3','52.26.0-5179','550.107.02','2024-01-15','','샘플 장비'
   ];
   const rows = [
@@ -1132,7 +1126,6 @@ async function importAssetCsv(input) {
     const obj = { customer_id: selectedCustomerId, project_id: selectedProjectId };
     colMap.forEach((field, ci) => { if (field) obj[field] = (row[ci] || '').trim(); });
     if (!obj.hostname) { errors.push(`행 ${i + 1}: hostname 없음`); continue; }
-    if (!obj.status) obj.status = '운영중';
     validRows.push(obj);
   }
 

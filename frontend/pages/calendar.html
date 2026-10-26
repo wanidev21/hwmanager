@@ -13,16 +13,16 @@ html[data-theme="dark"] { --ev-red-bg:#3A1A10; --ev-red-text:#FF8A5C; --ev-purpl
 
 /* ── 툴바 ── */
 .cal-toolbar { display:flex; align-items:center; gap:8px; margin-bottom:12px; flex-wrap:wrap; }
-.cal-month-label { font-family:var(--font-heading); font-size:18px; font-weight:800; color:var(--text); min-width:140px; text-align:center; }
+.cal-month-label { font-family:var(--font-heading); font-size:18px; font-weight:700; color:var(--text); min-width:140px; text-align:center; }
 .cal-nav {
-  width:32px; height:32px; border-radius:0; border:2px solid var(--ink);
-  background:var(--surface); color:var(--text); font-size:16px; font-weight:800; cursor:pointer;
+  width:32px; height:32px; border-radius:0; border:1px solid var(--ink);
+  background:var(--surface); color:var(--text); font-size:16px; font-weight:700; cursor:pointer;
   display:flex; align-items:center; justify-content:center; transition:background 0.1s;
 }
 .cal-nav:hover { background:var(--bg); }
 .cal-today-btn {
-  height:32px; padding:0 12px; border-radius:0; border:2px solid var(--ink);
-  background:var(--surface); color:var(--text); font-size:12px; font-weight:800;
+  height:32px; padding:0 12px; border-radius:0; border:1px solid var(--ink);
+  background:var(--surface); color:var(--text); font-size:12px; font-weight:700;
   cursor:pointer; font-family:inherit; transition:background 0.1s;
 }
 .cal-today-btn:hover { background:var(--bg); }
@@ -31,20 +31,20 @@ html[data-theme="dark"] { --ev-red-bg:#3A1A10; --ev-red-text:#FF8A5C; --ev-purpl
 /* ── 요일 헤더 ── */
 .cal-week-header {
   display:grid; grid-template-columns:repeat(7,1fr);
-  border:2px solid var(--ink); border-bottom:none; border-radius:0; overflow:hidden;
+  border:1px solid var(--ink); border-bottom:none; border-radius:0; overflow:hidden;
 }
-/* 요일 머리줄: 검정 띠 (테마 무관) → 주말 색은 검정 위에서 읽히는 밝은 값 */
+/* 요일 머리줄: 표 머리줄과 같은 옅은 바탕 + 잉크 선 */
 .cal-week-header div {
-  padding:8px 0; text-align:center; font-size:11px; font-weight:800;
-  color:#ECEAE4; background:#111111; letter-spacing:0.04em;
+  padding:8px 0; text-align:center; font-size:11px; font-weight:600;
+  color:var(--text-sub); background:var(--surface-2); letter-spacing:0.04em; border-bottom:1px solid var(--ink);
 }
-.cal-week-header div:first-child { color:#FF8A5C; }
-.cal-week-header div:last-child  { color:#9DB5FF; }
+.cal-week-header div:first-child { color:var(--primary-text); }
+.cal-week-header div:last-child  { color:var(--info); }
 
 /* ── 그리드 ── */
 .cal-grid {
   display:grid; grid-template-columns:repeat(7,1fr);
-  flex:1; border:2px solid var(--ink); border-top:none;
+  flex:1; border:1px solid var(--ink); border-top:none;
   border-radius:0; overflow:hidden;
 }
 .cal-cell {
@@ -65,7 +65,7 @@ html[data-theme="dark"] { --ev-red-bg:#3A1A10; --ev-red-text:#FF8A5C; --ev-purpl
   width:24px; height:24px; display:flex; align-items:center; justify-content:center;
   border-radius:0; margin-bottom:2px; flex-shrink:0;
 }
-.cal-date-num.is-today { background:var(--primary); color:#111111; font-weight:800; border-radius:0; }
+.cal-date-num.is-today { background:var(--primary); color:#111111; font-weight:700; border-radius:0; }
 .cal-date-num.is-sun   { color:var(--danger); }
 .cal-date-num.is-sat   { color:var(--info); }
 
@@ -78,10 +78,10 @@ html[data-theme="dark"] { --ev-red-bg:#3A1A10; --ev-red-text:#FF8A5C; --ev-purpl
   font-size:10px; color:var(--text-hint); padding:1px 4px; cursor:pointer; font-weight:500;
 }
 .cal-more:hover { color:var(--primary-text); }
-.cal-event-pill.is-job { border-left:3px solid #111111; font-weight:700; }
+.cal-event-pill.is-job { border-left:3px solid #111111; font-weight:600; }
 .cal-event-pill.is-done { opacity:.55; text-decoration:line-through; }
-.cal-legend { display:flex; gap:12px; font-size:11px; font-weight:700; color:var(--text-sub); }
-.cal-legend i { display:inline-block; width:10px; height:10px; margin-right:4px; vertical-align:-1px; border:1.5px solid var(--ink); }
+.cal-legend { display:flex; gap:12px; font-size:11px; font-weight:600; color:var(--text-sub); }
+.cal-legend i { display:inline-block; width:10px; height:10px; margin-right:4px; vertical-align:-1px; border:1px solid var(--ink); }
 .cal-loading { grid-column:span 7; display:flex; align-items:center; justify-content:center; padding:40px; color:var(--text-hint); font-size:13px; }
 
 /* ── 날짜별 일정 목록 모달 ── */
@@ -99,7 +99,7 @@ html[data-theme="dark"] { --ev-red-bg:#3A1A10; --ev-red-text:#FF8A5C; --ev-purpl
 /* ── 모달 ── */
 .ev-color-picker { display:flex; gap:10px; align-items:center; margin-top:4px; flex-wrap:wrap; }
 .ev-color-dot {
-  width:32px; height:32px; border-radius:0; border:2px solid var(--ink);
+  width:32px; height:32px; border-radius:0; border:1px solid var(--ink);
   cursor:pointer; flex-shrink:0; transition:outline-color 0.1s;
   outline:3px solid transparent; outline-offset:2px;
 }

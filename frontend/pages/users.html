@@ -3,13 +3,13 @@
   .acc-row { display:flex; align-items:center; gap:8px; padding:9px 14px; border-top:1px solid var(--border); font-family:var(--font-mono); font-size:13px; }
   .acc-row:first-child { border-top:none; }
   .acc-row span { flex:1; min-width:0; overflow:hidden; text-overflow:ellipsis; }
-  .acc-add { display:flex; gap:8px; padding:12px 14px; border-top:2px solid var(--ink); background:var(--surface-2); flex-wrap:wrap; }
+  .acc-add { display:flex; gap:8px; padding:12px 14px; border-top:1px solid var(--ink); background:var(--surface-2); flex-wrap:wrap; }
   .acc-add input { flex:1 1 220px; min-width:0; }
 </style>
 
 <!-- 로그인 허용 계정 (Firestore config/access) -->
 <div class="card mb-3" style="padding:0;overflow:hidden;">
-  <div style="padding:10px 14px;background:#111;color:#ECEAE4;font-weight:800;font-size:13px;">로그인 허용 계정</div>
+  <div style="padding:10px 14px;background:#111;color:#ECEAE4;font-weight:700;font-size:13px;">로그인 허용 계정</div>
   <div id="acc-list"></div>
   <div class="acc-add">
     <input type="email" class="form-input" id="acc-email" placeholder="someone@gmail.com" autocomplete="off"

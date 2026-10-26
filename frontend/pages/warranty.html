@@ -3,19 +3,19 @@
 .stat-cards { display:grid; grid-template-columns:repeat(4,1fr); gap:12px; margin-bottom:16px; }
 @media (max-width:860px) { .stat-cards { grid-template-columns:repeat(2,1fr); } }
 .stat-card {
-  background:var(--surface); border:2px solid var(--ink); border-radius:0;
+  background:var(--surface); border:1px solid var(--ink); border-radius:0;
   padding:12px 14px; border-left:10px solid transparent;
   cursor:pointer; transition:transform 0.1s, box-shadow 0.1s;
 }
 .stat-card:hover { background:var(--surface-2); }
 .stat-card.active { box-shadow:4px 4px 0 var(--ink); transform:translate(-2px,-2px); background:var(--surface-2); }
 .stat-card-val { font-family:var(--font-display); font-size:30px; color:var(--text); line-height:1.1; margin-bottom:4px; }
-.stat-card-label { font-size:12px; color:var(--text-sub); font-weight:800; }
+.stat-card-label { font-size:12px; color:var(--text-sub); font-weight:700; }
 
 .warranty-banner {
-  background:var(--primary); border:2px solid var(--ink); border-radius:0;
+  background:var(--primary); border:1px solid var(--ink); border-radius:0;
   padding:10px 14px; margin-bottom:14px;
-  font-size:13px; color:#111111; font-weight:800;
+  font-size:13px; color:#111111; font-weight:700;
 }
 
 .proj-asset-panel { margin-top:16px; }
@@ -26,15 +26,15 @@
 }
 .asset-row:last-child { border-bottom:none; }
 .asset-row-field { display:flex; flex-direction:column; gap:2px; min-width:70px; }
-.arf-label { font-size:10px; font-weight:800; color:var(--text-hint); text-transform:uppercase; letter-spacing:.04em; }
+.arf-label { font-size:10px; font-weight:700; color:var(--text-hint); text-transform:uppercase; letter-spacing:.04em; }
 .arf-val { font-size:12px; color:var(--text); }
 .w-hist { font-size:11px; color:var(--text-hint); font-weight:600; white-space:nowrap; }
-.wp-timeline { display:flex; flex-wrap:wrap; gap:0; padding:12px 14px; border-bottom:2px solid var(--ink); background:var(--surface-2); }
-.wp-seg { display:flex; flex-direction:column; gap:3px; padding:8px 12px; border:2px solid var(--ink); background:var(--surface); margin:0 -2px -2px 0; min-width:150px; }
+.wp-timeline { display:flex; flex-wrap:wrap; gap:0; padding:12px 14px; border-bottom:1px solid var(--ink); background:var(--surface-2); }
+.wp-seg { display:flex; flex-direction:column; gap:3px; padding:8px 12px; border:1px solid var(--ink); background:var(--surface); margin:0 -2px -2px 0; min-width:150px; }
 .wp-seg.cur { background:var(--signal); color:#111111; }
 .wp-seg.cur .wp-seg-type { background:#111111; color:var(--signal); }
-.wp-seg-type { align-self:flex-start; font-size:10px; font-weight:900; padding:1px 6px; background:var(--ink); color:var(--bg); }
-.wp-seg-range { font-family:var(--font-mono); font-size:12px; font-weight:700; }
+.wp-seg-type { align-self:flex-start; font-size:10px; font-weight:700; padding:1px 6px; background:var(--ink); color:var(--bg); }
+.wp-seg-range { font-family:var(--font-mono); font-size:12px; font-weight:600; }
 .wp-seg-memo { font-size:11px; opacity:0.8; }
 .wp-seg.gap { border-style:dashed; background:var(--surface-2); color:var(--text-sub); }
 .wp-seg.gap .wp-seg-type { background:var(--surface); color:var(--text-sub); border:1.5px dashed var(--ink); }
@@ -307,13 +307,12 @@ function showProjectAssets(projectId, scroll = true) {
       ${w.memo ? `<span class="wp-seg-memo">${FS.esc(w.memo)}</span>` : ''}
     </div>`; }).join('')}</div>` : '';
 
-  const statusCls = s => s === '운영중' ? 'badge-success' : s === '장애' ? 'badge-danger' : 'badge-warning';
-
   document.getElementById('proj-asset-list').innerHTML = assets.map(a => {
     const fields = [
       ['Hostname',  a.hostname],
       ['S/N',       a.serial],
       ['IP',        a.ip_address],
+      ['BMC IP',    a.bmc_ip],
       ['OS',        a.os],
       ['CPU',       a.cpu],
       ['메모리',    a.memory],
@@ -325,9 +324,6 @@ function showProjectAssets(projectId, scroll = true) {
       ['드라이버',  a.driver_version],
     ].filter(([, v]) => v);
     return `<div class="asset-row">
-      <div style="min-width:70px;padding-top:2px;">
-        <span class="badge ${statusCls(a.status || '')}">${FS.esc(a.status || '-')}</span>
-      </div>
       ${fields.map(([l, v]) => `<div class="asset-row-field">
         <span class="arf-label">${l}</span>
         <span class="arf-val">${escHtml(v)}</span>
